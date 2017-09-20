@@ -59,7 +59,8 @@ our code should be cleaned up
 
 ### Example contents for master_schedule.par
 
-```# Timezone offset in hours to apply to get to TAI
+```
+# Timezone offset in hours to apply to get to TAI
 # (i.e. Greenwich time)
 to_tai 7  # Mountain Standard Time
 
