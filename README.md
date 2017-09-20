@@ -1,8 +1,8 @@
-= Observing Simulation Code for SDSS-V =
+# Observing Simulation Code for SDSS-V
 
 This product is for observing simulation code for SDSS-V.
 
-== Master Schedule ==
+## Master Schedule
 
 The `master` module allows the interpretation of the master schedule and
 the calculation of basic astronomical parameters for each night within
@@ -24,14 +24,16 @@ and an example is given below.
 
 An example of how to use the master schedule module is as follows:
 
-```import observesim.master as master
+```
+import observesim.master as master
 
 schedule = master.Master()
 template = "mjd={mjd}, illumination={illumination}"
 for mjd in schedule.mjds:
     night = master.Night(mjd=mjd)
     illumination = night.moon.illumination(mjd=mjd)
-    print(template.format(mjd=mjd, illumination=illumination))```
+    print(template.format(mjd=mjd, illumination=illumination))
+```
 
 The `Night` class also has attributes which are the floating point
 MJDs of evening and morning twilight.  Thus, a simulation can use this
@@ -53,7 +55,7 @@ accurate routines found in astropy. There are a couple of problems in
 it with the Sun position calculation for large vectors. This part of
 our code should be cleaned up
 
-=== Example contents for master_schedule.par ===
+### Example contents for master_schedule.par
 
 ```# Timezone offset in hours to apply to get to TAI
 # (i.e. Greenwich time)
