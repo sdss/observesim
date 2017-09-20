@@ -83,6 +83,17 @@ typedef struct {
 SCHEDULE 2020-07-01 12:00 START_SURVEY
 SCHEDULE 2020-07-10 12:00 START_SHUTDOWN
 SCHEDULE 2020-08-20 12:00 END_SHUTDOWN
-SCHEDULE 2021-07-01 12:00 END_SURVEY```
+SCHEDULE 2021-07-01 12:00 END_SURVEY
+```
 
+### Example contents for observatories.par
 
+```
+typedef struct {
+  char observatory[100];
+  double longitude;
+  double latitude;
+} OBSERVATORY;
+
+OBSERVATORY APO -105.82027778 32.7797556
+```
