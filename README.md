@@ -1,6 +1,8 @@
 # Observing Simulation Code for SDSS-V
 
-This product is for observing simulation code for SDSS-V.
+This product is for observing simulation code for SDSS-V. This
+location on GitHub is temporary before being transferred to the main
+SDSS repositories.
 
 ## Master Schedule
 
