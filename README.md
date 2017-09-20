@@ -59,7 +59,7 @@ our code should be cleaned up
 
 ```# Timezone offset in hours to apply to get to TAI
 # (i.e. Greenwich time)
-to_tai 6  # Mountain Standard Time
+to_tai 7  # Mountain Standard Time
 
 # Whether events start ("on") or stop ("off") observing
 START_SURVEY on
