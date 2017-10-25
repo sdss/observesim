@@ -1,7 +1,7 @@
 from __future__ import print_function, division
 import numpy as np
 from PyAstronomy.pyasl import moonpos
-from sunpos2 import sunpos2
+from observesim.sunpos2 import sunpos2
 
 
 def moonphase2(jd):

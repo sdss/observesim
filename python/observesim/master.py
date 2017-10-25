@@ -41,11 +41,29 @@ import astropy.time as time
 import astropy.units as units
 import pydl.pydlutils.yanny as yanny
 import PyAstronomy.pyasl as pyasl
-from moonphase import moonphase2
-from sunpos2 import sunpos2
+from observesim.moonphase import moonphase2
+from observesim.sunpos2 import sunpos2
 
 
-class Observer(object):
+class MasterBase(object):
+    """Master base class with generic internal utilities."""
+    def __init__(self):
+        return
+
+    def _arrayify(self, quantity=None):
+        """Cast quantity as ndarray of numpy.float64"""
+        try:
+            length = len(quantity)
+        except TypeError:
+            length = 1
+        return np.zeros(length, dtype=np.float64) + quantity
+
+    def _mjd2jd(self, mjd=None):
+        """Convert MJD to JD"""
+        return (self._arrayify(mjd) + np.float64(2400000.5))
+
+
+class Observer(MasterBase):
     """Observer class to define different observatories.
 
     Parameters:
@@ -70,6 +88,11 @@ class Observer(object):
 
     longitude : numpy.float64
         Longitude (E of Greenwich) of observatory
+
+    Methods:
+    -------
+
+    lst(mjd) : return LST in degrees for observer at given MJD (days)
 """
     def __init__(self, observatory='APO', observatoryfile=None):
         """Create Observer object"""
@@ -86,8 +109,16 @@ class Observer(object):
         self.latitude = self._data['OBSERVATORY']['latitude'][indx]
         self.longitude = self._data['OBSERVATORY']['longitude'][indx]
 
+    def lst(self, mjd=None):
+        """Return LST (degrees) given MJD for observer"""
+        mjds = self._arrayify(mjd)
+        lst = (np.float64(15.) *
+               pyasl.ct2lst(self._mjd2jd(mjds),
+                            np.zeros(len(mjds)) + self.longitude))
+        return (lst)
 
-class Orb(object):
+
+class Orb(MasterBase):
     """Orb class to handle spherical astronomy of objects in sky
 
     Parameters:
@@ -99,7 +130,6 @@ class Orb(object):
     -------
 
     radec(mjd) : return (ra, dec) in deg J2000for Orb at MJD (days)
-    lst(mjd) : return LST in degrees for observer at given MJD (days)
     hadec(mjd) : return (ha, dec) in deg of Orb for observer at MJD (days)
     altaz(mjd) : return (alt, az) in deg of Orb for observer at MJD (days)
 """
@@ -109,33 +139,14 @@ class Orb(object):
         if(self.observer is None):
             self.observer = Observer('APO')
 
-    def _arrayify(self, quantity=None):
-        """Cast quantity as ndarray of numpy.float64"""
-        try:
-            length = len(quantity)
-        except TypeError:
-            length = 1
-        return np.zeros(length, dtype=np.float64) + quantity
-
-    def _mjd2jd(self, mjd=None):
-        """Convert MJD to JD"""
-        return (self._arrayify(mjd) + np.float64(2400000.5))
-
     def radec(self, mjd=None):
         """Dummy function to report RA, Dec for generic Orb object"""
         return (np.float64(180.), np.float64(0.))
 
-    def lst(self, mjd=None):
-        """Return LST (degrees) given MJD for observer"""
-        lst = (np.float64(15.) *
-               pyasl.ct2lst(self._mjd2jd(self._arrayify(mjd)),
-                            np.zeros(len(mjd)) + self.observer.longitude))
-        return (lst)
-
     def hadec(self, mjd=None):
         """Return (HA, dec) (degrees) of Orb given MJD for observer"""
         (ra, dec) = self.radec(self._arrayify(mjd))
-        lst = self.lst(mjd)
+        lst = self.observer.lst(mjd)
         ha = ((lst - ra + 360. + 180.) % 360.) - 180.
         return (ha, dec)
 
@@ -162,7 +173,6 @@ class Sun(Orb):
     -------
 
     radec(mjd) : return (ra, dec) in deg J2000 for Sun at MJD (days)
-    lst(mjd) : return LST in degrees for observer at given MJD (days)
     hadec(mjd) : return (ha, dec) in deg of Sun for observer at MJD (days)
     altaz(mjd) : return (alt, az) in deg of Sun for observer at MJD (days)
 """
@@ -185,7 +195,6 @@ class Moon(Orb):
     -------
 
     radec(mjd) : return (ra, dec) in deg J2000 for Moon at MJD (days)
-    lst(mjd) : return LST in degrees for observer at given MJD (days)
     hadec(mjd) : return (ha, dec) in deg of Moon for observer at MJD (days)
     altaz(mjd) : return (alt, az) in deg of Moon for observer at MJD (days)
     illumination(mjd) : return illumination of Moon at MJD (days)
@@ -202,7 +211,7 @@ class Moon(Orb):
         return (moonphase2(jd))
 
 
-class Night(object):
+class Night(MasterBase):
     """Night class to calculate observing parameters for night
 
     Parameters:
@@ -245,22 +254,22 @@ class Night(object):
         noon_ish = (np.float64(self.mjd) -
                     self.observer.longitude / 15. / 24. - 0.5)
         midnight_ish = noon_ish + 0.5
-        self.mjd_evening_twilight = optimize.brenth(self._twilight_function,
-                                                    noon_ish,
-                                                    midnight_ish,
-                                                    args=(self.twilight))
+        twi = optimize.brenth(self._twilight_function,
+                              noon_ish, midnight_ish,
+                              args=(self.twilight))
+        self.mjd_evening_twilight = np.float64(twi)
 
     def _calculate_morning_twilight(self):
         midnight_ish = (np.float64(self.mjd) -
                         self.observer.longitude / 15. / 24.)
         nextnoon_ish = midnight_ish + 0.5
-        self.mjd_morning_twilight = optimize.brenth(self._twilight_function,
-                                                    midnight_ish,
-                                                    nextnoon_ish,
-                                                    args=(self.twilight))
+        twi = optimize.brenth(self._twilight_function,
+                              midnight_ish, nextnoon_ish,
+                              args=(self.twilight))
+        self.mjd_morning_twilight = np.float64(twi)
 
 
-class Master(object):
+class Master(MasterBase):
     """Master class to interpret master schedule
 
     Parameters:
@@ -320,7 +329,7 @@ class Master(object):
         #  START_SURVEY is "on" 
         #  END_SURVEY is "off" 
         return
-    
+
     def check(self, mjd=None):
         if(mjd < self.event_mjds[0]):
             return('off')
