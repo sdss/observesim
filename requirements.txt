@@ -1,0 +1,6 @@
+
+numpy
+astropy
+PyAstronomy
+pyyaml
+pygments
