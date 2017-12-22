@@ -1,2 +1,74 @@
 #!/usr/bin/env python
+# encoding: utf-8
 
+from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
+
+# Perform an SDSS-V simulation
+
+import argparse
+import numpy as np
+import fitsio
+import observesim.master
+import observesim.weather
+import observesim.scheduler
+import observesim.observe
+
+# Read arguments
+usage = "sdss5_simulate"
+description = "Simulate the SDSS-V schedule"
+parser = argparse.ArgumentParser(description=description, usage=usage)
+parser.add_argument("-o", "--output-base", dest="output_base", type=str,
+                    required=True, help="output FITS file name")
+parser.add_argument("-s", "--seed", dest="seed", type=int,
+                    required=False, help="random seed",
+                    default=1)
+args = parser.parse_args()
+outbase = args.output_base
+seed = args.seed
+
+# Set up schedule and weather
+observer = observesim.master.Observer()
+master = observesim.master.Master()
+weather = observesim.weather.Weather(mjd_start=master.start,
+                                     mjd_end=master.end,
+                                     seed=seed)
+scheduler = observesim.scheduler.Scheduler(observer=observer)
+observe = observesim.observe.Observe()
+
+# Initialize observedb
+scheduler.initdb()
+scheduler.set_priority_all(master.mjds[0])
+
+# Loop through nights
+for mjd in master.mjds:
+    night = observesim.master.Night(mjd=mjd, observer=observer)
+    curr_mjd = night.mjd_evening_twilight
+    while(curr_mjd < night.mjd_morning_twilight and
+          curr_mjd < master.end_mjd()):
+        isclear, nextchange_weather = weather.clear(mjd=curr_mjd)
+        onoff, nextchange_on = master.on(mjd=curr_mjd)
+        nextchange_all = np.array([nextchange_weather, nextchange_on])
+        nextchange = np.min(nextchange_all)
+        if((isclear == True) and (onoff == 'on')):
+            fieldid = scheduler.field(mjd=curr_mjd)
+            if(fieldid is not None):
+                duration = scheduler.fields.duration[fieldid]
+                curr_mjd = curr_mjd + duration
+                if(curr_mjd > nextchange):
+                    duration = (duration - (curr_mjd - nextchange))
+                    curr_mjd = nextchange
+                result = observe.result(mjd=curr_mjd, fieldid=fieldid,
+                                        duration=duration)
+                scheduler.update(fieldid=fieldid, result=result)
+        else:
+            if(nextchange > curr_mjd):
+                curr_mjd = nextchange
+
+outobsfile = "{outbase}-observations.fits".format(outbase=outbase)
+fitsio.write(outobsfile, scheduler.observations.toarray(),
+             clobber=True)
+outfieldfile = "{outbase}-fields.fits".format(outbase=outbase)
+fitsio.write(outfieldfile, scheduler.fields.toarray(),
+             clobber=True)
