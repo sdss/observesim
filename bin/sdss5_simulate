@@ -10,7 +10,6 @@ from __future__ import absolute_import
 import argparse
 import numpy as np
 import fitsio
-import observesim.master
 import observesim.weather
 import observesim.scheduler
 import observesim.observe
@@ -29,26 +28,24 @@ outbase = args.output_base
 seed = args.seed
 
 # Set up schedule and weather
-observer = observesim.master.Observer()
-master = observesim.master.Master()
-weather = observesim.weather.Weather(mjd_start=master.start,
-                                     mjd_end=master.end,
+scheduler = observesim.scheduler.Scheduler()
+weather = observesim.weather.Weather(mjd_start=scheduler.master.start,
+                                     mjd_end=scheduler.master.end,
                                      seed=seed)
-scheduler = observesim.scheduler.Scheduler(observer=observer)
 observe = observesim.observe.Observe()
 
 # Initialize observedb
 scheduler.initdb()
-scheduler.set_priority_all(master.mjds[0])
+scheduler.set_priority_all(scheduler.master.mjds[0])
 
 # Loop through nights
-for mjd in master.mjds:
-    night = observesim.master.Night(mjd=mjd, observer=observer)
+for mjd in scheduler.master.mjds:
+    night = observesim.master.Night(mjd=mjd, observer=scheduler.observer)
     curr_mjd = night.mjd_evening_twilight
     while(curr_mjd < night.mjd_morning_twilight and
-          curr_mjd < master.end_mjd()):
+          curr_mjd < scheduler.master.end_mjd()):
         isclear, nextchange_weather = weather.clear(mjd=curr_mjd)
-        onoff, nextchange_on = master.on(mjd=curr_mjd)
+        onoff, nextchange_on = scheduler.master.on(mjd=curr_mjd)
         nextchange_all = np.array([nextchange_weather, nextchange_on])
         nextchange = np.min(nextchange_all)
         if((isclear == True) and (onoff == 'on')):

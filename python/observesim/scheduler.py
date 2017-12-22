@@ -19,8 +19,6 @@ class Scheduler(object):
 
     Parameters:
     ----------
-    observer : Observer object
-        Observer to use for scheduling
 
     airmass_limit : float, np.float32
         airmass limit for observations
@@ -28,11 +26,14 @@ class Scheduler(object):
     Attributes:
     ----------
 
-    observer : Observer object
-        Observer to use for scheduling
-
     airmass_limit : float, np.float32
         airmass limit for observations
+
+    master : Master object
+        Master schedule to use for scheduling
+
+    observer : Observer object
+        Observer to use for scheduling
 
     fields : Fields object
         object accessing list of fields
@@ -49,7 +50,6 @@ class Scheduler(object):
     set_priority_all(mjd=mjd) : reset all priorities
     set_priority(fieldid=fieldid, mjd=mjd) : reset priority for one field
     update(fieldid=fieldid, result=result) : update observations with result
-    update(field=field, result=result) : update db with result for field
 
     Comments:
     --------
@@ -65,8 +65,7 @@ class Scheduler(object):
          - take lowest transit altitude case among those
 
     """
-    def __init__(self, observatory='apo', airmass_limit=2.,
-                 observer=None):
+    def __init__(self, airmass_limit=2.):
         """Return Scheduler object
 
         Parameters:
@@ -78,7 +77,8 @@ class Scheduler(object):
         airmass_limit : float, np.float32
             airmass limit for observations (default 2)
         """
-        self.observer = observer
+        self.master = observesim.master.Master()
+        self.observer = observesim.master.Observer()
         self.airmass_limit = airmass_limit
         return
 
@@ -196,12 +196,44 @@ class Scheduler(object):
         return(pick_fieldid)
 
     def field(self, mjd=None):
+        """Picks the next field to observe
+
+        Parameters:
+        ----------
+
+        mjd : np.float64
+            Current MJD (days)
+
+
+        Returns:
+        --------
+
+        fieldid : np.int32, int
+            ID of field to observe
+        """
         observable_fieldid = self.observable(mjd=mjd)
         highest_fieldid = self.highest_priority(fieldid=observable_fieldid)
         fieldid = self.pick(fieldid=highest_fieldid, mjd=mjd)
         return(fieldid)
 
     def update(self, fieldid=None, result=None):
+        """Update the observation list with result of observations
+
+        Parameters:
+        ----------
+
+        fieldid : np.int32, int
+            ID of field
+
+        result : ndarray
+            One element, contains 'mjd', 'duration', 'sn2'
+
+        Comments:
+        --------
+
+        Updates the Scheduler.observations object
+
+        """
         self.observations.add(fieldid=fieldid,
                               mjd=result['mjd'],
                               duration=result['duration'],
