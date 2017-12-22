@@ -38,6 +38,9 @@ class Weather(object):
     fclear : float, np.float64
         fraction of clear time (default 0.5)
 
+    seed : int
+        random seed
+
     Methods:
     -------
 
@@ -45,7 +48,7 @@ class Weather(object):
 
 """
     def __init__(self, mjd_start=None, mjd_end=None, dmjd_minutes=10.,
-                 sigma=2., alpha=-0.75, fclear=0.5):
+                 sigma=2., alpha=-0.75, fclear=0.5, seed=1):
         self.mjd_start = mjd_start
         self.mjd_end = mjd_end
         self.alpha = alpha
@@ -55,10 +58,11 @@ class Weather(object):
         self.nmjd = np.int32(np.ceil((self.mjd_end - self.mjd_start) /
                                      self.dmjd))
         self.mjd = self.mjd_start + np.arange(self.nmjd) * self.dmjd
-        self._initialize_conditions()
+        self._initialize_conditions(seed=seed)
 
-    def _initialize_conditions(self):
+    def _initialize_conditions(self, seed=1):
         """Initialize the pattern of clear weather."""
+        np.random.seed(seed)
         nsigma = self.sigma / self.dmjd
         psigma = 1. / nsigma
         pk = np.zeros(self.nmjd // 2)

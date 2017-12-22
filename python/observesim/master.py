@@ -37,8 +37,8 @@ accurate routines found in astropy.
 import os
 import numpy as np
 import scipy.optimize as optimize
-import astropy.time as time
 import astropy.units as units
+import astropy.time as atime
 import pydl.pydlutils.yanny as yanny
 import PyAstronomy.pyasl as pyasl
 from observesim.moonphase import moonphase2
@@ -71,7 +71,7 @@ class Observer(MasterBase):
 
     observatory : str
         Name of observatory to use (must be in observatory file)
-        (default 'APO')
+        (default 'apo')
 
     observatoryfile : str
         Name of Yanny-format observatory file to read
@@ -94,7 +94,7 @@ class Observer(MasterBase):
 
     lst(mjd) : return LST in degrees for observer at given MJD (days)
 """
-    def __init__(self, observatory='APO', observatoryfile=None):
+    def __init__(self, observatory='apo', observatoryfile=None):
         """Create Observer object"""
         self.observatory = observatory
         if(observatoryfile is None):
@@ -124,7 +124,7 @@ class Orb(MasterBase):
     Parameters:
     ----------
     observer : Observer object
-        Instance of Observer object (default an 'APO' Observer object)
+        Instance of Observer object (default an 'apo' Observer object)
 
     Methods:
     -------
@@ -137,7 +137,7 @@ class Orb(MasterBase):
         """Create Orb object"""
         self.observer = observer
         if(self.observer is None):
-            self.observer = Observer('APO')
+            self.observer = Observer('apo')
 
     def radec(self, mjd=None):
         """Dummy function to report RA, Dec for generic Orb object"""
@@ -167,7 +167,7 @@ class Sun(Orb):
     Parameters:
     ----------
     observer : Observer object
-        Instance of Observer object (default an 'APO' Observer object)
+        Instance of Observer object (default an 'apo' Observer object)
 
     Methods:
     -------
@@ -189,7 +189,7 @@ class Moon(Orb):
     Parameters:
     ----------
     observer : Observer object
-        Instance of Observer object (default an 'APO' Observer object)
+        Instance of Observer object (default an 'apo' Observer object)
 
     Methods:
     -------
@@ -217,7 +217,7 @@ class Night(MasterBase):
     Parameters:
     ----------
     observer : Observer object
-        Instance of Observer object (default an 'APO' Observer object)
+        Instance of Observer object (default an 'apo' Observer object)
 
     mjd : np.int32, int
         MJD of night (corresponds to MJD of morning)
@@ -234,13 +234,12 @@ class Night(MasterBase):
         MJD (days) of evening twilight
 """
 
-    def __init__(self, observer=None, mjd=None, twilight=-8., ngrid=1000):
+    def __init__(self, observer=None, mjd=None, twilight=-8.):
         self.mjd = np.int32(mjd)
         self.observer = observer
-        self.ngrid = ngrid
         self.twilight = twilight
         if(self.observer is None):
-            self.observer = Observer('APO')
+            self.observer = Observer('apo')
         self.sun = Sun(observer=self.observer)
         self.moon = Moon(observer=self.observer)
         self._calculate_evening_twilight()
@@ -293,6 +292,10 @@ class Master(MasterBase):
         list of times in ISO format for events of note
     event_mjd : ndarray of numpy.float64
         MJDs (days) of events of note
+
+    Methods:
+    -------
+    on() : is the survey on
 """
     def __init__(self, schedulefile=None):
         """Create Master object for schedule"""
@@ -317,28 +320,32 @@ class Master(MasterBase):
     def _dateandtime2mjd(self):
         isotimes = ["{date} {time}".format(date=date, time=time) for date, time
                     in zip(self.event_dates, self.event_times)]
-        times = time.Time(isotimes, format='iso', scale='tai')
+        times = atime.Time(isotimes, format='iso', scale='tai')
         times = times + np.int32(self.schedule['to_tai']) * units.hour
         return(times.mjd)
 
     def _validate(self):
         # should make sure:
-        #  one start
-        #  one end
+        #  one start (first event)
+        #  one end (last event)
         #  start MJD is a daytime time 
         #  START_SURVEY is "on" 
         #  END_SURVEY is "off" 
         return
 
-    def check(self, mjd=None):
+    def on(self, mjd=None):
         if(mjd < self.event_mjds[0]):
-            return('off')
+            return('off', self.event_mjds[0])
         if(mjd >= self.event_mjds[-1]):
-            return('off')
+            return('off', mjd + 1.)
         # Assumes there is only one
         indx = np.where((mjd >= self.event_mjds[0:-1]) &
-                        (mjd < self.event_mjds))[0][0]
-        return(self.schedule[self.events[indx]])
+                        (mjd < self.event_mjds[1:]))[0][0]
+        return(self.schedule[self.events[indx]],
+               self.event_mjds[indx + 1])
+
+    def end_mjd(self):
+        return(self.event_mjds[-1])
 
     def _start(self):
         # Assumes there is only one
