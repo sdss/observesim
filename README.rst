@@ -50,6 +50,31 @@ module to loop through all of the nights, and then simulate each night.
 The ``sun`` and ``moon`` attributes of ``Night``, and the ``lst()``
 method, will give appropriate information for planning the night.
 
+Simulation Code
+---------------
+
+The ``sdss5_simulate`` executable performs an actual simulation. You
+must specify ``-o [outbase]``, and then the output goes in:
+
+::
+
+     [outbase]-fields.fits
+     [outbase]-observations.fits
+
+which give the list of fields and observations. You can also set a
+specific random seed with ``-s [integer]``.
+
+The first critical object that this code uses is the ``Scheduler``
+object, which contains the algorithms for picking the next field, and
+can be used to access the current state of observations. Specifically,
+it contains ``Fields``, ``Observations``, ``Master``, and ``Observer``
+objects. I don't know that I've settled on the exact best factoring of
+the code here.
+
+The second critical object that is used is the ``Weather`` object,
+which returns whether at any given MJD it is clear, and when the next
+change of state of the weather will be. 
+
 Dependencies:
 
 ::
