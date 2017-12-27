@@ -9,7 +9,7 @@ observesim.scheduler package
 Submodules
 ----------
 
-.. automodule:: observesim.scheduler
+.. automodule:: observesim.scheduler.Scheduler
     :imported-members:
     :undoc-members:
     :show-inheritance:
