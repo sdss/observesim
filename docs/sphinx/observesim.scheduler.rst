@@ -6,4 +6,12 @@ observesim.scheduler package
     :undoc-members:
     :show-inheritance:
 
+Submodules
+----------
+
+.. automodule:: dimage.atlas.scheduler
+    :imported-members:
+    :undoc-members:
+    :show-inheritance:
+
 
