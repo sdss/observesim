@@ -2,5 +2,6 @@ scipy
 numpy
 astropy
 PyAstronomy
+pydl
 pyyaml
 pygments
