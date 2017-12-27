@@ -6,7 +6,16 @@ Observing Simulation for SDSS-V Reference
 Main
 ----
 
-.. automodule:: observesim.main
-   :members:
+.. automodule:: observesim
+	 :members:
    :undoc-members:
    :show-inheritance:
+
+Subpackages
+-----------
+
+.. toctree::
+
+    observesim.scheduler
+    observesim.fields
+    observesim.observations
