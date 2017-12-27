@@ -9,7 +9,7 @@ observesim.scheduler package
 Submodules
 ----------
 
-.. automodule:: dimage.atlas.scheduler
+.. automodule:: observesim.scheduler
     :imported-members:
     :undoc-members:
     :show-inheritance:
