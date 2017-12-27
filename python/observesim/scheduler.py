@@ -563,7 +563,6 @@ class Scheduler(Master):
     def __init__(self, airmass_limit=2.,
                  schedulefile=None, observatory='apo', observatoryfile=None):
         """Return Scheduler object
-
         """
         super().__init__(schedulefile=schedulefile, observatory=observatory,
                          observatoryfile=observatoryfile)

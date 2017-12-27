@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # encoding: utf-8
 #
 # setup.py
@@ -8,6 +7,8 @@
 from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
+from __future__ import unicode_literals
+
 from setuptools import setup, find_packages
 
 import os
@@ -15,12 +16,10 @@ import argparse
 import sys
 
 
-# requirements_file = os.path.join(os.path.dirname(__file__), 'requirements.txt')
-# install_requires = [line.strip().replace('==', '>=') for line in open(requirements_file)
-#                     if not line.strip().startswith('#') and line.strip() != '']
-
+# The NAME variable should be of the format "sdss-observesim".
+# Please check your NAME adheres to that format.
 NAME = 'observesim'
-VERSION = '0.1.0'
+VERSION = '0.1.0dev'
 RELEASE = 'dev' in VERSION
 
 
@@ -30,7 +29,7 @@ def run(packages, install_requires):
           version=VERSION,
           license='BSD3',
           description='Description of your project.',
-          long_description=open('README.rst').read,
+          long_description=open('README.rst').read(),
           author='Michael Blanton',
           author_email='michael.blanton@nyu.edu',
           keywords='astronomy software',
@@ -39,7 +38,7 @@ def run(packages, install_requires):
           packages=packages,
           install_requires=install_requires,
           package_dir={'': 'python'},
-          scripts=[],
+          scripts=['bin/sdss5_simulate'],
           classifiers=[
               'Development Status :: 4 - Beta',
               'Intended Audience :: Science/Research',
@@ -83,12 +82,15 @@ def remove_args(parser):
         if arg in sys.argv:
             sys.argv.remove(arg)
 
+
 if __name__ == '__main__':
 
     # Custom parser to decide whether which requirements to install
     parser = argparse.ArgumentParser(prog=os.path.basename(sys.argv[0]))
-    parser.add_argument('-d', '--dev', dest='dev', default=False, action='store_true', help='Install all packages for development')
-    parser.add_argument('-o', '--doc', dest='doc', default=False, action='store_true', help='Install only core + documentation packages')
+    parser.add_argument('-d', '--dev', dest='dev', default=False, action='store_true',
+                        help='Install all packages for development')
+    parser.add_argument('-o', '--doc', dest='doc', default=False, action='store_true',
+                        help='Install only core + documentation packages')
 
     # We use parse_known_args because we want to leave the remaining args for distutils
     args = parser.parse_known_args()[0]
