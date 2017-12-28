@@ -6,12 +6,9 @@ observesim.scheduler package
     :undoc-members:
     :show-inheritance:
 
-Submodules
-----------
+Classes
+--------
 
-.. automodule:: observesim.Scheduler
-    :imported-members:
-    :undoc-members:
-    :show-inheritance:
+.. autoclass:: observesim.Scheduler
 
 
