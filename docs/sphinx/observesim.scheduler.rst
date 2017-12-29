@@ -9,6 +9,8 @@ observesim.scheduler package
 Classes
 --------
 
+.. _Observer:
+.. autoclass:: observesim.Observer
 .. autoclass:: observesim.Scheduler
 
 

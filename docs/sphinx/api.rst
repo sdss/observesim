@@ -1,5 +1,5 @@
 Observing Simulation for SDSS-V Reference
-=========================
+=========================================
 
 .. _api-main:
 
