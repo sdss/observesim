@@ -41,11 +41,19 @@ Future Anticipated Changes in Design
 ------------------------------------
 
 The Scheduler class should at some later point be refactored into its
-own software product. The Fields and Observations should at some later
-point also be refactored into either one or two different products,
-and in survey operations need to be accessing databases rather than
-holding results in memory. The methods for Fields and Observations
-will ideally not change much when that change is made.
+own software product.
+
+The Fields and Observations classes currently allow access to
+properties of the fields and observations simply by looking at ndarray
+attributes (like racen, deccen). This access should be abstracted so
+this access by the Scheduler is not dependent on the internal storage
+mechanism for the information.
+
+The Fields and Observations should also at some later point be
+refactored into either one or two different products, and in survey
+operations need to be accessing databases rather than holding results
+in memory. The methods for Fields and Observations will ideally not
+change much when that change is made.
 
 None of this yet incorporates any functionality associated with
 assigning targets to fields. 
@@ -77,9 +85,13 @@ The :ref:`Observer <Observer>` class defines the properties of the
 observer and has methods for checking ephemerides and observability
 for the specific observer.
 
-This class gets information about the observatory from the
-$OBSERVESIM_DIR/data/observatories.par file. Example content of this
-file is here:
+This class gets information about the observatory from the Yanny file:
+
+::
+
+     $OBSERVESIM_DIR/data/observatories.par
+
+Example content of this file is here:
 
 .. code-block:: tcl
 
@@ -91,12 +103,76 @@ file is here:
 
    OBSERVATORY apo -105.82027778 32.7797556
 
+This file can be read with tools in the pydl.pydlutils.yanny module.
 
 Master Schedule
 ---------------
 
+The :ref:`Master <Master>` class is a subclass of :ref:`Observer
+<Observer>` that incorporates information about the master schedule
+for the observatory in question within SDSS-V.
+
+::
+
+    import observesim.scheduler as scheduler
+
+    schedule = scheduler.Master()
+    template = "mjd={mjd}, illumination={illumination}"
+    for mjd in schedule.mjds:
+        illumination = schedule.moon_illumination(mjd=mjd)
+        print(template.format(mjd=mjd, illumination=illumination))
+
+The master schedule itself is kept as a Yanny file at:
+
+::
+
+     $OBSERVESIM_DIR/data/master_schedule.par
+
+This file can be read with tools in the pydl.pydlutils.yanny module.
+
+Example content of the master schedule file is here:
+
+::
+
+    # Timezone offset in hours to apply to get to TAI
+    # (i.e. Greenwich time)
+    to_tai 7  # Mountain Standard Time
+
+    # Whether events start ("on") or stop ("off") observing
+    START_SURVEY on
+    END_SURVEY off
+    START_SHUTDOWN off
+    END_SHUTDOWN on
+
+    typedef enum {
+      START_SURVEY,
+      END_SURVEY,
+      START_SHUTDOWN,
+      END_SHUTDOWN
+    } EVENT;
+
+    typedef struct {
+      char date[10];
+      char time[5];
+      EVENT event;
+    } SCHEDULE;
+
+    SCHEDULE 2020-07-01 12:00 START_SURVEY
+    SCHEDULE 2020-07-10 12:00 START_SHUTDOWN
+    SCHEDULE 2020-08-20 12:00 END_SHUTDOWN
+    SCHEDULE 2021-07-01 12:00 END_SURVEY
+
 Scheduler
 ---------
+
+The :ref:`Scheduler <Scheduler>` class is a subclass of
+:ref:`Scheduler <Scheduler>` that has tools necessary to schedule
+observations.
+
+First, it contains attributes "fields" and "observations" which are
+expected to be objects of the Fields and Observations classes
+described below. These are used to access and update information about
+the fields and observations.
 
 Fields
 ------
