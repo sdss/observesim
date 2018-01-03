@@ -55,6 +55,10 @@ operations need to be accessing databases rather than holding results
 in memory. The methods for Fields and Observations will ideally not
 change much when that change is made.
 
+The "results" passed around in the scheduler and the simulator is a
+simple dictionary. I'm not sure how this should evolve so was keeping
+it simple for now.
+
 None of this yet incorporates any functionality associated with
 assigning targets to fields. 
 
@@ -122,6 +126,10 @@ for the observatory in question within SDSS-V.
         illumination = schedule.moon_illumination(mjd=mjd)
         print(template.format(mjd=mjd, illumination=illumination))
 
+It also contains the method "on()", which returns whether the survey
+is on at any given (floating point) MJD, and the next change in on/off
+status. 
+
 The master schedule itself is kept as a Yanny file at:
 
 ::
@@ -165,14 +173,21 @@ Example content of the master schedule file is here:
 Scheduler
 ---------
 
-The :ref:`Scheduler <Scheduler>` class is a subclass of
-:ref:`Scheduler <Scheduler>` that has tools necessary to schedule
-observations.
+The :ref:`Scheduler <Scheduler>` class is a subclass of :ref:`Master
+<Master>` that has tools necessary to schedule observations.
 
 First, it contains attributes "fields" and "observations" which are
 expected to be objects of the Fields and Observations classes
 described below. These are used to access and update information about
 the fields and observations.
+
+It then provides the method "field()" which returns the next field to
+observe given a (floating point) MJD. 
+
+Finally, it provides the method "update()" which updates the status of
+a field given a result. The result is currently assumed to be a
+dictionary with 'sn2', 'mjd', and 'duration', as described below in
+the simulation section. 
 
 Fields
 ------
