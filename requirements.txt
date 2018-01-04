@@ -1,6 +1,6 @@
-fitsio
-scipy
 numpy
+scipy
+fitsio
 astropy
 PyAstronomy
 pydl
