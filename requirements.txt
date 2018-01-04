@@ -1,6 +1,5 @@
 numpy
 scipy
-fitsio
 astropy
 PyAstronomy
 pydl
