@@ -88,6 +88,20 @@ class Fields(object):
         return
 
     def toarray(self, indx=None):
+        """Return fields as a record array
+
+        Parameters:
+        ----------
+
+        indx : ndarray of np.int32
+            fieldids to return (default to all)
+
+        Returns:
+        -------
+
+        fields : record array
+            field information
+"""
         field0 = [('fieldid', np.int32),
                   ('racen', np.float64),
                   ('deccen', np.float64),

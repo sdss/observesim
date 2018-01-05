@@ -478,6 +478,13 @@ class Master(Observer):
                self.event_mjds[indx + 1])
 
     def end_mjd(self):
+        """Return end MJD
+
+        Returns:
+
+        end_mjd : np.float64
+            MJD of last event (end of survey)
+        """
         return(self.event_mjds[-1])
 
     def _start(self):
@@ -539,22 +546,26 @@ class Scheduler(Master):
     -------
 
     initdb() : initialize field list and set to unobserved
+
     field(mjd=mjd) : return field to observe at mjd
+
     observable(mjd=mjd) : return fieldids observable at mjd
+
     set_priority_all(mjd=mjd) : reset all priorities
+
     set_priority(fieldid=fieldid, mjd=mjd) : reset priority for one field
+
     update(fieldid=fieldid, result=result) : update observations with result
 
     Comments:
     --------
 
-    Scheduling proceeds conceptually as follows:
-
+    Scheduling proceeds conceptually as follows
          - fields are limited to set that are conceivably observable
          - highest priority fields to observe are selected among the
          - A strategy to optimize completion
 
-    In this default Scheduler, the strategy is a completely heuristic one:
+    In this default Scheduler, the strategy is a completely heuristic one
          - take lowest HA cases in bins of 5 deg
          - take lowest transit altitude case among those
 
@@ -591,7 +602,7 @@ class Scheduler(Master):
         --------
 
         Sets Scheduler.fields.priority for fieldid
-        """
+"""
         observations = self.observations.forfield(fieldid=fieldid, mjd=mjd)
         if(self.fields.fieldtype[fieldid] == 'standard'):
             tsn2 = observations['sn2'].sum()
@@ -611,8 +622,7 @@ class Scheduler(Master):
 
         mjd : np.float64
             current MJD (only use observations prior to MJD)
-
-        """
+"""
         for fieldid in self.fields.fieldid:
             self.set_priority(mjd=mjd, fieldid=fieldid)
         return
@@ -625,7 +635,7 @@ class Scheduler(Master):
 
         mjd : np.float64
             current MJD
-        """
+"""
         (alt, az) = self.radec2altaz(mjd=mjd, ra=self.fields.racen,
                                      dec=self.fields.deccen)
         airmass = self.alt2airmass(alt)
@@ -647,7 +657,7 @@ class Scheduler(Master):
 
         highest_fieldid : ndarray of np.int32
             array of fieldid values in highest priority class
-        """
+"""
         priority = self.fields.priority[fieldid]
         highest_priority = priority.min()
         ihighest_priority = np.where(priority == highest_priority)[0]
@@ -668,7 +678,7 @@ class Scheduler(Master):
 
         pick_fieldid : ndarray of np.int32
             fieldids
-        """
+"""
         lst = self.lst(mjd)
         ha = self.ralst2ha(ra=self.fields.racen[fieldid], lst=lst)
         iha = np.int32(np.floor(np.abs(ha) / 5.))
@@ -694,7 +704,7 @@ class Scheduler(Master):
 
         fieldid : np.int32, int
             ID of field to observe
-        """
+"""
         observable_fieldid = self.observable(mjd=mjd)
         highest_fieldid = self.highest_priority(fieldid=observable_fieldid)
         fieldid = self.pick(fieldid=highest_fieldid, mjd=mjd)
@@ -704,7 +714,7 @@ class Scheduler(Master):
         """Update the observation list with result of observations
 
         Parameters:
-        ----------
+        -----------
 
         fieldid : np.int32, int
             ID of field
@@ -713,11 +723,10 @@ class Scheduler(Master):
             One element, contains 'mjd', 'duration', 'sn2'
 
         Comments:
-        --------
+        ---------
 
         Updates the Scheduler.observations object
-
-        """
+"""
         self.observations.add(fieldid=fieldid,
                               mjd=result['mjd'],
                               duration=result['duration'],

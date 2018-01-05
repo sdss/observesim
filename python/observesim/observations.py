@@ -71,6 +71,20 @@ class Observations(object):
         return(self.toarray(indx=indx))
 
     def toarray(self, indx=None):
+        """Return observations as a record array
+
+        Parameters:
+        ----------
+
+        indx : ndarray of np.int32
+            indices of observations to return (default to all)
+
+        Returns:
+        -------
+
+        observations : record array
+            observation information
+"""
         obs0 = [('fieldid', np.int32),
                 ('mjd', np.float64),
                 ('duration', np.float64),

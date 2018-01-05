@@ -12,8 +12,12 @@ Dependencies:
 class Observe(object):
     """Observe class.
 
+    Used to simulate observations of fields.
+
     Methods:
     -------
+
+    result() : return result of an observation
 
 """
     def __init__(self):
@@ -24,6 +28,26 @@ class Observe(object):
         pass
 
     def result(self, fieldid=None, duration=None, mjd=None):
+        """Return simulated result of an observation
+
+        Parameters:
+        ----------
+
+        fieldid : int, np.int32
+            id of field to observe
+
+        duration : float, np.float64
+            duration of observation (days)
+
+        mjd : float, np.float64
+            MJD start time of observation (days)
+
+        Returns:
+        -------
+
+        result : dict
+            has keys 'sn2', 'mjd', 'duration'
+"""
         fresult = self._result0
         fresult['sn2'] = 3000.
         fresult['mjd'] = mjd
