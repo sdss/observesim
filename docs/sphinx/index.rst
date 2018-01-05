@@ -205,14 +205,40 @@ Sloane distribution of tiles on the sky.
 
 In its current form, one accesses the fields from a set of ndarrays
 containing the RA, Dec, type of field, priority, etc. The fields are
-indexed by fieldid, which is just the zero-indexed positions of the
-arrays. 
+indexed by fieldid, which is just the zero-indexed position of each
+field in the arrays.
 
 Observations
 ------------
 
+The :ref:`Observations <Observations>` class creates and stores the
+information about the observations.
+
+In its current form, one access observations from the Observations
+class through its attributes, which are just ndarrays of durations,
+MJDs, and signal-to-noise squared.  The "add()" method adds an
+observations. The "forfield()" method returns all observations for a
+specific field.
+
 Weather
 -------
+
+The :ref:`Weather <Weather>` class handles simulated weather
+conditions. 
+
+It is initialized with a starting and ending MJD, an optional random
+seed, and optional other parameters including the fraction of clear
+weather.
+
+It has one method "clear()" which returns whether a specific
+floating-point MJD is clear, and what the MJD of the next change in
+state is.
+
+The weather patterns have a power law frequency spectrum cut off at
+high frequency with a Gaussian. This characteristic scale is by
+default two days (but this leaves plenty of variation below that
+scale). It does not characterize the weather beyond clear or not
+clear.
 
 Reference
 ---------

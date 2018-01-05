@@ -40,6 +40,7 @@ class Observations(object):
     Methods:
     -------
 
+    add() : add an observation of a field 
     toarray() : Return ndarray of field properties
 
 """
