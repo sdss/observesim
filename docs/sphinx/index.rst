@@ -49,6 +49,11 @@ attributes (like racen, deccen). This access should be abstracted so
 this access by the Scheduler is not dependent on the internal storage
 mechanism for the information.
 
+The Fields class currently assumes a particular distribution on the
+sky. There needs to be a process that generates the set of desired
+fields. Whether this is part of the Fields class or a different
+product altogether remains to be seen. 
+
 The Fields and Observations should also at some later point be
 refactored into either one or two different products, and in survey
 operations need to be accessing databases rather than holding results
@@ -191,6 +196,17 @@ the simulation section.
 
 Fields
 ------
+
+The :ref:`Fields <Fields>` class creates and stores the information
+about the survey fields.
+
+In its current form the Fields class initializes itself from the
+Sloane distribution of tiles on the sky.
+
+In its current form, one accesses the fields from a set of ndarrays
+containing the RA, Dec, type of field, priority, etc. The fields are
+indexed by fieldid, which is just the zero-indexed positions of the
+arrays. 
 
 Observations
 ------------
