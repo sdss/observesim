@@ -1,16 +1,22 @@
 observesim.scheduler package
 ============================
 
-.. automodule:: observesim.scheduler
-    :imported-members:
-    :undoc-members:
-    :show-inheritance:
-
-Classes
+Observer
 --------
-
 .. _Observer:
-.. autoclass:: observesim.Observer
-.. autoclass:: observesim.Scheduler
+.. autoclass:: observesim.scheduler.Observer
+    :members:
+
+Master
+------
+.. _Master:
+.. autoclass:: observesim.scheduler.Master
+    :members:
+
+Scheduler
+---------
+.. _Scheduler:
+.. autoclass:: observesim.scheduler.Scheduler
+    :members:
 
 

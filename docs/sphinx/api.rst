@@ -1,5 +1,5 @@
-Observing Simulation for SDSS-V Reference
-=========================================
+Reference for Observing Simulation for SDSS-V
+=============================================
 
 .. _api-main:
 
@@ -19,3 +19,5 @@ Subpackages
     observesim.scheduler
     observesim.fields
     observesim.observations
+    observesim.weather
+    observesim.observe

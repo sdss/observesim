@@ -5,7 +5,6 @@ import PyAstronomy.pyasl as pyasl
 import astropy.units as units
 import astropy.time as atime
 import pydl.pydlutils.yanny as yanny
-import observesim.master
 import observesim.fields
 import observesim.observations
 from observesim.moonphase import moonphase2
@@ -551,9 +550,9 @@ class Scheduler(Master):
 
     Scheduling proceeds conceptually as follows:
 
-      * fields are limited to set that are conceivably observable
-      * highest priority fields to observe are selected among the
-      * A strategy to optimize completion
+         - fields are limited to set that are conceivably observable
+         - highest priority fields to observe are selected among the
+         - A strategy to optimize completion
 
     In this default Scheduler, the strategy is a completely heuristic one:
          - take lowest HA cases in bins of 5 deg
