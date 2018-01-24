@@ -65,7 +65,8 @@ class Fields(object):
         return
 
     def _set_fields(self, observatory='apo', nsloane=None):
-        (ra, dec) = sloane.sloane(n=nsloane)
+        sl = sloane.Sloane(n=nsloane)
+        (ra, dec) = (sl.ra, sl.dec)
         if(observatory == 'apo'):
             indx = np.where(dec >= -10.)[0]
             ra = ra[indx]
