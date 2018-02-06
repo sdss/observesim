@@ -27,7 +27,12 @@ CREATE TABLE targetdb.target (
 	program_pk SMALLINT,
 	priority SMALLINT,
 	spectrograph_pk SMALLINT,
-	target_cadence_pk SMALLINT);
+	target_cadence_pk SMALLINT,
+	lunation_pk SMALLINT);
+
+CREATE TABLE targetdb.lunation (
+	pk serial PRIMARY KEY NOT NULL,
+	max_lunation REAL);
 
 CREATE TABLE targetdb.magnitude (
 	pk serial PRIMARY KEY NOT NULL,
@@ -81,6 +86,7 @@ CREATE TABLE targetdb.spectrograph (
 CREATE TABLE targetdb.fiber (
 	pk serial PRIMARY KEY NOT NULL,
 	fiberid INTEGER,
+	throughput REAL,
 	spectrograph_pk SMALLINT,
 	fiber_status_pk SMALLINT,
 	actuator_pk SMALLINT);
@@ -89,7 +95,8 @@ CREATE TABLE targetdb.actuator (
 	pk serial PRIMARY KEY NOT NULL,
 	id INTEGER,
 	xcen REAL,
-	ycen REAL);
+	ycen REAL,
+	actuator_status_pk SMALLINT);
 
 CREATE TABLE targetdb.fiber_configuration (
 	pk serial PRIMARY KEY NOT NULL,
@@ -100,6 +107,10 @@ CREATE TABLE targetdb.fiber_configuration (
 	target_pk INTEGER);
 
 CREATE TABLE targetdb.fiber_status (
+	pk serial PRIMARY KEY NOT NULL,
+	label TEXT);
+
+CREATE TABLE targetdb.actuator_status (
 	pk serial PRIMARY KEY NOT NULL,
 	label TEXT);
 
@@ -114,12 +125,20 @@ CREATE TABLE targetdb.exposure (
 	tile_pk INTEGER,
 	start_mjd INTEGER,
 	duration REAL,
-	sn2_median REAL);
+	sn2_median REAL,
+	weather_pk INTEGER);
+
+CREATE TABLE targetdb.weather (
+	pk serial PRIMARY KEY NOT NULL,
+	cloud_cover REAL,
+	humidity REAL,
+	temperature REAL);
 
 CREATE TABLE targetdb.tile (
 	pk serial PRIMARY KEY NOT NULL,
 	racen REAL,
-	deccen REAL);
+	deccen REAL,
+	rotation REAL);
 
 CREATE TABLE targetdb.target_to_tile (
 	pk serial PRIMARY KEY NOT NULL,
@@ -141,6 +160,8 @@ INSERT INTO targetdb.target_completion VALUES
 INSERT INTO targetdb.survey VALUES (0, 'MWM'), (1, 'BHM');
 
 INSERT INTO targetdb.fiber_status VALUES (0, 'OK'), (1, 'Broken');
+
+INSERT INTO targetdb.actuator_status VALUES (0, 'OK'), (1, 'KO');
 
 
 -- Foreign keys
@@ -185,6 +206,11 @@ ALTER TABLE ONLY targetdb.target
     FOREIGN KEY (target_cadence_pk) REFERENCES targetdb.target_cadence(pk)
     ON UPDATE CASCADE ON DELETE CASCADE;
 
+ALTER TABLE ONLY targetdb.target
+    ADD CONSTRAINT lunation_fk
+    FOREIGN KEY (lunation_pk) REFERENCES targetdb.lunation(pk)
+    ON UPDATE CASCADE ON DELETE CASCADE;
+
 ALTER TABLE ONLY targetdb.program
     ADD CONSTRAINT survey_fk
     FOREIGN KEY (survey_pk) REFERENCES targetdb.survey(pk)
@@ -203,6 +229,11 @@ ALTER TABLE ONLY targetdb.target_to_tile
 ALTER TABLE ONLY targetdb.exposure
     ADD CONSTRAINT exposure_tile_fk
     FOREIGN KEY (tile_pk) REFERENCES targetdb.tile(pk)
+    ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE ONLY targetdb.exposure
+    ADD CONSTRAINT weather_fk
+    FOREIGN KEY (weather_pk) REFERENCES targetdb.weather(pk)
     ON UPDATE CASCADE ON DELETE CASCADE;
 
 ALTER TABLE ONLY targetdb.spectrum
@@ -240,6 +271,11 @@ ALTER TABLE ONLY targetdb.fiber
     FOREIGN KEY (fiber_status_pk) REFERENCES targetdb.fiber_status(pk)
     ON UPDATE CASCADE ON DELETE CASCADE;
 
+ALTER TABLE ONLY targetdb.actuator
+    ADD CONSTRAINT actuator_status_fk
+    FOREIGN KEY (actuator_status_pk) REFERENCES targetdb.actuator_status(pk)
+    ON UPDATE CASCADE ON DELETE CASCADE;
+
 
 -- Indices
 CREATE INDEX CONCURRENTLY file_pk_idx ON targetdb.target using BTREE(file_pk);
@@ -250,6 +286,7 @@ CREATE INDEX CONCURRENTLY stellar_params_pk_idx ON targetdb.target using BTREE(s
 CREATE INDEX CONCURRENTLY program_pk_idx ON targetdb.target using BTREE(program_pk);
 CREATE INDEX CONCURRENTLY target_spectrograph_pk_idx ON targetdb.target using BTREE(spectrograph_pk);
 CREATE INDEX CONCURRENTLY target_cadence_pk_idx ON targetdb.target using BTREE(target_cadence_pk);
+CREATE INDEX CONCURRENTLY lunation_pk_idx ON targetdb.target using BTREE(lunation_pk);
 
 CREATE INDEX CONCURRENTLY survey_pk_idx ON targetdb.program using BTREE(survey_pk);
 
@@ -257,6 +294,7 @@ CREATE INDEX CONCURRENTLY target_to_tile_target_pk_idx ON targetdb.target_to_til
 CREATE INDEX CONCURRENTLY target_to_tile_tile_pk_idx ON targetdb.target_to_tile using BTREE(tile_pk);
 
 CREATE INDEX CONCURRENTLY exposure_tile_pk_idx ON targetdb.exposure using BTREE(tile_pk);
+CREATE INDEX CONCURRENTLY weather_pk_idx ON targetdb.exposure using BTREE(weather_pk);
 
 CREATE INDEX CONCURRENTLY exposure_pk_idx ON targetdb.spectrum using BTREE(exposure_pk);
 CREATE INDEX CONCURRENTLY fiber_configuration_pk_idx ON targetdb.spectrum using BTREE(fiber_configuration_pk);
@@ -268,3 +306,5 @@ CREATE INDEX CONCURRENTLY fiber_configuration_target_pk_idx ON targetdb.fiber_co
 CREATE INDEX CONCURRENTLY fiber_status_pk_idx ON targetdb.fiber using BTREE(fiber_status_pk);
 CREATE INDEX CONCURRENTLY fiber_spectrograph_pk_idx ON targetdb.fiber using BTREE(spectrograph_pk);
 CREATE INDEX CONCURRENTLY actuator_pk_idx ON targetdb.fiber using BTREE(actuator_pk);
+
+CREATE INDEX CONCURRENTLY actuator_status_pk_idx ON targetdb.actuator using BTREE(actuator_status_pk);

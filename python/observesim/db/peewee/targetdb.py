@@ -57,11 +57,25 @@ class BaseModel(Model):
         return super(BaseModel, self).__repr__()
 
 
+class ActuatorStatus(BaseModel):
+    label = TextField(null=True)
+    pk = AutoField()
+
+    class Meta:
+        table_name = 'actuator_status'
+        schema = 'targetdb'
+
+
 class Actuator(BaseModel):
     id = IntegerField(null=True)
     pk = AutoField()
     xcen = FloatField(null=True)
     ycen = FloatField(null=True)
+    actuator_status = ForeignKeyField(column_name='actuator_status_pk',
+                                      field='pk',
+                                      model=ActuatorStatus,
+                                      null=True,
+                                      backref='actuators')
 
     class Meta:
         table_name = 'actuator'
@@ -72,9 +86,21 @@ class Tile(BaseModel):
     deccen = FloatField(null=True)
     pk = AutoField()
     racen = FloatField(null=True)
+    rotation = FloatField(null=True)
 
     class Meta:
         table_name = 'tile'
+        schema = 'targetdb'
+
+
+class Weather(BaseModel):
+    pk = AutoField()
+    cloud_cover = FloatField(null=True)
+    transparency = FloatField(null=True)
+    temperature = FloatField(null=True)
+
+    class Meta:
+        table_name = 'weather'
         schema = 'targetdb'
 
 
@@ -88,6 +114,11 @@ class Exposure(BaseModel):
                            model=Tile,
                            null=True,
                            backref='exposures')
+    weather = ForeignKeyField(column_name='weather_pk',
+                              field='pk',
+                              model=Weather,
+                              null=True,
+                              backref='exposures')
 
     class Meta:
         table_name = 'exposure'
@@ -124,6 +155,7 @@ class Fiber(BaseModel):
                                    null=True,
                                    backref='fibers')
     fiberid = IntegerField(null=True)
+    throughput = FloatField(null=True)
     pk = AutoField()
     spectrograph = ForeignKeyField(backref='fibers',
                                    column_name='spectrograph_pk',
@@ -225,6 +257,15 @@ class File(BaseModel):
         schema = 'targetdb'
 
 
+class Lunation(BaseModel):
+    max_lunation = FloatField(null=True)
+    pk = AutoField()
+
+    class Meta:
+        table_name = 'lunation'
+        schema = 'targetdb'
+
+
 class Target(BaseModel):
     dec = FloatField(null=True)
     field = ForeignKeyField(column_name='field_pk',
@@ -274,6 +315,11 @@ class Target(BaseModel):
                                         model=TargetCompletion,
                                         null=True,
                                         backref='targets')
+    lunation = ForeignKeyField(column_name='lunation_pk',
+                               field='pk',
+                               model=Lunation,
+                               null=True,
+                               backref='targets')
     tiles = ManyToManyField(Tile, backref='targets')
 
     class Meta:
