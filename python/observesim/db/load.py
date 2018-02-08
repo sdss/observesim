@@ -138,7 +138,7 @@ def _load_stellar_params(catalogue, row):
     return _load_table_from_cols(valid_columns, catalogue, row, targetdb.StellarParams)
 
 
-def load_targetdb(filename, verbose=False):
+def load_targetdb(filename, verbose=False, delete=False):
     """Populates targetdb.
 
     Parameters:
@@ -147,19 +147,31 @@ def load_targetdb(filename, verbose=False):
             insert.
         verbose (bool):
             Determines the level of verbosity.
+        remove (bool):
+            If ``True``, the target, magnitude, field, program, target cadence,
+            file, and stellar paramater tables will be truncated before
+            inserting new records.
 
     """
 
     if verbose:
         log.sh.setLevel(logging.DEBUG)
+    else:
+        log.sh.setLevel(logging.INFO)
 
     filename = pathlib.Path(filename)
     assert filename.exists()
 
     target_files = table.Table.read(filename, format='ascii')
 
-    log.info('Deleting all target records ...')
-    targetdb.Target.delete().execute()
+    if delete:
+        models = [targetdb.Target, targetdb.TargetCadence,
+                  targetdb.Field, targetdb.File, targetdb.Program,
+                  targetdb.Magnitude, targetdb.StellarParams]
+
+        for model in models:
+            log.info('Deleting all records in table {} ...'.format(model._meta.table_name))
+            model.delete().execute()
 
     for row in target_files[[-1]]:
 
