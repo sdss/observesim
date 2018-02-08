@@ -138,7 +138,7 @@ def _load_stellar_params(catalogue, row):
     return _load_table_from_cols(valid_columns, catalogue, row, targetdb.StellarParams)
 
 
-def load_targetdb(filename, verbose=False, delete=False):
+def load_targets(filename, verbose=False, remove=False):
     """Populates targetdb.
 
     Parameters:
@@ -164,7 +164,7 @@ def load_targetdb(filename, verbose=False, delete=False):
 
     target_files = table.Table.read(filename, format='ascii')
 
-    if delete:
+    if remove:
         models = [targetdb.Target, targetdb.TargetCadence,
                   targetdb.Field, targetdb.File, targetdb.Program,
                   targetdb.Magnitude, targetdb.StellarParams]
