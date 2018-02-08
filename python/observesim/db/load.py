@@ -19,6 +19,9 @@ from observesim import log
 from .peewee import targetdb
 
 
+__all__ = ['load_targets', 'load_fibres']
+
+
 def _create_program_record(program, survey):
     """Creates or retrieves a ``program`` for a given ``survey``.
 
@@ -257,3 +260,84 @@ def load_targets(filename, verbose=False, remove=False):
                                                   targetdb.Target.magnitude_pk,
                                                   targetdb.Target.stellar_params_pk,
                                                   targetdb.Target.target_type_pk]).execute()
+
+
+def load_fibres(filename, verbose=False, remove=False):
+    """Loads fibres and actuators to the DB.
+
+    Parameters:
+        filename (str):
+            Path to the file containing the positions of the actuators and
+            the fibres associated to each one.
+        verbose (bool):
+            Determines the level of verbosity.
+        remove (bool):
+            If ``True``, the fiber, actuator, and fiber configuation tables
+            will be truncated before inserting new records.
+
+    """
+
+    if verbose:
+        log.sh.setLevel(logging.DEBUG)
+    else:
+        log.sh.setLevel(logging.INFO)
+
+    filename = pathlib.Path(filename)
+    assert filename.exists()
+
+    positions = table.Table.read(filename, format='ascii.commented_header',
+                                 names=['row', 'pos', 'x', 'y', 'assignment'])
+
+    if remove:
+        log.info('Deleting all actuator and fibre records ...')
+        targetdb.Actuator.delete().execute()
+        targetdb.Fiber.delete().execute()
+        targetdb.FiberConfiguration.delete().execute()
+
+    boss_spec_pk = targetdb.Spectrograph.get(label='BOSS').pk
+    apogee_spec_pk = targetdb.Spectrograph.get(label='APOGEE').pk
+
+    fibre_status_ok = targetdb.FiberStatus.get(label='OK').pk
+    actuator_status_ok = targetdb.ActuatorStatus.get(label='OK').pk
+
+    log.info('loading actuator and fibre data ... ')
+
+    fiberid = 1
+
+    with targetdb.database.atomic():
+
+        for ii, position in enumerate(positions):
+
+            if position['assignment'] == 'Fiducial':
+                actuator_type = 'Fiducial'
+                specs = []
+            else:
+                actuator_type = 'Robot'
+                if position['assignment'] == 'BA':
+                    specs = ['BOSS', 'APOGEE']
+                elif position['assignment'] == 'BOSS':
+                    specs = ['BOSS']
+                else:
+                    raise ValueError('invalid position of type {}'.format(position['assignment']))
+
+            xcen = position['x']
+            ycen = position['y']
+
+            actuator = targetdb.Actuator.create(
+                id=(ii + 1), xcen=xcen, ycen=ycen,
+                actuator_status_pk=actuator_status_ok,
+                actuator_type_pk=targetdb.ActuatorType.get(label=actuator_type).pk)
+
+            if verbose:
+                log.debug(f'created actuator id={actuator.id} of type '
+                          f'{actuator_type!r} at ({xcen}, {ycen})')
+
+            for spec in specs:
+                fibre = targetdb.Fiber.create(
+                    fiberid=fiberid, throughput=1,
+                    spectrograph_pk=(boss_spec_pk if spec == 'BOSS' else apogee_spec_pk),
+                    fiber_status_pk=fibre_status_ok, actuator_pk=actuator.pk)
+
+                if verbose:
+                    log.debug(f'created fibre id={fibre.fiberid} associated with '
+                              f'spectrograph {spec} and actuator id={actuator.id}')
