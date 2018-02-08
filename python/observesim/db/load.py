@@ -173,7 +173,7 @@ def load_targets(filename, verbose=False, remove=False):
             log.info('Deleting all records in table {} ...'.format(model._meta.table_name))
             model.delete().execute()
 
-    for row in target_files[[-1]]:
+    for row in target_files:
 
         fn = pathlib.Path(row['filename'])
         log.info(f'processing file {fn}')
