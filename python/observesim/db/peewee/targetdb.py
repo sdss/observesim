@@ -9,7 +9,7 @@
 
 import re
 
-from peewee import TextField, IntegerField, AutoField
+from peewee import TextField, IntegerField, AutoField, DateTimeField
 from peewee import BigIntegerField, ForeignKeyField, FloatField
 from peewee import ManyToManyField, PostgresqlDatabase, Model
 
@@ -82,11 +82,27 @@ class Actuator(BaseModel):
         schema = 'targetdb'
 
 
+class Simulation(BaseModel):
+    comments = TextField(null=True)
+    date = DateTimeField(null=True)
+    id = IntegerField(null=True)
+    pk = AutoField()
+
+    class Meta:
+        table_name = 'simulation'
+        schema = 'targetdb'
+
+
 class Tile(BaseModel):
     deccen = FloatField(null=True)
     pk = AutoField()
     racen = FloatField(null=True)
     rotation = FloatField(null=True)
+    simulation = ForeignKeyField(column_name='simulation_pk',
+                                 field='pk',
+                                 model=Simulation,
+                                 null=True,
+                                 backref='tiles')
 
     class Meta:
         table_name = 'tile'
@@ -119,6 +135,11 @@ class Exposure(BaseModel):
                               model=Weather,
                               null=True,
                               backref='exposures')
+    simulation = ForeignKeyField(column_name='simulation_pk',
+                                 field='pk',
+                                 model=Simulation,
+                                 null=True,
+                                 backref='exposures')
 
     class Meta:
         table_name = 'exposure'
@@ -266,6 +287,15 @@ class Lunation(BaseModel):
         schema = 'targetdb'
 
 
+class TargetType(BaseModel):
+    label = TextField(null=True)
+    pk = AutoField()
+
+    class Meta:
+        table_name = 'target_type'
+        schema = 'targetdb'
+
+
 class Target(BaseModel):
     dec = FloatField(null=True)
     field = ForeignKeyField(column_name='field_pk',
@@ -321,6 +351,11 @@ class Target(BaseModel):
                                null=True,
                                backref='targets')
     tiles = ManyToManyField(Tile, backref='targets')
+    target_type = ForeignKeyField(column_name='target_type_pk',
+                                  field='pk',
+                                  model=TargetType,
+                                  null=True,
+                                  backref='targets')
 
     class Meta:
         table_name = 'target'
