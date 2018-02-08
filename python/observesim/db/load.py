@@ -224,10 +224,14 @@ def load_targetdb(filename, verbose=False):
         else:
             log.debug('stellar parameters data added')
 
+        # Gets the pk for science target type and assigns it to all targets
+        science_target_pk = targetdb.TargetType.get(label='Science').pk
+        target_type_pks = [science_target_pk] * len(catalogue)
+
         # Bulk loads all the data
         rows = zip(ra, dec, spectrograph_pks, program_pks, file_pks,
                    file_index, target_completion_pks, field_pks, target_cadence_pks,
-                   magnitude_pks, stellar_params_pks)
+                   magnitude_pks, stellar_params_pks, target_type_pks)
 
         targetdb.Target.insert_many(rows, fields=[targetdb.Target.ra,
                                                   targetdb.Target.dec,
@@ -239,4 +243,5 @@ def load_targetdb(filename, verbose=False):
                                                   targetdb.Target.field_pk,
                                                   targetdb.Target.target_cadence_pk,
                                                   targetdb.Target.magnitude_pk,
-                                                  targetdb.Target.stellar_params_pk]).execute()
+                                                  targetdb.Target.stellar_params_pk,
+                                                  targetdb.Target.target_type_pk]).execute()
