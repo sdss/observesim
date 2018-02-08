@@ -1,6 +1,6 @@
 /*
 
-targetDB schema version 0.3
+targetDB schema version 0.3.1
 
 Created Jan 2018 - J. Sánchez-Gallego
 
