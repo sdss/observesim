@@ -66,6 +66,15 @@ class ActuatorStatus(BaseModel):
         schema = 'targetdb'
 
 
+class ActuatorType(BaseModel):
+    label = TextField(null=True)
+    pk = AutoField()
+
+    class Meta:
+        table_name = 'actuator_type'
+        schema = 'targetdb'
+
+
 class Actuator(BaseModel):
     id = IntegerField(null=True)
     pk = AutoField()
@@ -76,6 +85,12 @@ class Actuator(BaseModel):
                                       model=ActuatorStatus,
                                       null=True,
                                       backref='actuators')
+
+    actuator_type = ForeignKeyField(column_name='actuator_type_pk',
+                                    field='pk',
+                                    model=ActuatorStatus,
+                                    null=True,
+                                    backref='actuators')
 
     class Meta:
         table_name = 'actuator'

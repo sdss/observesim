@@ -1,6 +1,6 @@
 /*
 
-targetDB schema version 0.3.2
+targetDB schema version 0.3.3
 
 Created Jan 2018 - J. Sánchez-Gallego
 
@@ -101,7 +101,8 @@ CREATE TABLE targetdb.actuator (
 	id INTEGER,
 	xcen REAL,
 	ycen REAL,
-	actuator_status_pk SMALLINT);
+	actuator_status_pk SMALLINT NOT NULL,
+	actuator_type_pk SMALLINT NOT NULL);
 
 CREATE TABLE targetdb.fiber_configuration (
 	pk serial PRIMARY KEY NOT NULL,
@@ -118,6 +119,10 @@ CREATE TABLE targetdb.fiber_status (
 CREATE TABLE targetdb.actuator_status (
 	pk serial PRIMARY KEY NOT NULL,
 	label TEXT);
+
+CREATE TABLE targetdb.actuator_type (
+	pk serial PRIMARY KEY NOT NULL,
+	label TEXT NOT NULL);
 
 CREATE TABLE targetdb.spectrum (
 	pk serial PRIMARY KEY NOT NULL,
@@ -178,6 +183,8 @@ INSERT INTO targetdb.survey VALUES (0, 'MWM'), (1, 'BHM');
 INSERT INTO targetdb.fiber_status VALUES (0, 'OK'), (1, 'Broken');
 
 INSERT INTO targetdb.actuator_status VALUES (0, 'OK'), (1, 'KO');
+
+INSERT INTO targetdb.actuator_type VALUES (0, 'Robot'), (1, 'Fiducial');
 
 
 -- Foreign keys
@@ -307,6 +314,11 @@ ALTER TABLE ONLY targetdb.actuator
     FOREIGN KEY (actuator_status_pk) REFERENCES targetdb.actuator_status(pk)
     ON UPDATE CASCADE ON DELETE CASCADE;
 
+ALTER TABLE ONLY targetdb.actuator
+    ADD CONSTRAINT actuator_type_fk
+    FOREIGN KEY (actuator_type_pk) REFERENCES targetdb.actuator_type(pk)
+    ON UPDATE CASCADE ON DELETE CASCADE;
+
 
 -- Indices
 CREATE INDEX CONCURRENTLY file_pk_idx ON targetdb.target using BTREE(file_pk);
@@ -343,3 +355,4 @@ CREATE INDEX CONCURRENTLY fiber_spectrograph_pk_idx ON targetdb.fiber using BTRE
 CREATE INDEX CONCURRENTLY actuator_pk_idx ON targetdb.fiber using BTREE(actuator_pk);
 
 CREATE INDEX CONCURRENTLY actuator_status_pk_idx ON targetdb.actuator using BTREE(actuator_status_pk);
+CREATE INDEX CONCURRENTLY actuator_type_pk_idx ON targetdb.actuator using BTREE(actuator_type_pk);
