@@ -33,7 +33,8 @@ from pkg_resources import parse_version
 # ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'sphinx.ext.autosummary',
               'sphinx.ext.todo', 'sphinx.ext.viewcode', 'sphinx.ext.mathjax',
-              'sphinx.ext.intersphinx']
+              'sphinx.ext.intersphinx', 'sphinx_automodapi.automodapi',
+              'sphinx_automodapi.smart_resolver']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -111,6 +112,8 @@ intersphinx_mapping = {'python': ('https://docs.python.org/3.6', None),
 
 autodoc_mock_imports = ['_tkinter']
 autodoc_member_order = 'groupwise'
+
+automodapi_toctreedirnm = 'automodapi'
 
 napoleon_use_rtype = False
 napoleon_use_ivar = True
