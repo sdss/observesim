@@ -245,7 +245,7 @@ ALTER TABLE ONLY targetdb.program
     ON UPDATE CASCADE ON DELETE CASCADE;
 
 ALTER TABLE ONLY targetdb.target_to_tile
-    ADD CONSTRAINT target_fk
+    ADD CONSTRAINT target_to_tile_target_fk
     FOREIGN KEY (target_pk) REFERENCES targetdb.target(pk)
     ON UPDATE CASCADE ON DELETE CASCADE;
 
@@ -290,8 +290,13 @@ ALTER TABLE ONLY targetdb.fiber_configuration
     ON UPDATE CASCADE ON DELETE CASCADE;
 
 ALTER TABLE ONLY targetdb.fiber_configuration
-    ADD CONSTRAINT target_fk
+    ADD CONSTRAINT target_to_tile_target_fk
     FOREIGN KEY (target_pk) REFERENCES targetdb.target(pk)
+    ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE ONLY targetdb.fiber_configuration
+    ADD CONSTRAINT fiber_configuration_tile_fk
+    FOREIGN KEY (tile_pk) REFERENCES targetdb.tile(pk)
     ON UPDATE CASCADE ON DELETE CASCADE;
 
 ALTER TABLE ONLY targetdb.fiber
