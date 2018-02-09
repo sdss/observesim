@@ -13,8 +13,7 @@ from peewee import TextField, IntegerField, AutoField, DateTimeField
 from peewee import BigIntegerField, ForeignKeyField, FloatField
 from peewee import ManyToManyField, PostgresqlDatabase, Model
 
-
-database = PostgresqlDatabase('sdss5db', **{})
+from . import database
 
 
 class UnknownField(object):
