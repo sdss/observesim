@@ -142,7 +142,7 @@ def _load_stellar_params(catalogue, row):
 
 
 def load_targets(filename, verbose=False, remove=False):
-    """Populates targetdb.
+    """Populates the ``targetdb.target`` and associated tables.
 
     Parameters:
         filename (str):
@@ -263,7 +263,7 @@ def load_targets(filename, verbose=False, remove=False):
 
 
 def load_fibres(filename, verbose=False, remove=False):
-    """Loads fibres and actuators to the DB.
+    """Loads fibres and actuators into ``targetdb``.
 
     Parameters:
         filename (str):
