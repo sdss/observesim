@@ -1,6 +1,8 @@
 .. role:: header_no_toc
   :class: class_header_no_toc
 
+:tocdepth: 2
+
 
 Using the database
 ==================
@@ -175,13 +177,16 @@ will load targets and actuators/fibres to ``targetdb`` using the information in 
 
 
 API Reference
-=============
+-------------
 
 .. automodapi:: observesim.db.peewee
    :no-inheritance-diagram:
+   :headings: ~^
 
 .. automodapi:: observesim.db.sqlalchemy.connections
    :no-inheritance-diagram:
+   :headings: ~^
 
 .. automodapi:: observesim.db.load
    :no-inheritance-diagram:
+   :headings: ~^
