@@ -6,3 +6,4 @@ sphinx-automodapi>=0.7
 
 peewee
 sqlalchemy
+psycopg2
