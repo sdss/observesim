@@ -12,6 +12,7 @@ Observing Simulations for SDSS-V
    :maxdepth: 2
 
    guide
+   database
    api
 
 
