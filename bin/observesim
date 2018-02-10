@@ -1,0 +1,50 @@
+#!/usr/bin/env python
+# encoding: utf-8
+#
+# @Author: José Sánchez-Gallego
+# @Date: Feb 6, 2018
+# @Filename: observesim
+# @License: BSD 3-Clause
+# @Copyright: José Sánchez-Gallego
+
+
+import click
+
+
+@click.group()
+@click.option('-v', '--verbose', is_flag=True)
+@click.pass_context
+def observesim(ctx, verbose=False):
+    """Base CLI group for observesim."""
+
+    ctx.obj['verbose'] = verbose
+
+
+@observesim.command()
+@click.option('--remove', is_flag=True, help='truncates tables before adding new data')
+@click.option('--no-targets', is_flag=True, help='does not load the target data')
+@click.option('--no-fibres', is_flag=True, help='does not load the fibre data')
+@click.argument('targets_file', required=False, type=click.Path(exists=True))
+@click.argument('fibres_file', required=False, type=click.Path(exists=True))
+@click.pass_context
+def loaddb(ctx, targets_file, fibres_file, no_targets=False, no_fibres=False, remove=False):
+    """Loads targets and fibres/actuator to targetDB."""
+
+    from observesim.db.load import load_targets, load_fibres
+
+    if no_targets is False and no_fibres is False:
+        assert targets_file is not None and fibres_file is not None, 'missing input files'
+
+    if no_targets is False:
+        assert targets_file is not None, 'target file is required'
+        load_targets(click.format_filename(targets_file), verbose=ctx.obj['verbose'],
+                     remove=remove)
+
+    if no_fibres is False:
+        assert targets_file is not None, 'target file is required'
+        load_fibres(click.format_filename(fibres_file), verbose=ctx.obj['verbose'],
+                    remove=remove)
+
+
+if __name__ == '__main__':
+    observesim(obj={})

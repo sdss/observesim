@@ -5,3 +5,4 @@ PyAstronomy
 pydl
 pyyaml
 pygments
+click
