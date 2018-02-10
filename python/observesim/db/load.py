@@ -142,7 +142,7 @@ def _load_stellar_params(catalogue, row):
 
 
 def load_targets(filename, verbose=False, remove=False):
-    """Populates the ``targetdb.target`` and associated tables.
+    """Populates ``targetdb.target`` and associated tables.
 
     Parameters:
         filename (str):
