@@ -14,16 +14,17 @@
 
 import sphinx_bootstrap_theme
 
+# Importing matplotlib here with agg to prevent tkinter error in readthedocs
+import matplotlib
+matplotlib.use('agg')
+
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 
 from observesim import __version__
 from pkg_resources import parse_version
-
-# Importing matplotlib here with agg to prevent tkinter error in readthedocs
-import matplotlib
-matplotlib.use('agg')
 
 
 # -- General configuration ------------------------------------------------
