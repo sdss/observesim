@@ -216,7 +216,8 @@ html_favicon = './_static/favicon.ico'
 html_static_path = ['_static']
 
 
-html_sidebars = {'**': ['localtoc.html']}
+html_sidebars = {'automodapi/**': [],
+                 '**': ['localtoc.html']}
 
 # -- Options for HTMLHelp output ------------------------------------------
 
