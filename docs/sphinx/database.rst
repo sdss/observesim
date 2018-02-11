@@ -26,8 +26,10 @@ Another section of ``targetdb`` contains tables with information about the fibre
 
 A final group of tables stores information about exposures and spectra. In the operations database, those tables are likely to be moved to their own schema. The ``simulation`` table connects with ``tile`` and ``exposure`` and can be used to catalogue what exposures and tiles have been created for each simulation.
 
-Several tables, such as ``weather`` and ``lunation`` are placeholder for future functionality.
+Several tables, such as ``weather`` and ``lunation`` are placeholders for future functionality.
 
+
+.. _basic-conn:
 
 Basic connection
 ----------------
@@ -125,7 +127,9 @@ which will try, in order, the local, Utah, and tunnel connections and connect to
 
     targetdb.database.connect_from_config('tunnel')
 
-will change the connection to the tunnel profile. The model classes will, from that moment, query the corresponding tables via the tunnel connection. You can also pass custom configuration options ::
+will change the connection to the tunnel profile. The model classes will, from that moment, query the corresponding tables via the tunnel connection. The profiles *do not* contain the password for the database, which should instead be stored in ``.pgpass`` (see :ref:`basic-conn`.)
+
+You can also pass custom configuration options ::
 
     targetdb.database.connect_from_parameters('mydb', user='me', password='1234')
 
@@ -163,7 +167,7 @@ As usual, and in both the peewee and SQLAlchemy implementations, models have the
 Loading targetdb
 ----------------
 
-At this time, ``targetdb`` has been loaded using a series of (to a certain degree) mock catalogues for the different subprograms for MWM and BHM. The data is described in `this wiki page <https://internal.sdss.org/trac/as4/wiki/Targetlist>`__ and the files used for loading can be found `here <https://data.sdss.org/sas/mangawork/users/u0931042/sdss5_target_list/>`__. In particular, the file `target_list.dat <https://data.sdss.org/sas/mangawork/users/u0931042/sdss5_target_list/target_list.dat>`__ contains a table with the files to load and the mapping of column names for each one of them. This file can be used with `observesim loaddb` (see below) to ingest the data to targetdb.
+At this time, ``targetdb`` has been loaded using a series of (to a certain degree) mock catalogues for the different subprograms for MWM and BHM. The data is described in `this wiki page <https://internal.sdss.org/trac/as4/wiki/Targetlist>`__ and the files used for loading can be found `here <https://data.sdss.org/sas/mangawork/users/u0931042/sdss5_target_list/>`__. In particular, the file `target_list.dat <https://data.sdss.org/sas/mangawork/users/u0931042/sdss5_target_list/target_list.dat>`__ contains a table with the files to load and the mapping of column names for each one of them. This file can be used with ``observesim loaddb`` (see below) to ingest the data to targetdb.
 
 The focal plane system layout (fibres and actuators) is described in a :download:`file <../../python/observesim/etc/fps_RTConfig.txt>` provided by Rick Pogge and expanded `here <https://internal.sdss.org/trac/as4/wiki/FPSLayout>`__.
 
