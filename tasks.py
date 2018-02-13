@@ -36,7 +36,7 @@ def build_docs(ctx):
 def show_docs(ctx):
     """Shows the Sphinx docs"""
     print('Showing the docs')
-    os.chdir('docs/sphinx/_build/html')
+    os.chdir('_build/html')
     ctx.run('open ./index.html')
 
 

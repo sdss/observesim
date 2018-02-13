@@ -14,6 +14,11 @@
 
 import sphinx_bootstrap_theme
 
+# Importing matplotlib here with agg to prevent tkinter error in readthedocs
+import matplotlib
+matplotlib.use('agg')
+
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -33,7 +38,8 @@ from pkg_resources import parse_version
 # ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'sphinx.ext.autosummary',
               'sphinx.ext.todo', 'sphinx.ext.viewcode', 'sphinx.ext.mathjax',
-              'sphinx.ext.intersphinx']
+              'sphinx.ext.intersphinx', 'sphinx_automodapi.automodapi',
+              'sphinx_automodapi.smart_resolver']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -107,10 +113,14 @@ todo_include_todos = False
 # Intersphinx mappings
 intersphinx_mapping = {'python': ('https://docs.python.org/3.6', None),
                        'astropy': ('http://docs.astropy.org/en/latest', None),
-                       'numpy': ('http://docs.scipy.org/doc/numpy/', None)}
+                       'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+                       'peewee': ('http://docs.peewee-orm.com/en/latest/', None),
+                       'psycopg2': ('http://initd.org/psycopg/docs/', None)}
 
 autodoc_mock_imports = ['_tkinter']
 autodoc_member_order = 'groupwise'
+
+automodapi_toctreedirnm = 'automodapi'
 
 napoleon_use_rtype = False
 napoleon_use_ivar = True
@@ -206,7 +216,8 @@ html_favicon = './_static/favicon.ico'
 html_static_path = ['_static']
 
 
-html_sidebars = {'**': ['localtoc.html']}
+html_sidebars = {'automodapi/**': [],
+                 '**': ['localtoc.html']}
 
 # -- Options for HTMLHelp output ------------------------------------------
 
