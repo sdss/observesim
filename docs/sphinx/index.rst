@@ -14,6 +14,7 @@ Observing Simulations for SDSS-V
    guide
    database
    api
+   nomenclature
 
 
 Indices and tables
