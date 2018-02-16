@@ -1,0 +1,108 @@
+This document describes a conceptual design for the targeting and
+scheduling system for SDSS-V.
+
+Sequence of events
+------------------
+
+1. Targeting
+
+ a. Fundamental catalogs (Gaia, 2MASS, TIC, SDSS imaging, SDSS
+ spectroscopy, others) are loaded into targetdb.
+
+ b. Fundamental catalogs are resolved into a single "catalog" table.
+ All targets except targets-of-opportunity must exist in this table.
+ Each entry receives a unique catalogid. The catalog stores the
+ healpix pixel (nside=64, which is a bit less than 1 deg on a side)
+ containing the RA/Dec.
+
+ c. "target" is run. It receives input only from targetdb.  It fills a
+ table which has: targeting bit mask, epochs, exposures per epoch, and
+ cadence name. 
+
+ d. The target table is output to disk as a set of FITS files
+ organized by healpix pixel. 
+
+
+2. Tiling
+
+ a. Teams define the regions over which their targets will
+ be observed. These regions will be defined in terms of healpix
+ nside=64 map. There will be three pieces of information per pixel:
+
+  * window:
+	    1 indicates a region with targets and 0 indicates a region without.
+  * epochs:
+	    number of epochs necessary for the pixel. 
+  * exposures:
+	    number of exposure-epochs in the pixel total
+  * cadence name:
+	    name of cadence desired for the pixel
+
+ It must be understood that not necesarily will quite all of these
+ regions be covered. That depends on a global tiling solution and how
+ it intersects the window of the targets. 
+
+ Although ultimately the requirement is on the cadence and S/N of
+ individual targets, in order to observe a target, you need to target
+ the whole region around it, which is why these requirements come in
+ at the healpix pixel level. 
+
+ b. A set of fields are defined that cover the area with the
+ appropriate density. This will almost certainly be a by-hand task.
+
+ c. "tiling" is run. Tiling must define a set of tiles (zero or more
+ for each field), and determine which exposures of which targ
+ 		
+
+
+Software products
+-----------------
+
+* targetdb: 
+
+* target: 
+
+* tile: 
+
+* scheduler: 
+
+* observesim: 
+
+Databases
+---------
+
+* targetdb
+
+* fpsdb
+
+Glossary
+--------
+
+* Catalogs: refers to the fundamental catalogs from which the list of
+  targets is derived (e.g. Gaia, 2MASS, TESS Input Catalog, etc.).
+
+* Targeting: refers to the process of identifying a catalog object as
+  a potential target for spectroscopy. Results in a global list of
+  these targets in the database. This does not guarantee a fiber is
+  assigned.
+
+* Target: An astronomical object that has been identified in targeting
+  to potentially receive a fiber.
+
+* Field: refers to an RA/Dec center associated with a pointing of one
+  of the telescopes.
+
+* Tile: refers to a proposed observation of a field, including how the
+  fibers are assigned to targets.
+
+* Configuration: refers to the conditions of an actual observation of
+  a field, and the specific assignments of fibers to targets.
+
+Standards
+---------
+
+ * All target coordinates are given in columns names "ra", "dec",
+   which are 64-bit precision and given in J2000 deg, with an "epoch"
+   specified in decimal years, and with proper motions called "pmra"
+   and "pmdec" in mas / year.
+ 
