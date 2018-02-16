@@ -48,16 +48,57 @@ Sequence of events
  at the healpix pixel level. 
 
  b. A set of fields are defined that cover the area with the
- appropriate density. This will almost certainly be a by-hand task.
+ appropriate density. This will almost certainly be a by-hand
+ task. Each field inherits some cadence necessary, driven by the
+ targets it covers.
 
- c. "tiling" is run.
+ c. "tiling" is run. Note that the iterative sequence below is an
+ attempt to cast this difficult global problem into a set of tractable
+ ones. This is still R&D.
 
-  i. Tiling must define a set of tiles (zero or more for each field),
+  i. The code defines a set of tiles (zero or more for each field),
      and determine which exposures of which targets are taken in each
-     field. Note that at this stage there is no cadence requirement
-     imposed.
+     tile. Note that at this stage there is no cadence requirement
+     imposed. This can be done with a network flow as done for the
+		 plates. It establishes a starting point for the observations that
+		 at least observes everything.
 
-  ii. 
+  ii. Given the set of tiles, tiling defines a sequence of
+      observations based on the cadence criteria for each field and
+      the LST opportunity of each field. How to approach this is
+      unclear, but constraint programming techniques may work.
+
+  iii. Each tile now has specific planned sequence. In this context,
+       we now assign targets to the tiles applying cadence criteria. 
+       Again constraint programming may work here, but how to solve
+			 this is unclear.
+
+  iv. There may be some iteration in the above steps.
+
+  v. For each tile, we need to define some window of opportunity for
+  its observation in the plan. 
+
+3. Training the strategy:
+
+ a. Define a global metric for assessing success.
+
+ b. Define a strategy for selecting the next tile based on its
+ observability and its window of opportunity. The strategy may allow a
+ periodic rerunning of tiling based on achieved results.  The strategy
+ may have tunable parameters. 
+
+ c. Run simulations under that strategy.
+
+ d. Iterate on the strategy parameters to achieve best results on
+ global metric.
+
+ e. Assess strategy based on individual program outcomes.
+
+ f. Iterate on choices of (a) and (b) to best achieve outcomes of (e),
+ whatever that means.
+
+4. Survey operations
+ ... need to move material here from previous emails on databases ...
 
 
 Software products
