@@ -17,7 +17,7 @@ class Observations(object):
     ----------
 
     observatory : string
-       Observatory for fields ('apo' or 'lco'; default 'apo')
+       Observatory for tiles ('apo' or 'lco'; default 'apo')
 
     Attributes:
     ----------
@@ -25,8 +25,8 @@ class Observations(object):
     nobservations : np.int32
         number of observations
 
-    fieldid : ndarray of np.int32
-        id of each field for observations
+    tileid : ndarray of np.int32
+        id of each tile for observations
 
     mjd : ndarray of np.float64
         MJD of observation (days)
@@ -40,34 +40,34 @@ class Observations(object):
     Methods:
     -------
 
-    add() : add an observation of a field 
-    toarray() : Return ndarray of field properties
+    add() : add an observation of a tile
+    toarray() : Return ndarray of tile properties
 
 """
     def __init__(self, observatory='apo'):
         self.nobservations = np.int32(0)
         self.observatory = observatory
-        self.fieldid = np.zeros(0, dtype=np.int32)
+        self.tileid = np.zeros(0, dtype=np.int32)
         self.mjd = np.zeros(0, dtype=np.float64)
         self.duration = np.zeros(0, dtype=np.float64)
         self.sn2 = np.zeros(0, dtype=np.float64)
         return
 
-    def add(self, fieldid=None, mjd=None, duration=None, sn2=None):
-        self.fieldid = np.append(self.fieldid,
-                                 np.array([np.float64(fieldid)]))
+    def add(self, tileid=None, mjd=None, duration=None, sn2=None):
+        self.tileid = np.append(self.tileid,
+                                np.array([np.float64(tileid)]))
         self.mjd = np.append(self.mjd,
                              np.array([np.float64(mjd)]))
         self.duration = np.append(self.duration,
                                   np.array([np.float64(duration)]))
         self.sn2 = np.append(self.sn2,
                              np.array([np.float64(sn2)]))
-        self.nobservations = len(self.fieldid)
+        self.nobservations = len(self.tileid)
         return
 
-    def forfield(self, mjd=None, fieldid=None):
+    def fortile(self, mjd=None, tileid=None):
         indx = np.where((self.mjd <= mjd) &
-                        (self.fieldid == fieldid))[0]
+                        (self.tileid == tileid))[0]
         return(self.toarray(indx=indx))
 
     def toarray(self, indx=None):
@@ -85,7 +85,7 @@ class Observations(object):
         observations : record array
             observation information
 """
-        obs0 = [('fieldid', np.int32),
+        obs0 = [('tileid', np.int32),
                 ('mjd', np.float64),
                 ('duration', np.float64),
                 ('sn2', np.float64)]
@@ -94,7 +94,7 @@ class Observations(object):
         nobs = len(indx)
         obs = np.zeros(nobs, dtype=obs0)
         if(nobs > 0):
-            obs['fieldid'] = self.fieldid[indx]
+            obs['tileid'] = self.tileid[indx]
             obs['mjd'] = self.mjd[indx]
             obs['duration'] = self.duration[indx]
             obs['sn2'] = self.sn2[indx]

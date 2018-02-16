@@ -12,7 +12,7 @@ Dependencies:
 class Observe(object):
     """Observe class.
 
-    Used to simulate observations of fields.
+    Used to simulate observations of tiles.
 
     Methods:
     -------
@@ -27,14 +27,14 @@ class Observe(object):
         self._result0 = np.zeros(1, dtype=self._result_dtype)
         pass
 
-    def result(self, fieldid=None, duration=None, mjd=None):
+    def result(self, tileid=None, duration=None, mjd=None):
         """Return simulated result of an observation
 
         Parameters:
         ----------
 
-        fieldid : int, np.int32
-            id of field to observe
+        tileid : int, np.int32
+            id of tile to observe
 
         duration : float, np.float64
             duration of observation (days)

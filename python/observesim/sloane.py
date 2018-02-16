@@ -3,6 +3,7 @@ import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
 import PyAstronomy.pyasl as pyasl
+import mpl_toolkits.basemap as basemap
 
 
 def _arrayify(quantity=None):
@@ -90,7 +91,7 @@ class Sloane(object):
     Only a limited set of coverings are available. If "n" is outside this
     set, ra and dec are set to None.
 """
-    def __init__(self, n=None, alignment='Galactic'):
+    def __init__(self, n=None, alignment='Galactic', radius=1.5):
         self.n = n
         self.alignment = alignment
         (lon, lat) = self._uniform(n=self.n)
@@ -104,6 +105,7 @@ class Sloane(object):
             (ra, dec) = (lon, lat)
         self.ra = ra
         self.dec = dec
+        self.radius = radius
         return
 
     def _uniform(self, n=None):
@@ -119,6 +121,7 @@ class Sloane(object):
         dec_rad = (0.5 * np.pi - np.arctan2(c, xyz[:, 2]))
         ra = ra_rad * 180. / np.pi
         dec = dec_rad * 180. / np.pi
+        print(len(ra))
 
         return(ra, dec)
 
@@ -159,7 +162,48 @@ class Sloane(object):
         self.dec = dec
         return
 
+    def deccut(self, dec=None, above=True):
+        if(above is True):
+            ikeep = np.where(self.dec > dec)[0]
+        else:
+            ikeep = np.where(self.dec < dec)[0]
+        self.ra = self.ra[ikeep]
+        self.dec = self.dec[ikeep]
+
+    def _convert_radec(self, m, ra, dec):
+        return m(((360. - ra) + 180.) % 360., dec, inverse=False)
+
     def plot(self):
         """Plot ra and dec"""
-        plt.plot(self.ra, self.dec, '.')
-        plt.show()
+        m = basemap.Basemap(projection='moll', lon_0=270, resolution='c')
+
+        # draw parallels and meridians.
+        m.drawparallels(np.arange(-90., 120., 30.),
+                        linewidth=0.5,
+                        labels=[1, 0, 0, 0],
+                        labelstyle='+/-')
+        m.drawmeridians(np.arange(0., 420., 60.), linewidth=0.5)
+        m.drawmapboundary()
+
+        boundary = 90.
+
+        ncirc = 60
+
+        theta = np.arange(ncirc) * np.pi * 2. / np.float32(ncirc - 1)
+
+        for (ra, dec) in zip(self.ra, self.dec):
+            cra = (ra + self.radius / np.cos(dec * np.pi / 180.) *
+                   np.cos(theta))
+            cdec = dec + self.radius * np.sin(theta)
+
+            nbelow = np.count_nonzero(cra < boundary)
+            if(nbelow > 0):
+                ibelow = np.nonzero(cra < boundary)[0]
+                (xx, yy) = self._convert_radec(m, cra[ibelow], cdec[ibelow])
+                plt.plot(xx, yy, linewidth=0.25, color='blue')
+
+            nabove = np.count_nonzero(cra > boundary)
+            if(nabove > 0):
+                iabove = np.nonzero(cra > boundary)[0]
+                (xx, yy) = self._convert_radec(m, cra[iabove], cdec[iabove])
+                plt.plot(xx, yy, linewidth=0.25, color='blue')

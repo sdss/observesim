@@ -23,15 +23,23 @@ parser.add_argument("-o", "--output-base", dest="output_base", type=str,
 parser.add_argument("-s", "--seed", dest="seed", type=int,
                     required=False, help="random seed",
                     default=1)
+parser.add_argument("-t", "--telescope", dest="telescope", type=str,
+                    required=False, help="telescope ('apo' or 'lco')",
+                    default='apo')
 args = parser.parse_args()
 outbase = args.output_base
 seed = args.seed
+observatory = args.telescope
+if(observatory == 'apo'):
+    fclear = 0.5
+if(observatory == 'lco'):
+    fclear = 0.7
 
 # Set up schedule and weather
-scheduler = observesim.scheduler.Scheduler()
+scheduler = observesim.scheduler.Scheduler(observatory=observatory)
 weather = observesim.weather.Weather(mjd_start=scheduler.start,
                                      mjd_end=scheduler.end,
-                                     seed=seed)
+                                     seed=seed, fclear=fclear)
 observe = observesim.observe.Observe()
 
 # Initialize observedb
@@ -43,6 +51,7 @@ for mjd in scheduler.mjds:
     mjd_evening_twilight = scheduler.evening_twilight(mjd)
     mjd_morning_twilight = scheduler.morning_twilight(mjd)
     curr_mjd = mjd_evening_twilight
+    print(curr_mjd)
     while(curr_mjd < mjd_morning_twilight and
           curr_mjd < scheduler.end_mjd()):
         isclear, nextchange_weather = weather.clear(mjd=curr_mjd)
@@ -50,16 +59,16 @@ for mjd in scheduler.mjds:
         nextchange_all = np.array([nextchange_weather, nextchange_on])
         nextchange = np.min(nextchange_all)
         if((isclear == True) and (onoff == 'on')):
-            fieldid = scheduler.field(mjd=curr_mjd)
-            if(fieldid is not None):
-                duration = scheduler.fields.duration[fieldid]
+            tileid = scheduler.nexttile(mjd=curr_mjd)
+            if(tileid is not None):
+                duration = scheduler.tile.duration[tileid]
                 curr_mjd = curr_mjd + duration
                 if(curr_mjd > nextchange):
                     duration = (duration - (curr_mjd - nextchange))
                     curr_mjd = nextchange
-                result = observe.result(mjd=curr_mjd, fieldid=fieldid,
+                result = observe.result(mjd=curr_mjd, tileid=tileid,
                                         duration=duration)
-                scheduler.update(fieldid=fieldid, result=result)
+                scheduler.update(tileid=tileid, result=result)
         else:
             if(nextchange > curr_mjd):
                 curr_mjd = nextchange
@@ -67,6 +76,6 @@ for mjd in scheduler.mjds:
 outobsfile = "{outbase}-observations.fits".format(outbase=outbase)
 fitsio.write(outobsfile, scheduler.observations.toarray(),
              clobber=True)
-outfieldfile = "{outbase}-fields.fits".format(outbase=outbase)
-fitsio.write(outfieldfile, scheduler.fields.toarray(),
+outtilefile = "{outbase}-tiles.fits".format(outbase=outbase)
+fitsio.write(outtilefile, scheduler.tile.toarray(),
              clobber=True)

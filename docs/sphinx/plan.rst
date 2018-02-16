@@ -20,7 +20,9 @@ Tiling
 
 * We will define a set of appropriate field centers with the desired coverage of the sky.
 
-* We will define a set of tiles covering those field centers that can fill them
+* We will define a set of tiles covering those field centers that cover the region
+
+* We will choose the 
 	
 Indices and tables
 ------------------
