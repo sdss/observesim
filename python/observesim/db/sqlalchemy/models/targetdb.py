@@ -186,6 +186,12 @@ class ActuatorType(Base):
     __table_args__ = {'autoload': True, 'schema': 'targetdb'}
 
 
+class FPSLayout(Base):
+
+    __tablename__ = 'fps_layout'
+    __table_args__ = {'autoload': True, 'schema': 'targetdb'}
+
+
 Target.file = relation(File, backref='targets')
 Target.field = relation(Field, backref='targets')
 Target.target_type = relation(TargetType, backref='targets')
@@ -220,6 +226,7 @@ Fiber.actuator = relation(Actuator, backref='fibers')
 
 Actuator.actuator_status = relation(ActuatorStatus, backref='actuators')
 Actuator.actuator_type = relation(ActuatorType, backref='actuators')
+Actuator.fps_layout = relation(FPSLayout, backref='actuators')
 
 
 try:

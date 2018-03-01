@@ -1,6 +1,6 @@
 /*
 
-targetDB schema version 0.3.3
+targetDB schema version v0.3.4
 
 Created Jan 2018 - J. Sánchez-Gallego
 
@@ -102,7 +102,8 @@ CREATE TABLE targetdb.actuator (
 	xcen REAL,
 	ycen REAL,
 	actuator_status_pk SMALLINT NOT NULL,
-	actuator_type_pk SMALLINT NOT NULL);
+	actuator_type_pk SMALLINT NOT NULL,
+	fps_layout_pk SMALLINT NOT NULL);
 
 CREATE TABLE targetdb.fiber_configuration (
 	pk serial PRIMARY KEY NOT NULL,
@@ -121,6 +122,10 @@ CREATE TABLE targetdb.actuator_status (
 	label TEXT);
 
 CREATE TABLE targetdb.actuator_type (
+	pk serial PRIMARY KEY NOT NULL,
+	label TEXT NOT NULL);
+
+CREATE TABLE targetdb.fps_layout (
 	pk serial PRIMARY KEY NOT NULL,
 	label TEXT NOT NULL);
 
@@ -324,6 +329,11 @@ ALTER TABLE ONLY targetdb.actuator
     FOREIGN KEY (actuator_type_pk) REFERENCES targetdb.actuator_type(pk)
     ON UPDATE CASCADE ON DELETE CASCADE;
 
+ALTER TABLE ONLY targetdb.actuator
+    ADD CONSTRAINT fps_layout_fk
+    FOREIGN KEY (fps_layout_pk) REFERENCES targetdb.fps_layout(pk)
+    ON UPDATE CASCADE ON DELETE CASCADE;
+
 
 -- Indices
 CREATE INDEX CONCURRENTLY file_pk_idx ON targetdb.target using BTREE(file_pk);
@@ -361,3 +371,4 @@ CREATE INDEX CONCURRENTLY actuator_pk_idx ON targetdb.fiber using BTREE(actuator
 
 CREATE INDEX CONCURRENTLY actuator_status_pk_idx ON targetdb.actuator using BTREE(actuator_status_pk);
 CREATE INDEX CONCURRENTLY actuator_type_pk_idx ON targetdb.actuator using BTREE(actuator_type_pk);
+CREATE INDEX CONCURRENTLY fps_layout_pk_idx ON targetdb.actuator using BTREE(fps_layout_pk);

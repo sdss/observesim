@@ -11,7 +11,7 @@ import re
 
 from peewee import TextField, IntegerField, AutoField, DateTimeField
 from peewee import BigIntegerField, ForeignKeyField, FloatField
-from peewee import ManyToManyField, PostgresqlDatabase, Model
+from peewee import ManyToManyField, Model
 
 from . import database
 
@@ -74,6 +74,15 @@ class ActuatorType(BaseModel):
         schema = 'targetdb'
 
 
+class FPSLayout(BaseModel):
+    label = TextField(null=True)
+    pk = AutoField()
+
+    class Meta:
+        table_name = 'fps_layout'
+        schema = 'targetdb'
+
+
 class Actuator(BaseModel):
     id = IntegerField(null=True)
     pk = AutoField()
@@ -90,6 +99,12 @@ class Actuator(BaseModel):
                                     model=ActuatorStatus,
                                     null=True,
                                     backref='actuators')
+
+    fps_layout = ForeignKeyField(column_name='fps_layout_pk',
+                                 field='pk',
+                                 model=FPSLayout,
+                                 null=True,
+                                 backref='actuators')
 
     class Meta:
         table_name = 'actuator'

@@ -12,7 +12,7 @@ Schema
 
 The data used for survey simulations is stored in the SDSS-V dedicated database ``sdss5db``, in particular in the ``targetdb`` schema. The following links give access to the :download:`graffle <../../schema/targetdb.graffle>` (:download:`PDF <../../schema/targetdb.pdf>`) and the :download:`SQL <../../schema/targetdb.sql>` files that implement the ``targetdb`` schema.
 
-The current version of the schema is ``v0.3.3``. If you make modifications to the schema, please remember to update the version in both the graffle and SQL file.
+The current version of the schema is ``v0.3.4``. If you make modifications to the schema, please remember to update the version in both the graffle and SQL file.
 
 
 What's in targetdb?
