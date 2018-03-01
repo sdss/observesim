@@ -262,13 +262,16 @@ def load_targets(filename, verbose=False, remove=False):
                                                   targetdb.Target.target_type_pk]).execute()
 
 
-def load_fibres(filename, verbose=False, remove=False):
+def load_fibres(filename, layout_name, verbose=False, remove=False):
     """Loads fibres and actuators into ``targetdb``.
 
     Parameters:
         filename (str):
             Path to the file containing the positions of the actuators and
             the fibres associated to each one.
+        layout_name (str):
+            The name of the FPS layout with which these fibres must be
+            associated.
         verbose (bool):
             Determines the level of verbosity.
         remove (bool):
@@ -293,12 +296,19 @@ def load_fibres(filename, verbose=False, remove=False):
         targetdb.Actuator.delete().execute()
         targetdb.Fiber.delete().execute()
         targetdb.FiberConfiguration.delete().execute()
+        targetdb.FPSLayout.delete().execute()
 
     boss_spec_pk = targetdb.Spectrograph.get(label='BOSS').pk
     apogee_spec_pk = targetdb.Spectrograph.get(label='APOGEE').pk
 
     fibre_status_ok = targetdb.FiberStatus.get(label='OK').pk
     actuator_status_ok = targetdb.ActuatorStatus.get(label='OK').pk
+
+    fps_layout_dbo, created = targetdb.FPSLayout.get_or_create(label=layout_name)
+    if created:
+        log.info(f'created FPS layout {layout_name!r}')
+    else:
+        log.info(f'found FPS layout for {layout_name!r}')
 
     log.info('loading actuator and fibre data ... ')
 
@@ -326,7 +336,8 @@ def load_fibres(filename, verbose=False, remove=False):
             actuator = targetdb.Actuator.create(
                 id=(ii + 1), xcen=xcen, ycen=ycen,
                 actuator_status_pk=actuator_status_ok,
-                actuator_type_pk=targetdb.ActuatorType.get(label=actuator_type).pk)
+                actuator_type_pk=targetdb.ActuatorType.get(label=actuator_type).pk,
+                fps_layout_pk=fps_layout_dbo.pk)
 
             if verbose:
                 log.debug(f'created actuator id={actuator.id} of type '
