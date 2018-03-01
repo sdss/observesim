@@ -6,3 +6,4 @@ pydl
 pyyaml
 pygments
 click
+fitsio
