@@ -22,7 +22,7 @@ What's in targetdb?
 
 The main section of :download:`targetdb <../../schema/targetdb.pdf>` comprises the ``target`` table as well as multiple auxiliary tables (``target_cadence``, ``program``, ``target_type``, etc.) At this time all targets have ``target_type='Science'`` but in the future we will add standard, skies, and maybe guide star targets. Many targets have magnitude information (in a variety of bands) as well as stellar parameters. While it is unlikely that we will need that data for scheduling they can be used for a number of QA and sample checks. Refer to :ref:`loading-targetdb` for details on the data currently loaded.
 
-Another section of ``targetdb`` contains tables with information about the fibres and actuators, according to the `latest focal plane system layout <https://internal.sdss.org/trac/as4/wiki/FPSLayout>`_. A ``tile`` table links position on the sky with targets and robot configuration.
+Another section of ``targetdb`` contains tables with information about the fibres and actuators, according to the `latest focal plane system layout <https://internal.sdss.org/trac/as4/wiki/FPSLayout>`_. A ``tile`` table links position on the sky with targets and robot configuration. Each set of actuators have an associated layout (table ``fps_layout``). Currently there are fibres and actuators loaded for the filled hexagon configuration and for the original one with a central park.
 
 A final group of tables stores information about exposures and spectra. In the operations database, those tables are likely to be moved to their own schema. The ``simulation`` table connects with ``tile`` and ``exposure`` and can be used to catalogue what exposures and tiles have been created for each simulation.
 
