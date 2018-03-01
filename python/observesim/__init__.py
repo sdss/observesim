@@ -16,7 +16,7 @@ import yaml
 # File logging can be started by calling log.start_file_logger(name).
 from .misc import log
 import observesim.scheduler
-import observesim.tile
+# import observesim.tile
 import observesim.observations
 import observesim.weather
 import observesim.observe
