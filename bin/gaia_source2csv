@@ -6,15 +6,51 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import os
+import sys
 import glob
+import time
+import multiprocessing
+import cStringIO
+import re
 
-from astropy.table import Table
+from astropy.table import Table, vstack
+from astropy.io import ascii
+
+def loadTable(fitsFile):
+    print("on table", fitsFile)
+    sys.stdout.flush()
+    return Table.read(fitsFile)
+
 
 GAIA_DIR = os.getenv("GAIA_DATA")
 GAIA_FITS_DIR = os.path.join(GAIA_DIR, "dr1/gaia_source/fits")
 allFitsTables = sorted(glob.glob(GAIA_FITS_DIR+"/GaiaSource*.fits"))
+print("len", len(allFitsTables))
+OUTPUT_DIR = os.path.join(os.getenv("SCRATCH_LUSTRE"), "gaiaSourceCSV")
 
-OUTPUT_DIR = os.path.join(os.getenv("$SCRATCH_LUSTRE"), "gaiaSourceCSV")
+def writeCSV(fitsFile):
+    table = Table.read(fitsFile)
+    filename = os.path.split(fitsFile)[-1]
+    csvfilename = filename.strip("fits") + "csv"
+    fullpath = os.path.join(OUTPUT_DIR, csvfilename)
+    outStrBuffer = cStringIO.StringIO()
+    ascii.write(table, outStrBuffer, format="csv")
+    outStr = outStrBuffer.getvalue()
+    t1 = time.time()
+    replNan = re.sub("nan", "NULL", outStr)
+    t1 = time.time()
+    with open(csvfilename, "w") as f:
+        f.write(replNan)
 
-tableList = [Table.read(fitsTable) for fitsTable in allFitsTables]
+def checkWrite():
+    allCSVs = sorted(glob.glob(OUTPUT_DIR + "/*.csv"))
+    for csv in allCSVs:
+        with open(csv, "r") as f:
+            print(f.readline())
 
+tstart = time.time()
+p = multiprocessing.Pool(12)
+tableList = p.map(writeCSV, allFitsTables)
+#tableList = [writeCSV(f) for f in allFitsTables[:3]]
+tend = time.time()
+print("took", (tend-tstart)/60.0, "minutes")
