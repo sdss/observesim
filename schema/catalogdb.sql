@@ -138,7 +138,7 @@ CREATE SCHEMA catalogdb;
 SET search_path TO catalogdb;
 
 CREATE TABLE catalogdb.gaia_dr1_source (
-	pk serial PRIMARY KEY NOT NULL,
+	pk bigserial PRIMARY KEY NOT NULL,
     solution_id BIGINT,
     source_id BIGINT,
     random_index BIGINT,
@@ -198,7 +198,7 @@ CREATE TABLE catalogdb.gaia_dr1_source (
     ecl_lat DOUBLE PRECISION);
 
 CREATE TABLE catalogdb.gaia_dr1_tgas (
-    pk serial PRIMARY KEY NOT NULL,
+    pk bigserial PRIMARY KEY NOT NULL,
     hip INTEGER,
     tycho2_id TEXT,
     solution_id BIGINT,
