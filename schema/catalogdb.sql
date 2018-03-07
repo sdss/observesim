@@ -195,8 +195,7 @@ CREATE TABLE catalogdb.gaia_dr1_source (
     l DOUBLE PRECISION,
     b DOUBLE PRECISION,
     ecl_lon DOUBLE PRECISION,
-    ecl_lat DOUBLE PRECISION,
-    );
+    ecl_lat DOUBLE PRECISION);
 
 CREATE TABLE catalogdb.gaia_dr1_tgas (
     pk serial PRIMARY KEY NOT NULL,
@@ -258,8 +257,7 @@ CREATE TABLE catalogdb.gaia_dr1_tgas (
     l DOUBLE PRECISION,
     b DOUBLE PRECISION,
     ecl_lon DOUBLE PRECISION,
-    ecl_lat DOUBLE PRECISION,
-    );
+    ecl_lat DOUBLE PRECISION);
 
 
 -- Indices
