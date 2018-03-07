@@ -55,11 +55,11 @@ if __name__ == "__main__":
     usageStr = "usage: gaia_source2csv tgas | source"
     if not sys.argv[1]:
         print(usageStr)
-        return
+        sys.exit()
     catalog = sys.argv[1].lower()
     if catalog not in ["tgas", "source"]:
         print(usageStr)
-        return
+        sys.exit()
     if catalog == "tgas":
         writeTgasCSVs()
     else:
