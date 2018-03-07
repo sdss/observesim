@@ -125,6 +125,11 @@ TGAS:
 ('b', dtype('>f8'))
 ('ecl_lon', dtype('>f8'))
 ('ecl_lat', dtype('>f8'))
+
+to run:
+psql -f catalogdb.sql -h db.sdss.utah.edu -U sdssdb_admin -p 5432 sdss5db
+
+drop schema catalogdb cascade;
 */
 
 
@@ -134,126 +139,126 @@ SET search_path TO catalogdb;
 
 CREATE TABLE catalogdb.gaia_dr1_source (
 	pk serial PRIMARY KEY NOT NULL,
-    solution_id BIGINT
-    source_id BIGINT
-    random_index BIGINT
-    ref_epoch DOUBLE PRECISION
-    ra DOUBLE PRECISION
-    ra_error DOUBLE PRECISION
-    dec DOUBLE PRECISION
-    dec_error DOUBLE PRECISION
-    parallax DOUBLE PRECISION
-    parallax_error DOUBLE PRECISION
-    pmra DOUBLE PRECISION
-    pmra_error DOUBLE PRECISION
-    pmdec DOUBLE PRECISION
-    pmdec_error DOUBLE PRECISION
-    ra_dec_corr REAL
-    ra_parallax_corr REAL
-    ra_pmra_corr REAL
-    ra_pmdec_corr REAL
-    dec_parallax_corr REAL
-    dec_pmra_corr REAL
-    dec_pmdec_corr REAL
-    parallax_pmra_corr REAL
-    parallax_pmdec_corr REAL
-    pmra_pmdec_corr REAL
-    astrometric_n_obs_al INTEGER
-    astrometric_n_obs_ac INTEGER
-    astrometric_n_good_obs_al INTEGER
-    astrometric_n_good_obs_ac INTEGER
-    astrometric_n_bad_obs_al INTEGER
-    astrometric_n_bad_obs_ac INTEGER
-    astrometric_delta_q REAL
-    astrometric_excess_noise DOUBLE PRECISION
-    astrometric_excess_noise_sig DOUBLE PRECISION
-    astrometric_primary_flag BOOLEAN
-    astrometric_relegation_factor REAL
-    astrometric_weight_al REAL
-    astrometric_weight_ac REAL
-    astrometric_priors_used INTEGER
-    matched_observations INTEGER
-    duplicated_source BOOLEAN
-    scan_direction_strength_k1 REAL
-    scan_direction_strength_k2 REAL
-    scan_direction_strength_k3 REAL
-    scan_direction_strength_k4 REAL
-    scan_direction_mean_k1 REAL
-    scan_direction_mean_k2 REAL
-    scan_direction_mean_k3 REAL
-    scan_direction_mean_k4 REAL
-    phot_g_n_obs INTEGER
-    phot_g_mean_flux DOUBLE PRECISION
-    phot_g_mean_flux_error DOUBLE PRECISION
-    phot_g_mean_mag DOUBLE PRECISION
-    phot_variable_flag dtypeS13
-    l DOUBLE PRECISION
-    b DOUBLE PRECISION
-    ecl_lon DOUBLE PRECISION
-    ecl_lat DOUBLE PRECISION
+    solution_id BIGINT,
+    source_id BIGINT,
+    random_index BIGINT,
+    ref_epoch DOUBLE PRECISION,
+    ra DOUBLE PRECISION,
+    ra_error DOUBLE PRECISION,
+    dec DOUBLE PRECISION,
+    dec_error DOUBLE PRECISION,
+    parallax DOUBLE PRECISION,
+    parallax_error DOUBLE PRECISION,
+    pmra DOUBLE PRECISION,
+    pmra_error DOUBLE PRECISION,
+    pmdec DOUBLE PRECISION,
+    pmdec_error DOUBLE PRECISION,
+    ra_dec_corr REAL,
+    ra_parallax_corr REAL,
+    ra_pmra_corr REAL,
+    ra_pmdec_corr REAL,
+    dec_parallax_corr REAL,
+    dec_pmra_corr REAL,
+    dec_pmdec_corr REAL,
+    parallax_pmra_corr REAL,
+    parallax_pmdec_corr REAL,
+    pmra_pmdec_corr REAL,
+    astrometric_n_obs_al INTEGER,
+    astrometric_n_obs_ac INTEGER,
+    astrometric_n_good_obs_al INTEGER,
+    astrometric_n_good_obs_ac INTEGER,
+    astrometric_n_bad_obs_al INTEGER,
+    astrometric_n_bad_obs_ac INTEGER,
+    astrometric_delta_q REAL,
+    astrometric_excess_noise DOUBLE PRECISION,
+    astrometric_excess_noise_sig DOUBLE PRECISION,
+    astrometric_primary_flag BOOLEAN,
+    astrometric_relegation_factor REAL,
+    astrometric_weight_al REAL,
+    astrometric_weight_ac REAL,
+    astrometric_priors_used INTEGER,
+    matched_observations INTEGER,
+    duplicated_source BOOLEAN,
+    scan_direction_strength_k1 REAL,
+    scan_direction_strength_k2 REAL,
+    scan_direction_strength_k3 REAL,
+    scan_direction_strength_k4 REAL,
+    scan_direction_mean_k1 REAL,
+    scan_direction_mean_k2 REAL,
+    scan_direction_mean_k3 REAL,
+    scan_direction_mean_k4 REAL,
+    phot_g_n_obs INTEGER,
+    phot_g_mean_flux DOUBLE PRECISION,
+    phot_g_mean_flux_error DOUBLE PRECISION,
+    phot_g_mean_mag DOUBLE PRECISION,
+    phot_variable_flag TEXT,
+    l DOUBLE PRECISION,
+    b DOUBLE PRECISION,
+    ecl_lon DOUBLE PRECISION,
+    ecl_lat DOUBLE PRECISION,
     );
 
 CREATE TABLE catalogdb.gaia_dr1_tgas (
     pk serial PRIMARY KEY NOT NULL,
-    hip INTEGER
-    tycho2_id TEXT
-    solution_id BIGINT
-    source_id BIGINT
-    random_index BIGINT
-    ref_epoch DOUBLE PRECISION
-    ra DOUBLE PRECISION
-    ra_error DOUBLE PRECISION
-    dec DOUBLE PRECISION
-    dec_error DOUBLE PRECISION
-    parallax DOUBLE PRECISION
-    parallax_error DOUBLE PRECISION
-    pmra DOUBLE PRECISION
-    pmra_error DOUBLE PRECISION
-    pmdec DOUBLE PRECISION
-    pmdec_error DOUBLE PRECISION
-    ra_dec_corr REAL
-    ra_parallax_corr REAL
-    ra_pmra_corr REAL
-    ra_pmdec_corr REAL
-    dec_parallax_corr REAL
-    dec_pmra_corr REAL
-    dec_pmdec_corr REAL
-    parallax_pmra_corr REAL
-    parallax_pmdec_corr REAL
-    pmra_pmdec_corr REAL
-    astrometric_n_obs_al INTEGER
-    astrometric_n_obs_ac INTEGER
-    astrometric_n_good_obs_al INTEGER
-    astrometric_n_good_obs_ac INTEGER
-    astrometric_n_bad_obs_al INTEGER
-    astrometric_n_bad_obs_ac INTEGER
-    astrometric_delta_q REAL
-    astrometric_excess_noise DOUBLE PRECISION
-    astrometric_excess_noise_sig DOUBLE PRECISION
-    astrometric_primary_flag BOOLEAN
-    astrometric_relegation_factor REAL
-    astrometric_weight_al REAL
-    astrometric_weight_ac REAL
-    astrometric_priors_used INTEGER
-    matched_observations INTEGER
-    duplicated_source BOOLEAN
-    scan_direction_strength_k1 REAL
-    scan_direction_strength_k2 REAL
-    scan_direction_strength_k3 REAL
-    scan_direction_strength_k4 REAL
-    scan_direction_mean_k1 REAL
-    scan_direction_mean_k2 REAL
-    scan_direction_mean_k3 REAL
-    scan_direction_mean_k4 REAL
-    phot_g_n_obs INTEGER
-    phot_g_mean_flux DOUBLE PRECISION
-    phot_g_mean_flux_error DOUBLE PRECISION
-    phot_g_mean_mag DOUBLE PRECISION
-    phot_variable_flag TEXT
-    l DOUBLE PRECISION
-    b DOUBLE PRECISION
-    ecl_lon DOUBLE PRECISION
-    ecl_lat DOUBLE PRECISION
+    hip INTEGER,
+    tycho2_id TEXT,
+    solution_id BIGINT,
+    source_id BIGINT,
+    random_index BIGINT,
+    ref_epoch DOUBLE PRECISION,
+    ra DOUBLE PRECISION,
+    ra_error DOUBLE PRECISION,
+    dec DOUBLE PRECISION,
+    dec_error DOUBLE PRECISION,
+    parallax DOUBLE PRECISION,
+    parallax_error DOUBLE PRECISION,
+    pmra DOUBLE PRECISION,
+    pmra_error DOUBLE PRECISION,
+    pmdec DOUBLE PRECISION,
+    pmdec_error DOUBLE PRECISION,
+    ra_dec_corr REAL,
+    ra_parallax_corr REAL,
+    ra_pmra_corr REAL,
+    ra_pmdec_corr REAL,
+    dec_parallax_corr REAL,
+    dec_pmra_corr REAL,
+    dec_pmdec_corr REAL,
+    parallax_pmra_corr REAL,
+    parallax_pmdec_corr REAL,
+    pmra_pmdec_corr REAL,
+    astrometric_n_obs_al INTEGER,
+    astrometric_n_obs_ac INTEGER,
+    astrometric_n_good_obs_al INTEGER,
+    astrometric_n_good_obs_ac INTEGER,
+    astrometric_n_bad_obs_al INTEGER,
+    astrometric_n_bad_obs_ac INTEGER,
+    astrometric_delta_q REAL,
+    astrometric_excess_noise DOUBLE PRECISION,
+    astrometric_excess_noise_sig DOUBLE PRECISION,
+    astrometric_primary_flag BOOLEAN,
+    astrometric_relegation_factor REAL,
+    astrometric_weight_al REAL,
+    astrometric_weight_ac REAL,
+    astrometric_priors_used INTEGER,
+    matched_observations INTEGER,
+    duplicated_source BOOLEAN,
+    scan_direction_strength_k1 REAL,
+    scan_direction_strength_k2 REAL,
+    scan_direction_strength_k3 REAL,
+    scan_direction_strength_k4 REAL,
+    scan_direction_mean_k1 REAL,
+    scan_direction_mean_k2 REAL,
+    scan_direction_mean_k3 REAL,
+    scan_direction_mean_k4 REAL,
+    phot_g_n_obs INTEGER,
+    phot_g_mean_flux DOUBLE PRECISION,
+    phot_g_mean_flux_error DOUBLE PRECISION,
+    phot_g_mean_mag DOUBLE PRECISION,
+    phot_variable_flag TEXT,
+    l DOUBLE PRECISION,
+    b DOUBLE PRECISION,
+    ecl_lon DOUBLE PRECISION,
+    ecl_lat DOUBLE PRECISION,
     );
 
 
