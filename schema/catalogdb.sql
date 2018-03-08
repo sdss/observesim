@@ -139,7 +139,7 @@ SET search_path TO catalogdb;
 
 CREATE TABLE catalogdb.gaia_dr1_source (
     solution_id BIGINT,
-    source_id BIGINT PRIMARY KEY NOT NULL,
+    source_id BIGINT,
     random_index BIGINT,
     ref_epoch DOUBLE PRECISION,
     ra DOUBLE PRECISION,
@@ -199,7 +199,7 @@ CREATE TABLE catalogdb.gaia_dr1_source (
 CREATE TABLE catalogdb.gaia_dr1_tgas (
     hip INTEGER,
     tycho2_id TEXT,
-    solution_id BIGINT PRIMARY KEY NOT NULL,
+    solution_id BIGINT,
     source_id BIGINT,
     random_index BIGINT,
     ref_epoch DOUBLE PRECISION,
