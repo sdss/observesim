@@ -138,9 +138,8 @@ CREATE SCHEMA catalogdb;
 SET search_path TO catalogdb;
 
 CREATE TABLE catalogdb.gaia_dr1_source (
-    pk serial PRIMARY KEY NOT NULL,
     solution_id BIGINT,
-    source_id BIGINT,
+    source_id BIGINT PRIMARY KEY NOT NULL,
     random_index BIGINT,
     ref_epoch DOUBLE PRECISION,
     ra DOUBLE PRECISION,
@@ -198,10 +197,9 @@ CREATE TABLE catalogdb.gaia_dr1_source (
     ecl_lat DOUBLE PRECISION);
 
 CREATE TABLE catalogdb.gaia_dr1_tgas (
-    pk serial PRIMARY KEY NOT NULL,
     hip INTEGER,
     tycho2_id TEXT,
-    solution_id BIGINT,
+    solution_id BIGINT PRIMARY KEY NOT NULL,
     source_id BIGINT,
     random_index BIGINT,
     ref_epoch DOUBLE PRECISION,
@@ -261,6 +259,7 @@ CREATE TABLE catalogdb.gaia_dr1_tgas (
 
 
 -- Indices
+/*
 CREATE INDEX CONCURRENTLY gaia_dr1_source_ra_index ON catalogdb.gaia_dr1_source using BTREE(ra);
 CREATE INDEX CONCURRENTLY gaia_dr1_source_dec_index ON catalogdb.gaia_dr1_source using BTREE(dec);
 CREATE INDEX CONCURRENTLY gaia_dr1_source_l_index ON catalogdb.gaia_dr1_source using BTREE(l);
@@ -285,4 +284,4 @@ CREATE INDEX CONCURRENTLY gaia_dr1_tgas_source_id_index ON catalogdb.gaia_dr1_tg
 CREATE INDEX CONCURRENTLY gaia_dr1_tgas_hip_index ON catalogdb.gaia_dr1_tgas using BTREE(hip);
 CREATE INDEX CONCURRENTLY gaia_dr1_tgas_tycho2_id_index ON catalogdb.gaia_dr1_tgas using BTREE(tycho2_id);
 CREATE INDEX CONCURRENTLY gaia_dr1_tgas_duplicated_source_index ON catalogdb.gaia_dr1_tgas using BTREE(duplicated_source);
-
+*/
