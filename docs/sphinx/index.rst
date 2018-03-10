@@ -11,6 +11,7 @@ Observing Simulations for SDSS-V
 .. toctree::
    :maxdepth: 2
 
+   installation
    guide
    database
    api
