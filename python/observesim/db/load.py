@@ -141,7 +141,7 @@ def _load_stellar_params(catalogue, row):
     return _load_table_from_cols(valid_columns, catalogue, row, targetdb.StellarParams)
 
 
-def load_targets(filename, verbose=False, remove=False):
+def load_targets(filename, verbose=False, remove=False, profile=None):
     """Populates ``targetdb.target`` and associated tables.
 
     Parameters:
@@ -154,6 +154,8 @@ def load_targets(filename, verbose=False, remove=False):
             If ``True``, the target, magnitude, field, program, target cadence,
             file, and stellar paramater tables will be truncated before
             inserting new records.
+        profile (str):
+            Profile to use to connect to the DB.
 
     """
 
@@ -161,6 +163,10 @@ def load_targets(filename, verbose=False, remove=False):
         log.sh.setLevel(logging.DEBUG)
     else:
         log.sh.setLevel(logging.INFO)
+
+    if profile:
+        log.info(f'setting DB profile {profile!r}')
+        targetdb.database.connect_from_config(profile)
 
     filename = pathlib.Path(filename)
     assert filename.exists()
@@ -262,7 +268,7 @@ def load_targets(filename, verbose=False, remove=False):
                                                   targetdb.Target.target_type_pk]).execute()
 
 
-def load_fibres(filename, layout_name, verbose=False, remove=False):
+def load_fibres(filename, layout_name, verbose=False, remove=False, profile=None):
     """Loads fibres and actuators into ``targetdb``.
 
     Parameters:
@@ -277,6 +283,8 @@ def load_fibres(filename, layout_name, verbose=False, remove=False):
         remove (bool):
             If ``True``, the fiber, actuator, and fiber configuation tables
             will be truncated before inserting new records.
+        profile (str):
+            Profile to use to connect to the DB.
 
     """
 
@@ -284,6 +292,10 @@ def load_fibres(filename, layout_name, verbose=False, remove=False):
         log.sh.setLevel(logging.DEBUG)
     else:
         log.sh.setLevel(logging.INFO)
+
+    if profile:
+        log.info(f'setting DB profile {profile!r}')
+        targetdb.database.connect_from_config(profile)
 
     filename = pathlib.Path(filename)
     assert filename.exists()
@@ -345,7 +357,7 @@ def load_fibres(filename, layout_name, verbose=False, remove=False):
 
             for spec in specs:
                 fibre = targetdb.Fiber.create(
-                    fiberid=fiberid, throughput=1,
+                    fiberid=(fiberid + ii), throughput=1,
                     spectrograph_pk=(boss_spec_pk if spec == 'BOSS' else apogee_spec_pk),
                     fiber_status_pk=fibre_status_ok, actuator_pk=actuator.pk)
 

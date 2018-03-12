@@ -21,6 +21,7 @@ def observesim(ctx, verbose=False):
 
 
 @observesim.command()
+@click.option('--profile', type=str, help='profile to use to connect to the db')
 @click.option('--remove', is_flag=True, help='truncates tables before adding new data')
 @click.option('--no-targets', is_flag=True, help='does not load the target data')
 @click.option('--no-fibres', is_flag=True, help='does not load the fibre data')
@@ -28,8 +29,8 @@ def observesim(ctx, verbose=False):
 @click.argument('targets_file', required=False, type=click.Path(exists=True))
 @click.argument('fibres_file', required=False, type=click.Path(exists=True))
 @click.pass_context
-def loaddb(ctx, targets_file, fibres_file, no_targets=False, no_fibres=False,
-           layout=None, remove=False):
+def loaddb(ctx, targets_file, fibres_file, profile=None, no_targets=False,
+           no_fibres=False, layout=None, remove=False):
     """Loads targets and fibres/actuator to targetDB."""
 
     from observesim.db.load import load_targets, load_fibres
@@ -40,7 +41,7 @@ def loaddb(ctx, targets_file, fibres_file, no_targets=False, no_fibres=False,
     if no_targets is False:
         assert targets_file is not None, 'target file is required'
         load_targets(click.format_filename(targets_file), verbose=ctx.obj['verbose'],
-                     remove=remove)
+                     remove=remove, profile=profile)
     else:
         fibres_file = targets_file
 
@@ -48,7 +49,7 @@ def loaddb(ctx, targets_file, fibres_file, no_targets=False, no_fibres=False,
         assert fibres_file is not None, 'fibres file is required'
         assert layout is not None, '--layout needs to be set'
         load_fibres(click.format_filename(fibres_file), layout,
-                    verbose=ctx.obj['verbose'], remove=remove)
+                    verbose=ctx.obj['verbose'], remove=remove, profile=profile)
 
 
 if __name__ == '__main__':
