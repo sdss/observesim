@@ -5,6 +5,9 @@ schema for tycho2 table
 http://tdc-www.harvard.edu/catalogs/tycho2.html
 http://tdc-www.harvard.edu/catalogs/tycho2.format.html#catalog
 
+to run:
+psql -f catalogdb.sql -h db.sdss.utah.edu -U sdssdb_admin -p 5432 sdss5db
+
 */
 
 CREATE TABLE catalogdb.tycho2 (
