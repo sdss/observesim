@@ -96,7 +96,7 @@ class Actuator(BaseModel):
 
     actuator_type = ForeignKeyField(column_name='actuator_type_pk',
                                     field='pk',
-                                    model=ActuatorStatus,
+                                    model=ActuatorType,
                                     null=True,
                                     backref='actuators')
 
