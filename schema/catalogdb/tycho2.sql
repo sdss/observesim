@@ -6,7 +6,7 @@ http://tdc-www.harvard.edu/catalogs/tycho2.html
 http://tdc-www.harvard.edu/catalogs/tycho2.format.html#catalog
 
 to run:
-psql -f catalogdb.sql -h db.sdss.utah.edu -U sdssdb_admin -p 5432 sdss5db
+psql -f tycho2.sql -h db.sdss.utah.edu -U sdssdb_admin -p 5432 sdss5db
 
 */
 

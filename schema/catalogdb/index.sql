@@ -2,7 +2,7 @@
 
 indices for catalogdb tables, to be run after bulk uploads
 
-psql -f catalogdb.sql -h db.sdss.utah.edu -U sdssdb_admin -p 5432 sdss5db
+psql -f index.sql -h db.sdss.utah.edu -U sdssdb_admin -p 5432 sdss5db
 
 drop index catalogdb.gaia_dr1_tgas_dec_index;
 
@@ -22,6 +22,8 @@ CREATE INDEX CONCURRENTLY gaia_dr1_source_phot_g_mean_mag_index ON catalogdb.gai
 CREATE INDEX CONCURRENTLY gaia_dr1_source_solution_id_index ON catalogdb.gaia_dr1_source using BTREE (solution_id);
 CREATE INDEX CONCURRENTLY gaia_dr1_source_source_id_index ON catalogdb.gaia_dr1_source using BTREE (source_id);
 
+
+/*
 CREATE INDEX CONCURRENTLY gaia_dr1_tgas_ra_index ON catalogdb.gaia_dr1_tgas using BTREE (ra);
 CREATE INDEX CONCURRENTLY gaia_dr1_tgas_dec_index ON catalogdb.gaia_dr1_tgas using BTREE (dec);
 CREATE INDEX CONCURRENTLY gaia_dr1_tgas_l_index ON catalogdb.gaia_dr1_tgas using BTREE (l);
@@ -35,4 +37,4 @@ CREATE INDEX CONCURRENTLY gaia_dr1_tgas_source_id_index ON catalogdb.gaia_dr1_tg
 CREATE INDEX CONCURRENTLY gaia_dr1_tgas_hip_index ON catalogdb.gaia_dr1_tgas using BTREE (hip);
 CREATE INDEX CONCURRENTLY gaia_dr1_tgas_tycho2_id_index ON catalogdb.gaia_dr1_tgas using BTREE (tycho2_id);
 CREATE INDEX CONCURRENTLY gaia_dr1_tgas_duplicated_source_index ON catalogdb.gaia_dr1_tgas using BTREE (duplicated_source);
-
+*/
