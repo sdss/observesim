@@ -67,9 +67,9 @@ class Robot(object):
 
     Some positions may be fiducials (neither optical nor apogee).
 """
-    def __init__(self, db=False):
+    def __init__(self, db=True, fps_layout='central_park'):
         if(db):
-            self._read_db()
+            self._read_db(fps_layout=fps_layout)
         else:
             self._read_config()
         self._set_parameters()
@@ -103,21 +103,50 @@ class Robot(object):
         self.apogee = (self.assignment == "BA")
         return
 
-    def _read_db(self):
+    def _read_db(self, fps_layout='central_park'):
         """Read db and set settings (not functional yet)"""
         targetdb.database.connect_from_config('local')
 
-        actuators = (targetdb.Actuator.select(targetdb.Actuator.id,
-                                              targetdb.Actuator.xcen,
-                                              targetdb.Actuator.ycen,
-                                              targetdb.FPSLayout.label,
-                                              targetdb.ActuatorType.label)
+        nactuators = targetdb.Fiber.select(targetdb.Actuator).count()
+        actuators = (targetdb.Actuator.select()
+                     .order_by(targetdb.Actuator.id)
                      .join(targetdb.FPSLayout,
                            on=(targetdb.Actuator.fps_layout_pk == targetdb.FPSLayout.pk))
-                     .switch(targetdb.Actuator)
-                     .join(targetdb.ActuatorType,
-                           on=(targetdb.Actuator.actuator_type_pk == targetdb.ActuatorType.pk))
-                     ).tuples()
+                     .where(targetdb.FPSLayout.label == fps_layout)
+                     .dicts())
+        fibers = (targetdb.Fiber.select(targetdb.Fiber.fiberid,
+                                        targetdb.Spectrograph.label.alias('spectrograph'),
+                                        targetdb.Actuator.id,
+                                        targetdb.FPSLayout.label.alias('fps_layout'))
+                  .join(targetdb.Spectrograph,
+                        on=(targetdb.Fiber.spectrograph_pk == targetdb.Spectrograph.pk))
+                  .join(targetdb.Actuator,
+                        on=(targetdb.Fiber.actuator_pk == targetdb.Actuator.pk))
+                  .join(targetdb.FPSLayout,
+                        on=(targetdb.Actuator.fps_layout_pk == targetdb.FPSLayout.pk))
+                  .where(targetdb.FPSLayout.label == fps_layout)
+                 ).dicts()
+
+        self.positionerid = np.zeros(nactuators, dtype=np.int32)
+        self.xcen = np.zeros(nactuators, dtype=np.float32)
+        self.ycen = np.zeros(nactuators, dtype=np.float32)
+        self.optical = np.zeros(nactuators, dtype=np.bool)
+        self.apogee = np.zeros(nactuators, dtype=np.bool)
+        self.indx = dict()
+
+        indx = 0
+        for indx, actuator in zip(np.arange(nactuators), actuators):
+            self.positionerid[indx] = actuator['id']
+            self.indx[self.positionerid[indx]] = indx
+            self.xcen[indx] = actuator['xcen']
+            self.ycen[indx] = actuator['ycen']
+
+        for fiber in fibers:
+            if(fiber['spectrograph'] == 'APOGEE'):
+                self.apogee[self.indx[fiber['id']]] = True
+            if(fiber['spectrograph'] == 'BOSS'):
+                self.optical[self.indx[fiber['id']]] = True
+
         return
 
     def positioners(self, x=None, y=None):
