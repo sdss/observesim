@@ -7,7 +7,8 @@ Sequence of events
 1. Targeting
 
  a. Fundamental catalogs (Gaia, 2MASS, TIC, SDSS imaging, SDSS
- spectroscopy, others) are loaded into targetdb.
+ spectroscopy, others) are loaded into catalogdb. catalogdb has
+ spatial indexing (q3c). 
 
  b. Fundamental catalogs are resolved into a single "catalog" table.
  All targets except targets-of-opportunity must exist in this table.

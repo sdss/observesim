@@ -3,7 +3,6 @@ import numpy as np
 import numpy.random as random
 import astropy.io.ascii as ascii
 import observesim.db.peewee.targetdb as targetdb
-import peewee
 
 """Robot module class.
 
