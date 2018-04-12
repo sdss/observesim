@@ -6,4 +6,5 @@ pydl
 pyyaml
 pygments
 click
-fitsio
+
+-r requirements_numpy.txt
