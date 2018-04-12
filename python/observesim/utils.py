@@ -23,7 +23,7 @@ def xy2tp(x, y, r_alpha=7.4, r_beta=15.0):
     are identical.
 
     Parameters:
-        x,y (`~np.array` or float):
+        x,y (`~numpy.array` or float):
             The x and y position of the target with respect to the axis of
             the positioner. Either a float or an array of floats.
         r_alpha,r_beta (float):
@@ -72,7 +72,7 @@ def tp2xy(theta, phi, r_alpha=7.4, r_beta=15.0):
     Assumes that the axis of the robot positioner is at ``(0, 0)``.
 
     Parameters:
-        theta,phi (`~np.array` or float):
+        theta,phi (`~numpy.array` or float):
             The theta and phi angles of the positioner arms.
             Either a float or an array of floats.
         r_alpha,r_beta (float):
