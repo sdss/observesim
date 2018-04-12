@@ -106,13 +106,14 @@ class Robot(object):
         """Read db and set settings (not functional yet)"""
         targetdb.database.connect_from_config('local')
 
-        nactuators = targetdb.Fiber.select(targetdb.Actuator).count()
         actuators = (targetdb.Actuator.select()
                      .order_by(targetdb.Actuator.id)
                      .join(targetdb.FPSLayout,
                            on=(targetdb.Actuator.fps_layout_pk == targetdb.FPSLayout.pk))
-                     .where(targetdb.FPSLayout.label == fps_layout)
-                     .dicts())
+                     .where(targetdb.FPSLayout.label == fps_layout))
+
+        nactuators = actuators.count()
+
         fibers = (targetdb.Fiber.select(targetdb.Fiber.fiberid,
                                         targetdb.Spectrograph.label.alias('spectrograph'),
                                         targetdb.Actuator.id,
@@ -131,14 +132,16 @@ class Robot(object):
         self.ycen = np.zeros(nactuators, dtype=np.float32)
         self.optical = np.zeros(nactuators, dtype=np.bool)
         self.apogee = np.zeros(nactuators, dtype=np.bool)
+        self.fiducial = np.zeros(nactuators, dtype=np.bool)
         self.indx = dict()
 
         indx = 0
-        for indx, actuator in zip(np.arange(nactuators), actuators):
-            self.positionerid[indx] = actuator['id']
+        for indx, actuator in enumerate(actuators):
+            self.positionerid[indx] = actuator.id
             self.indx[self.positionerid[indx]] = indx
-            self.xcen[indx] = actuator['xcen']
-            self.ycen[indx] = actuator['ycen']
+            self.xcen[indx] = actuator.xcen
+            self.ycen[indx] = actuator.ycen
+            self.fiducial[indx] = actuator.actuator_type.label == 'Fiducial'
 
         for fiber in fibers:
             if(fiber['spectrograph'] == 'APOGEE'):
