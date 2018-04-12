@@ -1,3 +1,0 @@
-# Requirements that need numpy to be installed first.
-
-fitsio
