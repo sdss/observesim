@@ -70,9 +70,9 @@ def get_requirements(opts):
     install_requires = []
     dependency_links = []
     for line in open(requirements_file):
-        if line.strip.startswith('#') or line.strip() == '':
+        if line.strip().startswith('#') or line.strip() == '':
             continue
-        if line.strip.startswith('-e'):
+        if line.strip().startswith('-e'):
             dependency_links.append(line.split()[1])
         else:
             line.strip().replace('==', '>=')
