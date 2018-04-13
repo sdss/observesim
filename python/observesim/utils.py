@@ -34,7 +34,7 @@ def xy2tp(x, y, r_alpha=7.4, r_beta=15.0):
             A 3-d array in which the first two dimensions are the
             ``(theta, phi)`` pairs for each input ``(x, y)``. The third
             dimension contains the two possible solutions for each ``(x, y)``
-            pair.
+            pair. Unreachable positions return NaN values.
 
     """
 
@@ -46,9 +46,16 @@ def xy2tp(x, y, r_alpha=7.4, r_beta=15.0):
     # target (x, y) position.
 
     rr = np.hypot(x, y)
+    rr[rr == 0] = np.nan
+
     cos_A = (r_alpha**2 + r_beta**2 - rr**2) / (2. * r_alpha * r_beta)
     cos_B = (rr**2 + r_alpha**2 - r_beta**2) / (2. * r_alpha * rr)
     cos_D = x / rr
+
+    # Sets invalid angles to NaN
+    cos_A[np.abs(cos_A) > 1] = np.nan
+    cos_B[np.abs(cos_B) > 1] = np.nan
+    cos_D[np.abs(cos_D) > 1] = np.nan
 
     D = np.arccos(cos_D)
     D[y < 0] = 2. * np.pi - D[y < 0]
@@ -59,9 +66,12 @@ def xy2tp(x, y, r_alpha=7.4, r_beta=15.0):
     theta_2 = np.rad2deg(D + np.arccos(cos_B))
     phi_2 = np.rad2deg(np.pi + np.arccos(cos_A))
 
-    theta_phi = np.array([np.array([theta_1, phi_1]).T, np.array([theta_2, phi_2]).T])
-    theta_phi[theta_phi < 0] += 360.
-    theta_phi = theta_phi % 360.
+    theta_phi = np.array([np.array([theta_1, phi_1]).T,
+                          np.array([theta_2, phi_2]).T])
+
+    valid = ~np.isnan(theta_phi)
+    theta_phi[valid][theta_phi[valid] < 0] += 360.
+    theta_phi[valid] = theta_phi[valid] % 360.
 
     return theta_phi
 

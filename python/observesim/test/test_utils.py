@@ -14,38 +14,58 @@ import pytest
 from ..utils import tp2xy, xy2tp
 
 
-def test_xy2tp(robot):
-    """Tests the utils.xy2tp function."""
+class TestThetaPhi(object):
 
-    n_actuators = np.sum(robot.fiducial)
+    def test_xy2tp(self, robot):
+        """Tests the utils.xy2tp function."""
 
-    thetas = np.random.sample(n_actuators) * 360.
-    phis = np.random.sample(n_actuators) * 360.
+        n_actuators = np.sum(robot.fiducial)
 
-    xy = tp2xy(thetas, phis)
+        thetas = np.random.sample(n_actuators) * 360.
+        phis = np.random.sample(n_actuators) * 360.
 
-    theta_phi_recovered = xy2tp(xy[:, 0], xy[:, 1])
+        xy = tp2xy(thetas, phis)
 
-    for ii in range(n_actuators):
+        theta_phi_recovered = xy2tp(xy[:, 0], xy[:, 1])
 
-        # Checks that one of the recovered solutions matches the original (theta, phi)
-        solutions = theta_phi_recovered[:, ii, :]
+        for ii in range(n_actuators):
 
-        solution1_comp = (pytest.approx(solutions[0, 0]) == thetas[ii] and
-                          pytest.approx(solutions[0, 1]) == phis[ii])
-        solution2_comp = (pytest.approx(solutions[1, 0]) == thetas[ii] and
-                          pytest.approx(solutions[1, 1]) == phis[ii])
+            # Checks that one of the recovered solutions matches the original (theta, phi)
+            solutions = theta_phi_recovered[:, ii, :]
 
-        assert solution1_comp or solution2_comp
+            solution1_comp = (pytest.approx(solutions[0, 0]) == thetas[ii] and
+                              pytest.approx(solutions[0, 1]) == phis[ii])
+            solution2_comp = (pytest.approx(solutions[1, 0]) == thetas[ii] and
+                              pytest.approx(solutions[1, 1]) == phis[ii])
 
-        # Checks that both solutions recover the (x, y) pair.
-        xy_from_solution1 = tp2xy(solutions[0, 0], solutions[0, 1])
-        xy_from_solution2 = tp2xy(solutions[1, 0], solutions[1, 1])
+            assert solution1_comp or solution2_comp
 
-        assert pytest.approx(xy_from_solution1[0]) == xy[ii][0]
-        assert pytest.approx(xy_from_solution1[1]) == xy[ii][1]
+            # Checks that both solutions recover the (x, y) pair.
+            xy_from_solution1 = tp2xy(solutions[0, 0], solutions[0, 1])
+            xy_from_solution2 = tp2xy(solutions[1, 0], solutions[1, 1])
 
-        assert pytest.approx(xy_from_solution2[0]) == xy[ii][0]
-        assert pytest.approx(xy_from_solution2[1]) == xy[ii][1]
-        print(xy_from_solution1, xy[ii])
-        print(xy_from_solution2, xy[ii])
+            assert pytest.approx(xy_from_solution1[0]) == xy[ii][0]
+            assert pytest.approx(xy_from_solution1[1]) == xy[ii][1]
+
+            assert pytest.approx(xy_from_solution2[0]) == xy[ii][0]
+            assert pytest.approx(xy_from_solution2[1]) == xy[ii][1]
+
+    def test_xy2tp_invalid(self):
+        """Tests the utils.xy2tp function with invalid points."""
+
+        # A point that is inside the inner ring
+        assert np.all(np.isnan(xy2tp(0, 0)))
+
+        # A point that is not reachable
+        assert np.all(np.isnan(xy2tp(100, 100)))
+
+    def test_xy2tp_phi_zero(self):
+        """Tests the utils.xy2tp function when phi=0."""
+
+        results = xy2tp(22.4, 0., r_alpha=7.4, r_beta=15.0)
+
+        assert pytest.approx(results[0, 0, 0]) == 0.
+        assert pytest.approx(results[1, 0, 0]) == 0.
+
+        assert pytest.approx(results[0, 0, 1], abs=1e-5) == 0.
+        assert pytest.approx(results[1, 0, 1], abs=1e-5) == 360.
