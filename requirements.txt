@@ -6,4 +6,4 @@ pydl
 pyyaml
 pygments
 click
-fitsio
+-e git://github.com/albireox/fitsio.git#egg=fitsio
