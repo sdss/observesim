@@ -3,7 +3,11 @@ import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
 import PyAstronomy.pyasl as pyasl
-import mpl_toolkits.basemap as basemap
+
+try:
+    import mpl_toolkits.basemap as basemap
+except ImportError:
+    basemap = None
 
 
 def _arrayify(quantity=None):
@@ -175,6 +179,10 @@ class Sloane(object):
 
     def plot(self):
         """Plot ra and dec"""
+
+        if basemap is None:
+            raise ImportError('basemap was not imported. Is it installed?')
+
         m = basemap.Basemap(projection='moll', lon_0=270, resolution='c')
 
         # draw parallels and meridians.
