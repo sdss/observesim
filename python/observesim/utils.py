@@ -31,11 +31,10 @@ def xy2tp(x, y, r_alpha=7.4, r_beta=15.0):
             The lengths of the actuator arms in millimetres.
 
     Returns:
-        result:
-            A 3-d array in which the first two dimensions are the
-            ``(theta, phi)`` pairs for each input ``(x, y)``. The third
-            dimension contains the two possible solutions for each ``(x, y)``
-            pair. Unreachable positions return NaN values.
+        A 3-d array in which the first two dimensions are the
+        ``(theta, phi)`` pairs for each input ``(x, y)``. The third
+        dimension contains the two possible solutions for each ``(x, y)``
+        pair. Unreachable positions return NaN values.
 
     """
 
@@ -90,8 +89,7 @@ def tp2xy(theta, phi, r_alpha=7.4, r_beta=15.0):
             The lengths of the actuator arms in millimetres.
 
     Returns:
-        result:
-            A 2-d array of ``(x, y)`` pairs for each input ``(theta, phi)``.
+        A 2-d array of ``(x, y)`` pairs for each input ``(theta, phi)``.
 
     """
 
@@ -122,10 +120,9 @@ def generate_mock_targets(robot, min_distance=3, one_per_positioner=True):
             them.
 
     Returns:
-        targets (`~numpy.ndarray`):
-            A Numpy array with the ``(x, y)`` position on the focal plane. The
-            ordering is such that it matches the order of the actuators in
-            ``robot``.
+        A Numpy array with the ``(x, y)`` position on the focal plane. The
+        ordering is such that it matches the order of the actuators in
+        ``robot``.
 
     """
 
@@ -188,10 +185,9 @@ def assign_targets_draining(robot, targets, return_target_to_positioners=False):
             positioners for each target in ``targets``.
 
     Returns:
-        indices (dict):
-            A dictionary in which the keys are the indices of the actuators in
-            ``robot``. For each element, the value is a list on the ``target``
-            indices associated to that actuator.
+        A dictionary in which the keys are the indices of the actuators in
+        ``robot``. For each element, the value is a list on the ``target``
+        indices associated to that actuator.
 
     Example:
         ::
