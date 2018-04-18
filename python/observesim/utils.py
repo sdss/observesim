@@ -15,7 +15,7 @@ __all__ = ['xy2tp', 'tp2xy', 'generate_mock_targets',
            'assign_targets_draining']
 
 
-def xy2tp(x, y, r_alpha=7.4, r_beta=15.0):
+def xy2tp(x, y, r_alpha=7.4, r_beta=15.0, phi_range=360):
     """Converts ``(x, y)`` positions on the focal plane to ``(theta, phi)``.
 
     Because each position in the patrol area of the actuator can be reached
@@ -29,14 +29,21 @@ def xy2tp(x, y, r_alpha=7.4, r_beta=15.0):
             the positioner. Either a float or an array of floats.
         r_alpha,r_beta (float):
             The lengths of the actuator arms in millimetres.
+        phi_range (int):
+            The range of ``phi``, either ``360`` to indicate that the beta
+            arm can move in the range ``[0, 360)``, or ``180`` to indicate
+            the range ``[0, 180)``.
 
     Returns:
         A 3-d array in which the first two dimensions are the
         ``(theta, phi)`` pairs for each input ``(x, y)``. The third
         dimension contains the two possible solutions for each ``(x, y)``
-        pair. Unreachable positions return NaN values.
+        pair. Unreachable positions return NaN values. If ``phi_range=180``,
+        the only valid configuration will be returned.
 
     """
+
+    assert phi_range in [180, 360], 'invalid phi_range value.'
 
     x = np.atleast_1d(x)
     y = np.atleast_1d(y)
@@ -72,6 +79,10 @@ def xy2tp(x, y, r_alpha=7.4, r_beta=15.0):
     valid = ~np.isnan(theta_phi)
     theta_phi[valid][theta_phi[valid] < 0] += 360.
     theta_phi[valid] = theta_phi[valid] % 360.
+
+    if phi_range == 180:
+        # Gets only the valid configuration but keeps the 3-d output.
+        return np.array([theta_phi[0, :, :]])
 
     return theta_phi
 
@@ -162,7 +173,8 @@ def generate_mock_targets(robot, min_distance=3, one_per_positioner=True):
     return targets
 
 
-def assign_targets_draining(robot, targets, return_target_to_positioners=False):
+def assign_targets_draining(robot, targets,
+                            return_target_to_positioners=False, phi_range=360):
     """Implements the target-fibre allocation method by Morales et al. (2012)
 
     Uses a draining algorithm to optimally assign targets to
@@ -180,6 +192,10 @@ def assign_targets_draining(robot, targets, return_target_to_positioners=False):
         targets (`numpy.ndarray`):
             An ``Nx2`` array with the ``(x, y)`` positions of the ``N`` targets
             on the focal plane (in mm).
+         phi_range (int):
+            The range of ``phi``, either ``360`` to indicate that the beta
+            arm can move in the range ``[0, 360)``, or ``180`` to indicate
+            the range ``[0, 180)``.
         return_target_to_positioners (bool):
             If ``True``, also returns a dictionary of indices from with valid
             positioners for each target in ``targets``.
@@ -219,7 +235,8 @@ def assign_targets_draining(robot, targets, return_target_to_positioners=False):
         target_xy = targets[target_idx, :]
         target_distance = target_xy - pos_xy
         theta_phi = xy2tp(target_distance[:, 0], target_distance[:, 1],
-                          r_alpha=robot._ralpha, r_beta=robot._rbeta)
+                          r_alpha=robot._ralpha, r_beta=robot._rbeta,
+                          phi_range=phi_range)
 
         # Valid positioners are those that have (theta, phi) not NaN
         valid_positioners = np.unique(np.where(~np.isnan(theta_phi))[1])
