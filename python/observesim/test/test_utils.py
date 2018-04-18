@@ -44,6 +44,7 @@ class TestThetaPhi(object):
 
             if phi_range == 180:
                 assert solution1_comp
+                assert solutions[0, 1] <= 180
             else:
                 solution2_comp = (pytest.approx(solutions[1, 0]) == thetas[ii] and
                                   pytest.approx(solutions[1, 1]) == phis[ii])
@@ -94,14 +95,14 @@ class TestTargetAllocation(object):
         distances_triu = distances[np.triu_indices(distances.shape[0], 1)]
         assert np.all(distances_triu > 3)
 
-    def test_assign_targets_draining(self, robot, phi_range):
+    def test_assign_targets_draining(self, robot):
 
         # Creates a long list of targets
         targets = np.vstack([utils.generate_mock_targets(robot, one_per_positioner=False)
                              for __ in range(5)])
 
         positioner_to_targets, target_to_positioners = utils.assign_targets_draining(
-            robot, targets, return_target_to_positioners=True, phi_range=phi_range)
+            robot, targets, return_target_to_positioners=True)
 
         assert len(positioner_to_targets) == len(robot.xcen) - np.sum(robot.fiducial)
 
