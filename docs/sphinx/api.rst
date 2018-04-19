@@ -35,10 +35,14 @@ Reference for Observing Simulation for SDSS-V
    :no-inheritance-diagram:
    :headings: ~^
 
-.. automodapi:: observesim.weather
+.. automodapi:: observesim.robot
    :no-inheritance-diagram:
    :headings: ~^
 
 .. automodapi:: observesim.utils
+   :no-inheritance-diagram:
+   :headings: ~^
+
+.. automodapi:: observesim.weather
    :no-inheritance-diagram:
    :headings: ~^
