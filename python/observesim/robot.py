@@ -307,8 +307,8 @@ class Configuration(object):
             only_collision (bool):
                 If ``False``, returns a `~shapely.MultiPolygon` with both
                 arms (one `~shapely.Polygon` for each arm). If ``True``,
-                returns a single `~shapely.Polygon` with the region of the beta
-                arm that can collide with other arms.
+                returns a single `~shapely.Polygon` with the region of the
+                beta arm that can collide with other arms.
             fraction (float):
                 The fraction of the beta arm that can collide with other
                 beta arms.
@@ -333,7 +333,7 @@ class Configuration(object):
                                              (0, arm_width / 2.)])
 
         # The part of the beta arm that we consider that can collide with other
-        # arms. Defined as the final 2/3 of the arm.
+        # arms. Defined as the final "fraction" of the arm.
         beta_arm_collision = shapely.geometry.Polygon(
             [(self.robot._rbeta * (1 - fraction), arm_width / 2.),
              (self.robot._rbeta * (1 - fraction), -arm_width / 2.),
