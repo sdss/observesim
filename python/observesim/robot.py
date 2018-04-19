@@ -1,8 +1,27 @@
+#!/usr/bin/env python
+# -*- coding:utf-8 -*-
+
+# @Filename: robot.py
+# @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
+
+
 import os
+import warnings
+
+import astropy.io.ascii as ascii
+import matplotlib.patches
+import matplotlib.pyplot as plt
+import matplotlib.transforms
 import numpy as np
 import numpy.random as random
-import astropy.io.ascii as ascii
+import shapely.affinity
+import shapely.geometry
+
 import observesim.db.peewee.targetdb as targetdb
+from observesim.utils import assign_targets_draining, xy2tp
+
+__all__ = ['Robot', 'Configuration']
+
 
 """Robot module class.
 
@@ -10,6 +29,8 @@ Dependencies:
 
  numpy
  astropy
+ matplotlib
+ shapely
 
 """
 
@@ -82,6 +103,7 @@ class Robot(object):
         self.inner_reach = self._rbeta - self._ralpha
         self.outer_reach = self._ralpha + self._rbeta
         self.exclusion = 11.
+        self.phi_range = 180  # Either 180 or 360, the range of movement of the beta arm.
 
     def _read_config(self):
         """Read config file and set settings"""
@@ -194,3 +216,279 @@ class Robot(object):
                 positionerids[ifree[imatch[0]]] = positionerid
                 targets[iposid[indx]] = ifree[imatch[0]]
         return(positionerids, targets)
+
+
+class Configuration(object):
+    """Represents a configuration of the robot around a set of targets.
+
+    Parameters:
+        robot (`.Robot` object):
+            The `.Robot` object describing the FPS and its layout.
+        targets (`numpy.ndarray`):
+            A ``Nx2`` array of target positions on the focal plane, in mm.
+        reassign (bool):
+            If ``True``, uses ``~observesim.utils.assign_targets_draining``
+            to find an optimal allocation of targets and positioners.
+
+    Attributes:
+        target_to_positioner (`numpy.ndarray`):
+            A 1-d array with the same length as the number of targets. In the
+            same order as ``targets``, contains the index of the positioner
+            allocated to it.
+        theta_phi (`numpy.ndarray`):
+            A 2-d array with the ``(theta, phi)`` values for each positioner.
+
+    """
+
+    def __init__(self, robot, targets, reassign=False):
+
+        self.robot = robot
+        self.targets = targets
+        self._polygons = None
+
+        assert isinstance(self.targets, np.ndarray) and self.targets.ndim == 2
+
+        n_real_positioners = np.sum(~self.robot.fiducial)
+
+        if n_real_positioners < self.targets.shape[0]:
+            warnings.warn('more targets than positioners. Only the first '
+                          f'{n_real_positioners} targets will be allocated', UserWarning)
+            self.targets = targets[0:n_real_positioners]
+
+        self.target_to_positioner = np.zeros(self.targets.shape[0], dtype=np.int)
+
+        if reassign:
+            positioner_to_targets = assign_targets_draining(robot, targets)
+            for positioner in positioner_to_targets:
+                pos_targets = positioner_to_targets[positioner]
+                assert len(pos_targets) <= 1
+                self.target_to_positioner[pos_targets[0]] = positioner
+        else:
+            n_target = 0
+            for positioner in np.where(~self.robot.fiducial)[0]:
+                self.target_to_positioner[n_target] = int(positioner)
+                n_target += 1
+
+        self.reset_positioners()
+
+    def reset_positioners(self):
+        """Resets positioners to folded."""
+
+        n_positioners = len(self.robot.xcen)
+
+        self.theta_phi = np.zeros((n_positioners, 2), dtype=np.float32)
+        self.theta_phi[:, 1] = 180
+
+        # Marks fiducials with NaNs
+        self.theta_phi[self.robot.fiducial] = np.nan
+
+    def compute(self):
+        """Computes a new set of ``(theta, phi)`` for each positioner."""
+
+        xcen = self.robot.xcen[self.target_to_positioner]
+        ycen = self.robot.ycen[self.target_to_positioner]
+
+        theta_phi_init = xy2tp(self.targets[:, 0] - xcen, self.targets[:, 1] - ycen)
+        theta_phi_init = theta_phi_init[0, :, :]  # Gets the first configuration
+
+        # Resets positioners
+        self.reset_positioners()
+
+        for ii in range(self.targets.shape[0]):
+            self.theta_phi[self.target_to_positioner[ii], :] = theta_phi_init[ii, :]
+
+    def get_polygons(self, arm_width=4, only_collision=False, fraction=2/3.):
+        """Returns a list of `~shapely.MultiPolygon`
+
+        Parameters:
+            arm_width (float):
+                The width, in mm, of each of the arms.
+            only_collision (bool):
+                If ``False``, returns a `~shapely.MultiPolygon` with both
+                arms (one `~shapely.Polygon` for each arm). If ``True``,
+                returns a single `~shapely.Polygon` with the region of the beta
+                arm that can collide with other arms.
+            fraction (float):
+                The fraction of the beta arm that can collide with other
+                beta arms.
+
+        """
+
+        if self._polygons is not None and only_collision is False:
+            return self._polygons
+
+        # Arm templates. We'll rotate and translate them below.
+
+        alpha_arm = shapely.geometry.Polygon([(0, arm_width / 2.),
+                                              (0, -arm_width / 2.),
+                                              (self.robot._ralpha, -arm_width / 2.),
+                                              (self.robot._ralpha, +arm_width / 2.),
+                                              (0, arm_width / 2.)])
+
+        beta_arm = shapely.geometry.Polygon([(0, arm_width / 2.),
+                                             (0, -arm_width / 2.),
+                                             (self.robot._rbeta, -arm_width / 2.),
+                                             (self.robot._rbeta, +arm_width / 2.),
+                                             (0, arm_width / 2.)])
+
+        # The part of the beta arm that we consider that can collide with other
+        # arms. Defined as the final 2/3 of the arm.
+        beta_arm_collision = shapely.geometry.Polygon(
+            [(self.robot._rbeta * (1 - fraction), arm_width / 2.),
+             (self.robot._rbeta * (1 - fraction), -arm_width / 2.),
+             (self.robot._rbeta, -arm_width / 2.),
+             (self.robot._rbeta, +arm_width / 2.),
+             (self.robot._rbeta * (1 - fraction), arm_width / 2.)])
+
+        polygons = []
+
+        # Removes fiducials
+        theta_phi = self.theta_phi[~self.robot.fiducial]
+
+        n_positioner = 0
+        for theta, phi in theta_phi:
+
+            xcen = self.robot.xcen[~self.robot.fiducial][n_positioner]
+            ycen = self.robot.ycen[~self.robot.fiducial][n_positioner]
+
+            alpha_arm_end = (xcen + self.robot._ralpha * np.cos(np.radians(theta)),
+                             ycen + self.robot._ralpha * np.sin(np.radians(theta)))
+
+            if only_collision is False:
+
+                alpha_arm_t = shapely.affinity.rotate(alpha_arm, theta, origin=(0, 0))
+                alpha_arm_t = shapely.affinity.translate(alpha_arm_t, xoff=xcen, yoff=ycen)
+
+                beta_arm_t = shapely.affinity.rotate(beta_arm, theta + phi, origin=(0, 0))
+                beta_arm_t = shapely.affinity.translate(
+                    beta_arm_t, xoff=alpha_arm_end[0], yoff=alpha_arm_end[1])
+
+                polygons.append(shapely.geometry.MultiPolygon([alpha_arm_t, beta_arm_t]))
+
+            else:
+
+                beta_arm_collision_t = shapely.affinity.rotate(beta_arm_collision,
+                                                               theta + phi, origin=(0, 0))
+                beta_arm_collision_t = shapely.affinity.translate(
+                    beta_arm_collision_t, xoff=alpha_arm_end[0], yoff=alpha_arm_end[1])
+
+                polygons.append(beta_arm_collision_t)
+
+            n_positioner += 1
+
+        # We don't overwrite self._polygons for only_collision
+        if only_collision:
+            return polygons
+
+        self._polygons = polygons
+
+        return polygons
+
+    def get_collisions(self):
+        """Returns a list of positioners that are collided."""
+
+        collisioned = np.zeros(self.theta_phi.shape[0], dtype=np.bool)
+        collision_polygons = self.get_polygons(only_collision=True)
+
+        # We need to keep two indices here because theta_phi's length
+        # includes fiducials while collision_polygons only contains real
+        # positoiners.
+
+        ii_polygon = 0
+        for ii in range(self.theta_phi.shape[0]):
+            if np.any(np.isnan(self.theta_phi[ii, :])):  # Skips fiducials
+                continue
+            beta_arm_ii = collision_polygons[ii_polygon]
+            jj_polygon = ii_polygon + 1
+            for jj in range(ii + 1, self.theta_phi.shape[0]):
+                if np.any(np.isnan(self.theta_phi[jj, :])):
+                    continue
+                beta_arm_jj = collision_polygons[jj_polygon]
+                if beta_arm_jj.intersects(beta_arm_ii):
+                    collisioned[ii] = True
+                    collisioned[jj] = True
+
+                jj_polygon += 1
+            ii_polygon += 1
+
+        return collisioned
+
+    def plot(self):
+        """Plots the configuration.
+
+        Note that the actuator shapes are slightly modified for stylistic
+        purposes and some collisions my not seem evident from the plot. The
+        collisions are calculated accurately using
+        `~Configuration.get_collisions`.
+
+        """
+
+        with plt.style.context(['seaborn-deep']):
+
+            __, ax = plt.subplots()
+
+            arm_width = 4.
+
+            xcen = self.robot.xcen[~self.robot.fiducial]
+            ycen = self.robot.ycen[~self.robot.fiducial]
+
+            # Removes fiducials
+            theta_phi = self.theta_phi[~self.robot.fiducial]
+            collisions = self.get_collisions()[~self.robot.fiducial]
+
+            # Calculates the positions of the articulation between alpha and
+            # beta arm.
+            theta_rad = np.radians(theta_phi[:, 0])
+            joints = np.array([xcen + (self.robot._ralpha + 0.25) * np.cos(theta_rad),
+                               ycen + (self.robot._ralpha + 0.25) * np.sin(theta_rad)]).T
+
+            # Plots the positioner axes, joints, and targets.
+            ax.scatter(xcen, ycen, s=1, color='k')
+            ax.scatter(joints[:, 0], joints[:, 1], s=0.1, color='k')
+            ax.scatter(self.targets[:, 0], self.targets[:, 1], s=1, color='b')
+
+            # Now we create patches for each arm on each positioner.
+            n_positioner = 0
+            for theta, phi in theta_phi:
+
+                is_collisioned = collisions[n_positioner]
+
+                theta_rad = np.radians(theta)
+
+                alpha_arm_end = (xcen[n_positioner] + self.robot._ralpha * np.cos(theta_rad),
+                                 ycen[n_positioner] + self.robot._ralpha * np.sin(theta_rad))
+
+                ec = 'k' if not is_collisioned else 'r'
+
+                # We use FancyBboxPatch to make the rectangles rounded.
+                # The dimensions of the boxes are slightly modified to look
+                # good on the plot.
+                alpha_arm = matplotlib.patches.FancyBboxPatch(
+                    (xcen[n_positioner] - 1, ycen[n_positioner] - arm_width / 2.),
+                    self.robot._ralpha + 2, arm_width, boxstyle='round,pad=0.3,rounding_size=2',
+                    fc='none', ec=ec, lw=0.2)
+
+                # We need to add the patch before modify it so that ax.transData works.
+                ax.add_patch(alpha_arm)
+
+                alpha_transform = matplotlib.transforms.Affine2D().rotate_deg_around(
+                    xcen[n_positioner], ycen[n_positioner], theta)
+                alpha_arm.set_transform(alpha_transform + ax.transData)
+
+                beta_arm = matplotlib.patches.FancyBboxPatch(
+                    (alpha_arm_end[0] - 1, alpha_arm_end[1] - arm_width / 2.),
+                    self.robot._rbeta + 2, arm_width, boxstyle='round,pad=0.3,rounding_size=2',
+                    fc='none', ec=ec, lw=0.2)
+
+                ax.add_patch(beta_arm)
+
+                beta_transform = matplotlib.transforms.Affine2D().rotate_deg_around(
+                    alpha_arm_end[0], alpha_arm_end[1], theta + phi)
+                beta_arm.set_transform(beta_transform + ax.transData)
+
+                n_positioner += 1
+
+        ax.set_xlabel('xFocal (mm)')
+        ax.set_xlabel('yFocal (mm)')
+
+        return ax

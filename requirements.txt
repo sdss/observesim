@@ -5,5 +5,6 @@ PyAstronomy
 pydl
 pyyaml
 pygments
+matplotlib
 click
 -e git://github.com/albireox/fitsio.git#egg=fitsio
