@@ -237,6 +237,7 @@ class Configuration(object):
             allocated to it.
         theta_phi (`numpy.ndarray`):
             A 2-d array with the ``(theta, phi)`` values for each positioner.
+            Values for indices corresponding to fiducials are set to NaN.
 
     """
 
