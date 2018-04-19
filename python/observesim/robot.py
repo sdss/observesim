@@ -173,6 +173,34 @@ class Robot(object):
 
         return
 
+    def positioner_overlaps(self, positionerid):
+        """For a ``positionerid`` returns a list of overlapping positionerids.
+
+        A positioner is consider to overlap with ``positionerid`` if their
+        beta arms can tocuh in any way, that is, if their distance is less
+        than twice the added lenghts of the alpha and beta arms.
+
+        """
+
+        xcen = self.xcen
+        ycen = self.ycen
+
+        pos = np.array([xcen, ycen]).T
+        pos[self.fiducial] = np.nan
+
+        idx = self.indx[positionerid]
+        this_pos = pos[idx]
+
+        pos_to_index = np.array(list(self.indx.items()), dtype=np.int)
+
+        distance = np.sqrt(np.sum((pos - this_pos)**2, axis=1))
+
+        collides = distance <= (2 * (self._ralpha + self._rbeta))
+        collides[idx] = False  # Don't collide with ourselves
+
+        return np.array([pos_to_index[np.where(pos_to_index[:, 1] == ii)][0][0]
+                         for ii in np.where(collides)[0]])
+
     def positioners(self, x=None, y=None):
         distances = np.sqrt((x - self.xcen)**2 + (y - self.ycen)**2)
         imatch = np.where((distances > self.inner_reach) &
