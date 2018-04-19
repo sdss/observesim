@@ -227,7 +227,7 @@ class Configuration(object):
         targets (`numpy.ndarray`):
             A ``Nx2`` array of target positions on the focal plane, in mm.
         reassign (bool):
-            If ``True``, uses ``~observesim.utils.assign_targets_draining``
+            If ``True``, uses `~observesim.utils.assign_targets_draining`
             to find an optimal allocation of targets and positioners.
 
     Attributes:
