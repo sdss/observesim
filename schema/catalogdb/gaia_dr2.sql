@@ -10,7 +10,7 @@ notes: byte value (astrometric_params_solved, phot_proc_mode) stored as integer
 
 
 to run:
-psql -f catalogdb.sql -h db.sdss.utah.edu -U sdssdb_admin -p 5432 sdss5db
+psql -f gaia_dr2.sql -U sdss sdss5db
 
 drop schema catalogdb cascade;
 */
