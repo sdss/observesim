@@ -2,7 +2,7 @@
 
 indices for catalogdb tables, to be run after bulk uploads
 
-psql -f index.sql -U sdss -p 5432 sdss5db
+psql -f gaia_dr2_index.sql -U sdss sdss5db
 
 drop index catalogdb.gaia_dr1_tgas_dec_index;
 

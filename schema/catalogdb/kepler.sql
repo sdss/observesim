@@ -56,5 +56,4 @@ CREATE TABLE catalogdb.kepler_input_10 (
     kic_gkcolor double precision,
     kic_degree_ra double precision,
     kic_fov_flag integer,
-    kic_tm_designation TEXT,
-    );
+    kic_tm_designation TEXT);
