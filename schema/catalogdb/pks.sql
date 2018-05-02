@@ -26,3 +26,4 @@ psql -f pks.sql -U sdss -p 5432 sdss5db
 alter table catalogdb.gaia_dr2_source add primary key(source_id);
 alter table catalogdb.kepler_input_10 add primary key(kic_kepler_id);
 alter table catalogdb.twomass_psc add primary key(pts_key);
+alter table catalogdb.tess_input_v6 add primary key(ID);
