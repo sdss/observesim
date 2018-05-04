@@ -1,19 +1,41 @@
 #!/usr/bin/env python
-# encoding: utf-8
-#
-# conftest.py
-#
+# -*- coding:utf-8 -*-
+
+# @Author: José Sánchez-Gallego (gallegoj@uw.edu)
+# @Date: 2018-04-12
+# @Filename: conftest.py
+# @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
+# @Copyright: José Sánchez-Gallego
 
 
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
+import pathlib
+
+import pytest
+
+from ..robot import Robot
 
 
-"""
-Here you can add fixtures that will be used for all the tests in this
-directory. You can also add conftest.py files in underlying subdirectories.
-Those conftest.py will only be applies to the tests in that subdirectory and
-underlying directories. See https://docs.pytest.org/en/2.7.3/plugins.html for
-more information.
-"""
+def pytest_addoption(parser):
+    parser.addoption('--plot', action='store_true', default=False, help='outputs test plots')
+
+
+def pytest_configure(config):
+    """Runs during configuration of conftest."""
+
+    do_plot = config.getoption('--plot')
+
+    if do_plot:
+        plots_path = (pathlib.Path(__file__).parent / 'plots')
+        if plots_path.exists():
+            for fn in plots_path.glob('*'):
+                fn.unlink()
+
+
+@pytest.fixture
+def plot(request):
+    return request.config.getoption('--plot')
+
+
+@pytest.fixture
+def robot():
+    yield Robot()

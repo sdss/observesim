@@ -107,3 +107,6 @@ docs/sphinx/automodapi
 # Emacs/Vim
 *~
 \#*\#
+
+# Plots
+python/observesim/test/plots/

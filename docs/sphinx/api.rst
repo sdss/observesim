@@ -3,21 +3,46 @@ Reference for Observing Simulation for SDSS-V
 
 .. _api-main:
 
-Main
-----
+.. Main
+.. ----
+..
+.. .. automodule:: observesim
+.. 	 :members:
+..    :undoc-members:
+..    :show-inheritance:
+..
+.. Subpackages
+.. -----------
+..
+.. .. toctree::
+..
+..     observesim.scheduler
+..     observesim.fields
+..     observesim.observations
+..     observesim.weather
+..     observesim.observe
 
-.. automodule:: observesim
-	 :members:
-   :undoc-members:
-   :show-inheritance:
 
-Subpackages
------------
+.. automodapi:: observesim.scheduler
+   :no-inheritance-diagram:
+   :headings: ~^
 
-.. toctree::
+.. automodapi:: observesim.observations
+   :no-inheritance-diagram:
+   :headings: ~^
 
-    observesim.scheduler
-    observesim.fields
-    observesim.observations
-    observesim.weather
-    observesim.observe
+.. automodapi:: observesim.observe
+   :no-inheritance-diagram:
+   :headings: ~^
+
+.. automodapi:: observesim.robot
+   :no-inheritance-diagram:
+   :headings: ~^
+
+.. automodapi:: observesim.utils
+   :no-inheritance-diagram:
+   :headings: ~^
+
+.. automodapi:: observesim.weather
+   :no-inheritance-diagram:
+   :headings: ~^

@@ -23,7 +23,7 @@ VERSION = '0.1.0dev'
 RELEASE = 'dev' in VERSION
 
 
-def run(packages, install_requires):
+def run(packages, install_requires, dependency_links):
 
     setup(name=NAME,
           version=VERSION,
@@ -37,6 +37,7 @@ def run(packages, install_requires):
           include_package_data=True,
           packages=packages,
           install_requires=install_requires,
+          dependency_links=dependency_links,
           package_dir={'': 'python'},
           scripts=['bin/sdss5_simulate'],
           classifiers=[
@@ -65,9 +66,18 @@ def get_requirements(opts):
         name = 'requirements.txt'
 
     requirements_file = os.path.join(os.path.dirname(__file__), name)
-    install_requires = [line.strip().replace('==', '>=') for line in open(requirements_file)
-                        if not line.strip().startswith('#') and line.strip() != '']
-    return install_requires
+
+    install_requires = []
+    dependency_links = []
+    for line in open(requirements_file):
+        if line.strip().startswith('#') or line.strip() == '':
+            continue
+        if line.strip().startswith('-e'):
+            dependency_links.append(line.split()[1])
+        else:
+            line.strip().replace('==', '>=')
+
+    return install_requires, dependency_links
 
 
 def remove_args(parser):
@@ -96,7 +106,7 @@ if __name__ == '__main__':
     args = parser.parse_known_args()[0]
 
     # Get the proper requirements file
-    install_requires = get_requirements(args)
+    install_requires, dependency_links = get_requirements(args)
 
     # Now we remove all our custom arguments to make sure they don't interfere with distutils
     remove_args(parser)
@@ -105,4 +115,4 @@ if __name__ == '__main__':
     packages = find_packages(where='python')
 
     # Runs distutils
-    run(packages, install_requires)
+    run(packages, install_requires, dependency_links)
