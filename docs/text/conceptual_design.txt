@@ -23,15 +23,15 @@ Sequence of events
  d. The target table is output to disk as a set of FITS files
  organized by healpix pixel. 
 
-
 2. Tiling
 
- a. Teams define the regions over which their targets will
- be observed. These regions will be defined in terms of healpix
- nside=64 map. There will be three pieces of information per pixel:
+ a. A set of fields are defined that cover the area with the
+ appropriate density. This will almost certainly be a by-hand
+ task.
 
-  * window:
-	    1 indicates a region with targets and 0 indicates a region without.
+ b. Teams define the cadence which they need for each field,
+ driven by the targets it covers.
+
   * epochs:
 	    number of epochs necessary for the pixel. 
   * exposures:
@@ -39,19 +39,10 @@ Sequence of events
   * cadence name:
 	    name of cadence desired for the pixel
 
- It must be understood that not necesarily will quite all of these
- regions be covered. That depends on a global tiling solution and how
- it intersects the window of the targets. 
-
  Although ultimately the requirement is on the cadence and S/N of
  individual targets, in order to observe a target, you need to target
  the whole region around it, which is why these requirements come in
- at the healpix pixel level. 
-
- b. A set of fields are defined that cover the area with the
- appropriate density. This will almost certainly be a by-hand
- task. Each field inherits some cadence necessary, driven by the
- targets it covers.
+ at the field level.
 
  c. "tiling" is run. Note that the iterative sequence below is an
  attempt to cast this difficult global problem into a set of tractable
@@ -139,10 +130,10 @@ Glossary
 * Field: refers to an RA/Dec center associated with a pointing of one
   of the telescopes.
 
-* Tile: refers to a proposed observation of a field, including how the
-  fibers are assigned to targets.
+* Tile: refers to an observation of the field, which may consist of
+  one or more configurations, observed back-to-back.
 
-* Configuration: refers to the conditions of an actual observation of
+* Configuration: refers to the conditions of an actual exposure of
   a field, and the specific assignments of fibers to targets.
 
 Standards
