@@ -187,11 +187,11 @@ class TileFile(TileBase):
         self._tiles = fitsio.read(filename)
         self.ntiles = len(self._tiles)
         self.tileid = np.arange(self.ntiles, dtype=np.int32)
-        self.tiletype = self._tiles['tiletype']
-        self.racen = self._tiles['racen']
-        self.deccen = self._tiles['deccen']
+        self.tiletype = self._tiles['TILETYPE']
+        self.racen = self._tiles['RA']
+        self.deccen = self._tiles['DEC']
         self.priority = np.zeros(self.ntiles, dtype=np.int32) + self._limit
         self.duration = (np.zeros(self.ntiles, dtype=np.float64) +
-                         self._default_duration)
+                         self._default_duration * self._tiles['NEXP'])
         self.observatory = observatory
         return

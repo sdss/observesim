@@ -3,6 +3,7 @@ import numpy as np
 import numpy.random as random
 import astropy.io.ascii as ascii
 import observesim.db.peewee.targetdb as targetdb
+import matplotlib.pyplot as plt
 
 """Robot module class.
 
@@ -191,3 +192,17 @@ class Robot(object):
                 positionerids[ifree[imatch[0]]] = positionerid
                 targets[iposid[indx]] = ifree[imatch[0]]
         return(positionerids, targets)
+
+    def plot(self, xoff=0., yoff=0.):
+        nth = 30
+        th = np.arange(nth) / np.float32(nth) * np.pi * 2.
+        xc = np.cos(th) * self.outer_reach
+        yc = np.sin(th) * self.outer_reach
+        for xcen, ycen, apogee, optical in zip(self.xcen, self.ycen,
+                                               self.apogee, self.optical):
+            x = xcen + xc
+            y = ycen + yc
+            if(optical):
+                plt.plot(x + xoff, y + yoff, color='black', linewidth=1)
+            if(apogee):
+                plt.plot(x + xoff, y + yoff, color='red', linewidth=1)

@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+# encoding: utf-8
+
+from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
+
+# Perform an SDSS-V simulation
+
+import argparse
+import numpy as np
+import fitsio
+
+# Read arguments
+usage = "fields2tiles"
+description = "Simple conversion of fields to tiles"
+parser = argparse.ArgumentParser(description=description, usage=usage)
+parser.add_argument("-o", "--output-file", dest="outfile", type=str,
+                    required=True, help="output FITS file name")
+parser.add_argument("-i", "--input-file", dest="infile", type=str,
+                    required=True, help="input FITS file name")
+args = parser.parse_args()
+outfile = args.outfile
+infile = args.infile
+
+fields = fitsio.read(infile)
+
+ntiles = fields['nepochs'].sum()
+
+tile_dtype = np.dtype([('RA', np.float64),
+                       ('DEC', np.float64),
+                       ('NEXP', np.int32),
+                       ('LUNATION', np.float32),
+                       ('TILETYPE', 'O')])
+tiles = np.zeros(ntiles, dtype=tile_dtype)
+
+indx = 0
+for field in fields:
+    nthis = field['nepochs']
+    tiles['RA'][indx:indx + nthis] = field['ra']
+    tiles['DEC'][indx:indx + nthis] = field['dec']
+    tiles['NEXP'][indx:indx + nthis] = field['nexp'][0:nthis]
+    tiles['TILETYPE'][indx:indx + nthis] = field['label']
+    tiles['LUNATION'][indx:indx + nthis] = field['lunation'][0:nthis]
+    indx = indx + nthis
+
+fitsio.write(outfile, tiles, clobber=True)
