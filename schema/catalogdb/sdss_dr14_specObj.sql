@@ -4,7 +4,7 @@ schema for dr 14 apogeeStarVisit table.
 
 Model can be found at http://skyserver.sdss.org/CasJobs/SchemaBrowser.aspx
 
-file is /uufs/chpc.utah.edu/common/home/sdss/dr14/casload/sqlSpecObj.csv.bz2
+file is /uufs/chpc.utah.edu/common/home/sdss/dr14/casload/spCSV/plates/sqlSpecObj.csv.bz2
 
 specObjID   decimal 16  ID_CATALOG      Unique database ID based on PLATE, MJD, FIBERID, RUN2D
 bestObjID   bigint  8   ID_MAIN     Object ID of photoObj match (position-based)
@@ -402,12 +402,11 @@ CREATE TABLE catalogdb.sdss_dr14_specobj(
 );
 
 
-\copy catalogdb.sdss_dr14_specobj FROM program 'bzcat /uufs/chpc.utah.edu/common/home/sdss/dr14/casload/sqlSpecObj.csv.bz2' WITH CSV HEADER;
+\copy catalogdb.sdss_dr14_specobj FROM program 'bzcat /uufs/chpc.utah.edu/common/home/sdss/dr14/casload/spCSV/plates/sqlSpecObj.csv.bz2' WITH CSV HEADER;
 
 alter table catalogdb.sdss_dr14_specobj add primary key(specObjID);
 
 CREATE INDEX CONCURRENTLY sdss_dr14_sdss_dr14_specobj_bestObjID_index ON catalogdb.sdss_dr14_specobj using BTREE (bestObjID);
-CREATE INDEX CONCURRENTLY sdss_dr14_sdss_dr14_specobj_fluxObjID_index ON catalogdb.sdss_dr14_specobj using BTREE (fluxObjID);
 CREATE INDEX CONCURRENTLY sdss_dr14_sdss_dr14_specobj_fluxObjID_index ON catalogdb.sdss_dr14_specobj using BTREE (fluxObjID);
 CREATE INDEX CONCURRENTLY sdss_dr14_sdss_dr14_specobj_targetObjID_index ON catalogdb.sdss_dr14_specobj using BTREE (targetObjID);
 CREATE INDEX CONCURRENTLY sdss_dr14_sdss_dr14_specobj_ra_index ON catalogdb.sdss_dr14_specobj using BTREE (ra);
