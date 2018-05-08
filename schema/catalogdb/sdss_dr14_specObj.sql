@@ -205,11 +205,11 @@ img varbinary   -1  IMAGE?      Spectrum Image
 */
 
 CREATE TABLE catalogdb.sdss_dr14_specobj(
-    specObjID decimal(16),
+    specObjID numeric(20),
     bestObjID bigint,
     fluxObjID bigint,
     targetObjID bigint,
-    plateID decimal(16),
+    plateID numeric(20),
     sciencePrimary smallint,
     sdssPrimary smallint,
     legacyPrimary smallint,
