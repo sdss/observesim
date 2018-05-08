@@ -80,7 +80,7 @@ CREATE TABLE catalogdb.sdss_dr14_apogeeStar(
     max_h real,
     min_jk real,
     max_jk real,
-    survey real,
+    survey varchar(100),
     extratarg bigint,
     nvisits bigint,
     commiss bigint,
