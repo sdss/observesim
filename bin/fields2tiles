@@ -29,16 +29,18 @@ ntiles = fields['nepochs'].sum()
 
 tile_dtype = np.dtype([('RA', np.float64),
                        ('DEC', np.float64),
+                       ('IFIELD', np.int32),
                        ('NEXP', np.int32),
                        ('LUNATION', np.float32),
                        ('TILETYPE', 'O')])
 tiles = np.zeros(ntiles, dtype=tile_dtype)
 
 indx = 0
-for field in fields:
+for ifield, field in zip(np.arange(len(fields)), fields):
     nthis = field['nepochs']
     tiles['RA'][indx:indx + nthis] = field['ra']
     tiles['DEC'][indx:indx + nthis] = field['dec']
+    tiles['IFIELD'][indx:indx + nthis] = ifield
     tiles['NEXP'][indx:indx + nthis] = field['nexp'][0:nthis]
     tiles['TILETYPE'][indx:indx + nthis] = field['label']
     tiles['LUNATION'][indx:indx + nthis] = field['lunation'][0:nthis]

@@ -580,11 +580,11 @@ class Scheduler(Master):
         self.airmass_limit = airmass_limit
         return
 
-    def initdb(self, tiling='tiling-0'):
+    def initdb(self, tiling='plan-0'):
         """Initialize Scheduler tiles and observation lists
         """
         filebase = os.path.join(os.getenv('OBSERVESIM_DIR'),
-                                'data', 'tiling', tiling)
+                                'data', 'tiling', tiling + "-tiles")
         self.tile = observesim.tile.TileFile(observatory=self.observatory,
                                              filebase=filebase)
         self.observations = observesim.observations.Observations(observatory=self.observatory)

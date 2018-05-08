@@ -1,0 +1,153 @@
+#!/usr/bin/env python
+# encoding: utf-8
+
+from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
+
+# Plot QA for an SDSS-V simulation
+
+import os
+import argparse
+import numpy as np
+import fitsio
+import matplotlib.pyplot as plt
+import mpl_toolkits.basemap as basemap
+
+
+def set_moll(ax):
+    "Set up Molleweide projection plot"
+    m = basemap.Basemap(projection='moll', lon_0=270, resolution='c')
+
+    # draw parallels and meridians.
+    m.drawparallels(np.arange(-90., 120., 30.),
+                    linewidth=0.5,
+                    labels=[1, 0, 0, 0],
+                    labelstyle='+/-', ax=ax)
+    m.drawmeridians(np.arange(0., 420., 60.), linewidth=0.5, ax=ax)
+    m.drawmapboundary(ax=ax)
+    return(m)
+
+
+def _convert_radec(m, ra, dec):
+    "Convert RA and Dec to projection"
+    return m(((360. - ra) + 180.) % 360., dec, inverse=False)
+
+
+def scatter(m, ax, ra, dec, **kwargs):
+    "Scatter plot of RA, Dec in projection"
+    (x, y) = _convert_radec(m, ra, dec)
+    return(ax.scatter(x, y, **kwargs))
+
+
+def plot_field(ax=None, fields=None, value=None, title=None):
+    m = set_moll(ax)
+    scatter(m, ax, fields['ra'], fields['dec'], s=1, color='pink')
+    igd = np.where(value > 0)[0]
+    sc = scatter(m, ax, fields['ra'][igd], fields['dec'][igd],
+                 c=np.log10(value[igd]), s=2)
+    ax.set_title(title)
+    f.colorbar(sc, ax=ax)
+    return
+
+
+# Read arguments
+usage = "sdss5_simulate_qa"
+description = "Plot QA for a simulation of the SDSS-V schedule"
+parser = argparse.ArgumentParser(description=description, usage=usage)
+parser.add_argument("-b", "--base", dest="base", type=str,
+                    required=True, help="observation FITS file base")
+parser.add_argument("-t", "--telescope", dest="telescope", type=str,
+                    required=False, help="telescope ('apo' or 'lco')",
+                    default='apo')
+args = parser.parse_args()
+base = args.base
+observatory = args.telescope
+
+tiles_file = os.path.join(os.getenv('OBSERVESIM_DIR'), 'data', 'tiling',
+                          '{base}-tiles-apo.fits'.format(base=base))
+fields_file = os.path.join(os.getenv('OBSERVESIM_DIR'), 'data', 'tiling',
+                           '{base}-fields-apo.fits'.format(base=base))
+observations_file = '{base}-{observatory}-observations.fits'.format(base=base,
+                                                                    observatory=observatory)
+
+fields = fitsio.read(fields_file)
+tiles = fitsio.read(tiles_file)
+observations = fitsio.read(observations_file)
+
+duration = np.zeros(len(fields))
+for o in observations:
+    cdur = duration[tiles['IFIELD'][o['tileid']]]
+    duration[tiles['IFIELD'][o['tileid']]] = cdur + o['duration']
+duration = duration * 24.
+
+desired_duration = np.zeros(len(fields))
+for indx in np.arange(len(tiles)):
+    findx = tiles['IFIELD'][indx]
+    desired_duration[findx] = (desired_duration[findx] +
+                               0.25 * tiles['NEXP'][indx])
+
+f, ax = plt.subplots(3, figsize=(6, 8))
+
+title = '{base} desired field duration (log$_{{10}}$ hours)'.format(base=base)
+plot_field(ax=ax[0], fields=fields, value=desired_duration, title=title)
+
+title = '{base} achieved field duration (log$_{{10}}$ hours)'.format(base=base)
+plot_field(ax=ax[1], fields=fields, value=duration, title=title)
+
+dratio = duration / desired_duration
+title = '{base} achieved fractional field duration (log$_{{10}}$)'.format(base=base)
+plot_field(ax=ax[2], fields=fields, value=dratio, title=title)
+
+duration_figure = '{base}-{obs}-field-duration.png'.format(base=base,
+                                                           obs=observatory)
+f.savefig(duration_figure)
+
+plt.clf()
+
+first_mjd = np.zeros(len(fields))
+ofields = tiles['IFIELD'][observations['tileid']]
+for fieldid in np.arange(len(fields)):
+    ifield = np.where(ofields == fieldid)[0]
+    if(len(ifield) > 0):
+        first_mjd[ofields[ifield]] = observations['mjd'][ifield].min()
+
+cadence_figures = []
+labels = np.unique(fields['label'])
+for label in labels:
+    itype = np.where(fields['label'][ofields] == label)[0]
+    dmjd = (observations['mjd'] - first_mjd[ofields])[itype]
+    iplot = np.where(dmjd != 0)[0]
+    plt.figure(figsize=(6, 4))
+    h = plt.hist(np.log10(dmjd[iplot]), bins=160, range=np.log10([0.01, 1600.]))
+    plt.title('{label} cadence results'.format(label=label.decode().strip().upper()))
+    plt.xlabel('log$_{10}$ difference in days')
+    plt.ylabel('number of observations')
+    cadence_figure = '{base}-{obs}-cadence-{label}.png'.format(base=base,
+                                                               obs=observatory,
+                                                               label=label.decode().strip().lower()) 
+    plt.savefig(cadence_figure)
+    plt.clf()
+    cadence_figures.append(cadence_figure)
+
+
+fp = open('{base}-{obs}-results.html'.format(base=base, obs=observatory), "w")
+fp.write('<html>')
+fp.write('<body>')
+fp.write('<a href="{fig}"><img src="{fig}" width=400px/></a>'.format(fig=duration_figure))
+fp.write('<table>')
+nper = 2
+indx = 0
+for cadence_figure in cadence_figures:
+    if((indx % nper) == 0):
+        fp.write('<tr>')
+    fp.write('<td>')
+    fp.write('<a href="{fig}"><img src="{fig}" width=400px/></a>'.format(fig=cadence_figure))
+    fp.write('</td>')
+    if((indx % nper) == nper - 1):
+        fp.write('</tr>')
+    indx = indx + 1
+fp.write('</table>')
+fp.write('</body>')
+fp.write('</html>')
+fp.close()
