@@ -191,7 +191,7 @@ CREATE TABLE catalogdb.sdss_dr14_ascapStar(
     alpha_m_err real,
     alpha_m_flag    integer,
     aspcap_chi2 real,
-    aspcap_class    varchar(100)
+    aspcap_class    varchar(100),
     aspcapflag  bigint,
     fparam_teff real,
     fparam_logg real,
