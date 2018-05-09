@@ -158,6 +158,9 @@ class TileFile(TileBase):
     tileid : ndarray of np.int32
         id for each tile
 
+    lunation : ndarray of np.float32
+        maximum illumination of Moon to observe at
+
     priority : ndarray of np.int32
         priority number (smaller is higher priority)
 
@@ -188,6 +191,7 @@ class TileFile(TileBase):
         self.ntiles = len(self._tiles)
         self.tileid = np.arange(self.ntiles, dtype=np.int32)
         self.tiletype = self._tiles['TILETYPE']
+        self.lunation = self._tiles['LUNATION']
         self.racen = self._tiles['RA']
         self.deccen = self._tiles['DEC']
         self.priority = np.zeros(self.ntiles, dtype=np.int32) + self._limit

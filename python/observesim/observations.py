@@ -34,8 +34,18 @@ class Observations(object):
     duration : ndarray of np.float64
         duration of observation (days)
 
-    sn2 : ndarray of np.float64
+    sn2 : ndarray of np.float32
         duration of observation (days)
+
+    airmass : ndarray of np.float32
+        airmass of observation
+
+    lunation : ndarray of np.float32
+        lunation of observation (Moon illumination fraction, or zero if
+        below horizon)
+
+    lst : ndarray of np.float32
+        LST of observation
 
     Methods:
     -------
@@ -50,10 +60,14 @@ class Observations(object):
         self.tileid = np.zeros(0, dtype=np.int32)
         self.mjd = np.zeros(0, dtype=np.float64)
         self.duration = np.zeros(0, dtype=np.float64)
-        self.sn2 = np.zeros(0, dtype=np.float64)
+        self.sn2 = np.zeros(0, dtype=np.float32)
+        self.airmass = np.zeros(0, dtype=np.float32)
+        self.lunation = np.zeros(0, dtype=np.float32)
+        self.lst = np.zeros(0, dtype=np.float32)
         return
 
-    def add(self, tileid=None, mjd=None, duration=None, sn2=None):
+    def add(self, tileid=None, mjd=None, duration=None, sn2=None,
+            lunation=None, airmass=None, lst=None):
         self.tileid = np.append(self.tileid,
                                 np.array([np.float64(tileid)]))
         self.mjd = np.append(self.mjd,
@@ -61,7 +75,13 @@ class Observations(object):
         self.duration = np.append(self.duration,
                                   np.array([np.float64(duration)]))
         self.sn2 = np.append(self.sn2,
-                             np.array([np.float64(sn2)]))
+                             np.array([np.float32(sn2)]))
+        self.lunation = np.append(self.lunation,
+                                  np.array([np.float32(lunation)]))
+        self.airmass = np.append(self.airmass,
+                                 np.array([np.float32(airmass)]))
+        self.lst = np.append(self.lst,
+                             np.array([np.float32(lst)]))
         self.nobservations = len(self.tileid)
         return
 
@@ -88,7 +108,10 @@ class Observations(object):
         obs0 = [('tileid', np.int32),
                 ('mjd', np.float64),
                 ('duration', np.float64),
-                ('sn2', np.float64)]
+                ('sn2', np.float32),
+                ('airmass', np.float32),
+                ('lunation', np.float32),
+                ('lst', np.float32)]
         if(indx is None):
             indx = np.arange(self.nobservations)
         nobs = len(indx)
@@ -98,4 +121,7 @@ class Observations(object):
             obs['mjd'] = self.mjd[indx]
             obs['duration'] = self.duration[indx]
             obs['sn2'] = self.sn2[indx]
+            obs['airmass'] = self.airmass[indx]
+            obs['lunation'] = self.lunation[indx]
+            obs['lst'] = self.lst[indx]
         return(obs)

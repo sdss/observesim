@@ -18,8 +18,8 @@ import observesim.observe
 usage = "sdss5_simulate"
 description = "Simulate the SDSS-V schedule"
 parser = argparse.ArgumentParser(description=description, usage=usage)
-parser.add_argument("-o", "--output-base", dest="output_base", type=str,
-                    required=True, help="output FITS file name")
+parser.add_argument("-b", "--base", dest="base", type=str,
+                    required=True, help="output FITS base name")
 parser.add_argument("-p", "--plan", dest="plan", type=str,
                     required=False, help="tiling plan",
                     default='plan-0')
@@ -30,7 +30,7 @@ parser.add_argument("-t", "--telescope", dest="telescope", type=str,
                     required=False, help="telescope ('apo' or 'lco')",
                     default='apo')
 args = parser.parse_args()
-outbase = args.output_base
+base = args.base
 plan = args.plan
 seed = args.seed
 observatory = args.telescope
@@ -77,7 +77,7 @@ for mjd in scheduler.mjds:
             if(nextchange > curr_mjd):
                 curr_mjd = nextchange
 
-outobstemplate = "{outbase}-{observatory}-observations.fits"
-outobsfile = outobstemplate.format(outbase=outbase, observatory=observatory)
+outobstemplate = "{base}-{observatory}-observations.fits"
+outobsfile = outobstemplate.format(base=base, observatory=observatory)
 fitsio.write(outobsfile, scheduler.observations.toarray(),
              clobber=True)

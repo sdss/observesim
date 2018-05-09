@@ -13,6 +13,7 @@ import numpy as np
 import fitsio
 import matplotlib.pyplot as plt
 import mpl_toolkits.basemap as basemap
+from observesim.scheduler import dateandtime2mjd
 
 
 def set_moll(ax):
@@ -46,7 +47,7 @@ def plot_field(ax=None, fields=None, value=None, title=None):
     igd = np.where(value > 0)[0]
     sc = scatter(m, ax, fields['ra'][igd], fields['dec'][igd],
                  c=np.log10(value[igd]), s=2)
-    ax.set_title(title)
+    ax.set_title(title, fontsize=8)
     f.colorbar(sc, ax=ax)
     return
 
@@ -65,9 +66,11 @@ base = args.base
 observatory = args.telescope
 
 tiles_file = os.path.join(os.getenv('OBSERVESIM_DIR'), 'data', 'tiling',
-                          '{base}-tiles-apo.fits'.format(base=base))
+                          '{base}-tiles-{obs}.fits'.format(base=base,
+                                                           obs=observatory))
 fields_file = os.path.join(os.getenv('OBSERVESIM_DIR'), 'data', 'tiling',
-                           '{base}-fields-apo.fits'.format(base=base))
+                           '{base}-fields-{obs}.fits'.format(base=base,
+                                                             obs=observatory))
 observations_file = '{base}-{observatory}-observations.fits'.format(base=base,
                                                                     observatory=observatory)
 
@@ -105,6 +108,34 @@ f.savefig(duration_figure)
 
 plt.clf()
 
+dates = ['2020-07-01', '2021-07-01', '2022-07-01',
+         '2023-07-01', '2024-07-01', '2025-07-01']
+
+f, axes = plt.subplots(5, figsize=(4, 8))
+
+for indx in np.arange(len(axes)):
+    mjd_start = dateandtime2mjd(date=dates[indx])
+    mjd_end = dateandtime2mjd(date=dates[indx + 1])
+
+    duration = np.zeros(len(fields))
+    iyear = np.where((observations['mjd'] >= mjd_start) &
+                     (observations['mjd'] < mjd_end))[0]
+    for o in observations[iyear]:
+        cdur = duration[tiles['IFIELD'][o['tileid']]]
+        duration[tiles['IFIELD'][o['tileid']]] = cdur + o['duration']
+    duration = duration * 24.
+
+    title_template = 'Exposure per field in season {start}-{end}'
+    title = title_template.format(start=dates[indx][0:4],
+                                  end=dates[indx + 1][0:4])
+    plot_field(ax=axes[indx], fields=fields, value=duration, title=title)
+
+progress_figure = '{base}-{obs}-field-progress.png'.format(base=base,
+                                                           obs=observatory)
+f.savefig(progress_figure)
+
+plt.clf()
+
 first_mjd = np.zeros(len(fields))
 ofields = tiles['IFIELD'][observations['tileid']]
 for fieldid in np.arange(len(fields)):
@@ -134,7 +165,16 @@ for label in labels:
 fp = open('{base}-{obs}-results.html'.format(base=base, obs=observatory), "w")
 fp.write('<html>')
 fp.write('<body>')
+fp.write('<table>')
+fp.write('<tr>')
+fp.write('<td>')
 fp.write('<a href="{fig}"><img src="{fig}" width=400px/></a>'.format(fig=duration_figure))
+fp.write('</td>')
+fp.write('<td>')
+fp.write('<a href="{fig}"><img src="{fig}" width=400px/></a>'.format(fig=progress_figure))
+fp.write('</td>')
+fp.write('</tr>')
+fp.write('</table>')
 fp.write('<table>')
 nper = 2
 indx = 0

@@ -16,12 +16,15 @@ Sequence of events
  healpix pixel (nside=64, which is a bit less than 1 deg on a side)
  containing the RA/Dec.
 
- c. "target" is run. It receives input only from targetdb.  It fills a
- table which has: targeting bit mask, epochs, exposures per epoch, and
- cadence name. 
+ c. "target" is run. It receives input only from catalogdb.  It fills
+ a table in targetdb which has: targeting bit mask, epochs, exposures
+ per epoch, the ideal cadence per epoch (in days since first epoch),
+ the softness in the cadence requirement per epoch (in units of
+ days), and a name for the category of cadences. Skies and standards
+ are included in this list of targets.
 
  d. The target table is output to disk as a set of FITS files
- organized by healpix pixel. 
+ organized by healpix pixel, for archival purposes. 
 
 2. Tiling
 
@@ -33,9 +36,14 @@ Sequence of events
  driven by the targets it covers.
 
   * epochs:
-	    number of epochs necessary for the pixel. 
+	    number of epochs necessary for the field. 
   * exposures:
-	    number of exposure-epochs in the pixel total
+	    number of exposures in each epoch of the field.
+  * ideal cadence:
+	    for each epoch, ideal number of days since first epoch
+  * cadence softness:
+	    for each epoch, a quantification in days of how soft the
+	    requirement is
   * cadence name:
 	    name of cadence desired for the pixel
 
@@ -53,7 +61,7 @@ Sequence of events
      tile. Note that at this stage there is no cadence requirement
      imposed. This can be done with a network flow as done for the
 		 plates. It establishes a starting point for the observations that
-		 at least observes everything.
+		 at least observes everything. Skies and standards are included.
 
   ii. Given the set of tiles, tiling defines a sequence of
       observations based on the cadence criteria for each field and
@@ -63,16 +71,17 @@ Sequence of events
   iii. Each tile now has specific planned sequence. In this context,
        we now assign targets to the tiles applying cadence criteria. 
        Again constraint programming may work here, but how to solve
-			 this is unclear.
+			 this is unclear. Skies and standards are included.
 
   iv. There may be some iteration in the above steps.
 
   v. For each tile, we need to define some window of opportunity for
-  its observation in the plan. 
+     its observation in the plan.
 
 3. Training the strategy:
 
- a. Define a global metric for assessing success.
+ a. Define a global metric for assessing success. This metric should
+ be based on the outcomes for the targets (not the fields). 
 
  b. Define a strategy for selecting the next tile based on its
  observability and its window of opportunity. The strategy may allow a
@@ -90,28 +99,62 @@ Sequence of events
  whatever that means.
 
 4. Survey operations
- ... need to move material here from previous emails on databases ...
 
+ a. Prior to the survey, the targets and tiles are prepared. This means
+    designing and running targeting software across the whole sky, and 
+    designing a full set of tiles.
+
+ b. Each night, the tiles and fiber plan is used throughout the night
+    to pick the next tile to observe and its duration or S/N
+    requirement for that night. At this point targets-of-opportunity  
+    may be added. The configuration used for each observation is stored 
+    and the results of each exposure is stored. Once the duration or 
+    S/N requirement is hit for a tile it is not reobserved that night.
+
+ c. Each morning, the fpsdb database is updated with the results of
+    the night. The status of each tile and overall fiber plan for the
+    tiles may be updated as well. This retile may mean, for example, that
+    individual fibers that performed either better or worse than
+    expected may be reassigned in the future-looking fiber plan
+    (expressed in the "fiber" table of fpsdb). 
+
+fpsdb should be designed to be lightweight. It would be instantiated
+at Utah, LCO, and APO. Targets would be designated for one or other or
+both. A daytime process would need to update the Utah version based on
+LCO and based on APO, perform retiling, and push back the full updated
+database to the observatories. If connectivity was lost, the retiling
+operation would be skipped that day and updates would happen later.
 
 Software products
 -----------------
 
-* targetdb: 
+Right now everything is being developed in observesim. However,
+ultimately we should be refactoring into separate products:
 
-* target: 
+* catalogdb: to create and access catalogdb
 
-* tile: 
+* targetdb: to create and access targetdb
 
-* scheduler: 
+* fpsdb: to create and access fpsdb
 
-* observesim: 
+* target: to run targeting
+
+* tile: to run tiling
+
+* scheduler: software to run scheduler
+
+* configure: software to assign and test fiber configurations
+
+* observesim: software to run simulations of above
 
 Databases
 ---------
 
-* targetdb
+* catalogdb: input catalog database (heavy-weight)
 
-* fpsdb
+* targetdb: target catalog database (medium-weight)
+
+* fpsdb: operational database (light-weight)
 
 Glossary
 --------
@@ -139,8 +182,12 @@ Glossary
 Standards
 ---------
 
- * All target coordinates are given in columns names "ra", "dec",
+ * All target coordinates are given in columns named "ra", "dec",
    which are 64-bit precision and given in J2000 deg, with an "epoch"
    specified in decimal years, and with proper motions called "pmra"
    and "pmdec" in mas / year.
+
+ * All field or tile center coordinates are given in columns  named
+   "racen", "deccen", which are 64-bit precision and given in J2000
+   deg.
  

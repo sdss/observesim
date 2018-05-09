@@ -23,6 +23,18 @@ Dependencies:
 """
 
 
+def dateandtime2mjd(date=None, time='12:00', to_tai=7):
+    """Utility to calculate an MJD"""
+    if((type(date) is list) | (type(date) is np.ndarray)):
+        isotimes = ["{date} {time}".format(date=cdate, time=ctime)
+                    for cdate, ctime in zip(date, time)]
+    else:
+        isotimes = "{date} {time}".format(date=date, time=time)
+    times = atime.Time(isotimes, format='iso', scale='tai')
+    times = times + np.int32(to_tai) * units.hour
+    return(times.mjd)
+
+
 class SchedulerBase(object):
     """Scheduler base class with generic utilities.
 
@@ -342,6 +354,14 @@ class Observer(SchedulerBase):
         (alt, az) = self.radec2altaz(mjd=mjd, ra=ra, dec=dec)
         return (alt, az)
 
+    def lunation(self, mjd=None):
+        """Return Moon illumination, or zero if Moon at alt<0"""
+        (moon_alt, moon_az) = self.moon_altaz(mjd=mjd)
+        if(moon_alt < 0):
+            return(0.)
+        else:
+            return(self.moon_illumination(mjd=mjd))
+
     def _twilight_function(self, mjd=None, twilight=-8.):
         """Utility function for root-finding to get twilight times"""
         (alt, az) = self.sun_altaz(mjd=mjd)
@@ -452,11 +472,9 @@ class Master(Observer):
         return
 
     def _dateandtime2mjd(self):
-        isotimes = ["{date} {time}".format(date=date, time=time) for date, time
-                    in zip(self.event_dates, self.event_times)]
-        times = atime.Time(isotimes, format='iso', scale='tai')
-        times = times + np.int32(self.schedule['to_tai']) * units.hour
-        return(times.mjd)
+        return(dateandtime2mjd(date=self.event_dates,
+                               time=self.event_times,
+                               to_tai=self.schedule['to_tai']))
 
     def _validate(self):
         # should make sure:
@@ -640,8 +658,10 @@ class Scheduler(Master):
         (alt, az) = self.radec2altaz(mjd=mjd, ra=self.tile.racen,
                                      dec=self.tile.deccen)
         airmass = self.alt2airmass(alt)
+        lunation = self.lunation(mjd)
         iobservable = np.where((alt > 0.) &
-                               (airmass < self.airmass_limit))[0]
+                               (airmass < self.airmass_limit) &
+                               (lunation < self.tile.lunation))[0]
         return self.tile.tileid[iobservable]
 
     def highest_priority(self, tileid=None):
@@ -686,7 +706,10 @@ class Scheduler(Master):
         minha = iha.min()
         iminha = np.where(iha == minha)[0]
         dec = self.tile.deccen[tileid[iminha]]
-        ipick = np.argmin(dec)
+        if(self.observatory == 'apo'):
+            ipick = np.argmin(dec)
+        else:
+            ipick = np.argmax(dec)
         pick_tileid = tileid[iminha[ipick]]
         return(pick_tileid)
 
@@ -728,9 +751,18 @@ class Scheduler(Master):
 
         Updates the Scheduler.observations object
 """
+        (alt, az) = self.radec2altaz(mjd=result['mjd'],
+                                     ra=self.tile.racen[tileid],
+                                     dec=self.tile.deccen[tileid])
+        airmass = self.alt2airmass(alt)
+        lunation = self.lunation(result['mjd'])
+        lst = self.lst(result['mjd'])
         self.observations.add(tileid=tileid,
                               mjd=result['mjd'],
                               duration=result['duration'],
-                              sn2=result['sn2'])
+                              sn2=result['sn2'],
+                              lunation=lunation,
+                              airmass=airmass,
+                              lst=lst)
         self.set_priority(tileid=tileid, mjd=result['mjd'])
         return
