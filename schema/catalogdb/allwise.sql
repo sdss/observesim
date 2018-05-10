@@ -90,7 +90,7 @@ CREATE TABLE catalogdb.allwise(
     w3cc_map_str varchar(9),
     w4cc_map integer,
     w4cc_map_str varchar(9),
-    use_src integer,
+    use_src bigint,
     best_use_cntr bigint,
     ngrp integer,
     w1flux double precision,
