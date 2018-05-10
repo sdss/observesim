@@ -738,13 +738,5 @@ CREATE TABLE catalogdb.sdss_dr13_photoobj(
 
 
 
-\copy catalogdb.sdss_dr14_apogeeStar FROM program 'bzcat /uufs/chpc.utah.edu/common/home/sdss/dr14/casload/apCSV/spectro/sqlApogeeStar.csv.bz2' WITH CSV HEADER;
-
-alter table catalogdb.sdss_dr14_apogeeStar add primary key(apstar_id);
-
-CREATE INDEX CONCURRENTLY sdss_dr14_apogeeStar_ra_index ON catalogdb.sdss_dr14_apogeeStar using BTREE (ra);
-CREATE INDEX CONCURRENTLY sdss_dr14_apogeeStar_dec_index ON catalogdb.sdss_dr14_apogeeStar using BTREE (dec);
-CREATE INDEX CONCURRENTLY sdss_dr14_apogeeStar_glon_index ON catalogdb.sdss_dr14_apogeeStar using BTREE (glon);
-CREATE INDEX CONCURRENTLY sdss_dr14_apogeeStar_glat_index ON catalogdb.sdss_dr14_apogeeStar using BTREE (glat);
 
 
