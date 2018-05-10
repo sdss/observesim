@@ -188,7 +188,7 @@ CREATE TABLE catalogdb.allwise(
     w3flg_5 integer,
     w4mag_5 double precision,
     w4sigm_5 double precision,
-    w4flg_5 integer
+    w4flg_5 integer,
     w1mag_6 double precision,
     w1sigm_6 double precision,
     w1flg_6 integer,
