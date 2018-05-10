@@ -1,0 +1,285 @@
+#!/usr/bin/env python
+# encoding: utf-8
+
+from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
+
+import os
+import sys
+import glob
+import multiprocessing
+import cStringIO
+import re
+
+from astropy.table import Table
+from astropy.io import ascii
+
+wantCols = [
+    "objID",
+    "run",
+    "rerun",
+    "camcol",
+    "field",
+    "obj",
+    "type",
+    "flags",
+    "rowc",
+    "rowcErr",
+    "colc",
+    "colcErr",
+    "rowv",
+    "rowvErr",
+    "colv",
+    "colvErr",
+    "sky_u",
+    "sky_g",
+    "sky_r",
+    "sky_i",
+    "sky_z",
+    "skyIvar_u",
+    "skyIvar_g",
+    "skyIvar_r",
+    "skyIvar_i",
+    "skyIvar_z",
+    "psfMag_u",
+    "psfMag_g",
+    "psfMag_r",
+    "psfMag_i",
+    "psfMag_z",
+    "psfMagErr_u",
+    "psfMagErr_g",
+    "psfMagErr_r",
+    "psfMagErr_i",
+    "psfMagErr_z",
+    "fiberMag_u ",
+    "fiberMag_g ",
+    "fiberMag_r ",
+    "fiberMag_i ",
+    "fiberMag_z ",
+    "fiberMagErr_u",
+    "fiberMagErr_g",
+    "fiberMagErr_r",
+    "fiberMagErr_i",
+    "fiberMagErr_z",
+    "fiber2Mag_u",
+    "fiber2Mag_g",
+    "fiber2Mag_r",
+    "fiber2Mag_i",
+    "fiber2Mag_z",
+    "fiber2MagErr_u",
+    "fiber2MagErr_g",
+    "fiber2MagErr_r",
+    "fiber2MagErr_i",
+    "fiber2MagErr_z",
+    "petroMag_u",
+    "petroMag_g",
+    "petroMag_r",
+    "petroMag_i",
+    "petroMag_z",
+    "petroMagErr_u",
+    "petroMagErr_g",
+    "petroMagErr_r",
+    "petroMagErr_i",
+    "petroMagErr_z",
+    "psfFlux_u",
+    "psfFlux_g",
+    "psfFlux_r",
+    "psfFlux_i",
+    "psfFlux_z",
+    "psfFluxIvar_u",
+    "psfFluxIvar_g",
+    "psfFluxIvar_r",
+    "psfFluxIvar_i",
+    "psfFluxIvar_z",
+    "fiberFlux_u",
+    "fiberFlux_g",
+    "fiberFlux_r",
+    "fiberFlux_i",
+    "fiberFlux_z",
+    "fiberFluxIvar_u",
+    "fiberFluxIvar_g",
+    "fiberFluxIvar_r",
+    "fiberFluxIvar_i",
+    "fiberFluxIvar_z",
+    "fiber2Flux_u",
+    "fiber2Flux_g",
+    "fiber2Flux_r",
+    "fiber2Flux_i",
+    "fiber2Flux_z",
+    "fiber2FluxIvar_u",
+    "fiber2FluxIvar_g",
+    "fiber2FluxIvar_r",
+    "fiber2FluxIvar_i",
+    "fiber2FluxIvar_z",
+    "petroFlux_u",
+    "petroFlux_g",
+    "petroFlux_r",
+    "petroFlux_i",
+    "petroFlux_z",
+    "petroFluxIvar_u",
+    "petroFluxIvar_g",
+    "petroFluxIvar_r",
+    "petroFluxIvar_i",
+    "petroFluxIvar_z",
+    "petroRad_u",
+    "petroRad_g",
+    "petroRad_r",
+    "petroRad_i",
+    "petroRad_z",
+    "petroRadErr_u",
+    "petroRadErr_g",
+    "petroRadErr_r",
+    "petroRadErr_i",
+    "petroRadErr_z",
+    "petroR50_u",
+    "petroR50_g",
+    "petroR50_r",
+    "petroR50_i",
+    "petroR50_z",
+    "petroR50Err_u",
+    "petroR50Err_g",
+    "petroR50Err_r",
+    "petroR50Err_i",
+    "petroR50Err_z",
+    "petroR90_u",
+    "petroR90_g",
+    "petroR90_r",
+    "petroR90_i",
+    "petroR90_z",
+    "petroR90Err_u",
+    "petroR90Err_g",
+    "petroR90Err_r",
+    "petroR90Err_i",
+    "petroR90Err_z",
+    "mRrCc_u",
+    "mRrCc_g",
+    "mRrCc_r",
+    "mRrCc_i",
+    "mRrCc_z",
+    "deVFlux_u",
+    "deVFlux_g",
+    "deVFlux_r",
+    "deVFlux_i",
+    "deVFlux_z",
+    "deVFluxIvar_u",
+    "deVFluxIvar_g",
+    "deVFluxIvar_r",
+    "deVFluxIvar_i",
+    "deVFluxIvar_z",
+    "extinction_u",
+    "extinction_g",
+    "extinction_r",
+    "extinction_i",
+    "extinction_z",
+    "lnLDeV_u",
+    "lnLDeV_g",
+    "lnLDeV_r",
+    "lnLDeV_i",
+    "lnLDeV_z",
+    "expFlux_u",
+    "expFlux_g",
+    "expFlux_r",
+    "expFlux_i",
+    "expFlux_z",
+    "expFluxIvar_u",
+    "expFluxIvar_g",
+    "expFluxIvar_r",
+    "expFluxIvar_i",
+    "expFluxIvar_z",
+    "aperFlux7_u",
+    "aperFlux7_g",
+    "aperFlux7_r",
+    "aperFlux7_i",
+    "aperFlux7_z",
+    "calibStatus_u",
+    "calibStatus_g",
+    "calibStatus_r",
+    "calibStatus_i",
+    "calibStatus_z",
+    "nMgyPerCount_u",
+    "nMgyPerCount_g",
+    "nMgyPerCount_r",
+    "nMgyPerCount_i",
+    "nMgyPerCount_z",
+    "resolveStatus",
+    "thingId",
+    "fieldID",
+    "balkanId",
+    "nDetect",
+    "psffwhm_u",
+    "psffwhm_g",
+    "psffwhm_r",
+    "psffwhm_i",
+    "psffwhm_z",
+    "htmID",
+    "parentID",
+    "specObjID",
+    "lnLStar_u",
+    "lnLStar_g",
+    "lnLStar_r",
+    "lnLStar_i",
+    "lnLStar_z",
+    "lnLExp_u",
+    "lnLExp_g",
+    "lnLExp_r",
+    "lnLExp_i",
+    "lnLExp_z",
+    "ra",
+    "dec",
+    "b",
+    "l",
+]
+
+PH_DIR = "/uufs/chpc.utah.edu/common/home/sdss/dr13/casload/phCSV/2"
+
+fileList = []
+for dirpath,n,fileList in os.path.walk("PH_DIR"):
+    for f in fileList:
+        if f.startswith("sqlPhotoObjAll"):
+            fiileList.append(os.path.join(dirpath,f))
+for file in fileList:
+    print (file)
+
+def writeCSV(fitsFile):
+    # cant pass out dir using multiprocessing?
+    table = Table.read(fitsFile)
+    filename = os.path.split(fitsFile)[-1]
+    if filename.startswith("TgasSource"):
+        OUTPUT_DIR = CSV_TGAS_DIR
+    else:
+        OUTPUT_DIR = CSV_SOURCE_DIR
+    csvfilename = filename.strip("fits") + "csv"
+    fullpath = os.path.join(OUTPUT_DIR, csvfilename)
+    outStrBuffer = cStringIO.StringIO()
+    ascii.write(table, outStrBuffer, format="csv")
+    outStr = outStrBuffer.getvalue()
+    replNan = re.sub("nan", "NULL", outStr)
+    with open(fullpath, "w") as f:
+        f.write(replNan)
+
+def writeSourceCSVs():
+    allFitsTables = sorted(glob.glob(GAIA_SOURCE_DIR+"/GaiaSource*.fits"))
+    p = multiprocessing.Pool(12)
+    p.map(writeCSV, allFitsTables)
+
+def writeTgasCSVs():
+    allFitsTables = sorted(glob.glob(GAIA_TGAS_DIR+"/TgasSource*.fits"))
+    p = multiprocessing.Pool(12)
+    p.map(writeCSV, allFitsTables)
+
+# if __name__ == "__main__":
+#     # usage gaia_source2csv tgas | source
+#     usageStr = "usage: gaia_source2csv tgas | source"
+#     if not sys.argv[1]:
+#         print(usageStr)
+#         sys.exit()
+#     catalog = sys.argv[1].lower()
+#     if catalog not in ["tgas", "source"]:
+#         print(usageStr)
+#         sys.exit()
+#     if catalog == "tgas":
+#         writeTgasCSVs()
+#     else:
+#         writeSourceCSVs()
+
