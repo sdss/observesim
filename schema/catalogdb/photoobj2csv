@@ -757,24 +757,22 @@ for dirpath,n,fs in os.walk(PH_DIR):
         if f.startswith("sqlPhotoObjAll"):
             fileList.append(os.path.join(dirpath,f))
 
-for file in fileList:
-    print (file)
-
 def writeCSV(casCSV):
     # cant pass out dir using multiprocessing?
     outFilePath = casCSV.split("/")[-1].split(".bz2")[0]
     outFilePath = os.path.join("/scratch/general/lustre/u0449727/photoobj", outFilePath)
     outfile = open(outFilePath, "w")
-    cf = bz2.open(casCSV, "r")
+    cf = bz2.BZ2File(casCSV, "r")
     for line in cf:
         vals = line.split(",")
         outVals = []
         for index in indexList:
             outVals.append(vals[index])
-        outLine = ",".join(outVals) + "\n"
+        outLine = ",".join(outVals) + "\r\n"
         outfile.write(outLine)
     cf.close()
     outfile.close()
+    print("wrote: ", outfilePath)
 
 writeCSV(fileList[0])
 
