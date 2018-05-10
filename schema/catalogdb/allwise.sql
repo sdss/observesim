@@ -64,7 +64,7 @@ CREATE TABLE catalogdb.allwise(
     rchi2_pm real,
     pmcode char(5),
     cc_flags char(4),
-    rel char(1)
+    rel char(1),
     ext_flg integer,
     var_flg char(4),
     ph_qual char(4),
