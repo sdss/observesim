@@ -6,16 +6,11 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import os
-import sys
-import glob
-import multiprocessing
-import cStringIO
-import re
+from multiprocessing import Pool
+
 
 import bz2
 
-from astropy.table import Table
-from astropy.io import ascii
 
 allCols = [
     "objID",
@@ -772,8 +767,9 @@ def writeCSV(casCSV):
         outfile.write(outLine)
     cf.close()
     outfile.close()
-    print("wrote: ", outfilePath)
+    print("wrote: ", outFilePath)
 
-writeCSV(fileList[0])
+pool = Pool(processes=24)
+pool.map(writeCSV, fileList)
 
 
