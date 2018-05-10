@@ -234,7 +234,7 @@ wantCols = [
 PH_DIR = "/uufs/chpc.utah.edu/common/home/sdss/dr13/casload/phCSV/2"
 
 fileList = []
-for dirpath,n,fs in os.path.walk(PH_DIR):
+for dirpath,n,fs in os.walk(PH_DIR):
     for f in fs:
         if f.startswith("sqlPhotoObjAll"):
             fileList.append(os.path.join(dirpath,f))
