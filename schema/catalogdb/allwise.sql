@@ -69,7 +69,7 @@ CREATE TABLE catalogdb.allwise(
     var_flg char(4),
     ph_qual char(4),
     det_bit integer,
-    moon_lev char(4)
+    moon_lev char(4),
     w1nm integer,
     w1m integer,
     w2nm integer,
