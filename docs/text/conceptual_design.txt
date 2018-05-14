@@ -1,6 +1,19 @@
 This document describes a conceptual design for the targeting and
 scheduling system for SDSS-V.
 
+Notes from discussion:
+----------------------
+
+* Tile -> design
+* Need to build in flexibility to get some objects of a class?
+* What cadence classes are most important? How do we quantify this?
+* What is criterion for adding a design?
+* Can we quantify value? 
+* Queue observing for HET: weights, synoptic targets,
+  etc. Supercommittee proposes different weights. Weight includes
+  future opportunity.
+* SPIE: queue-interested group -- Austin area
+
 Sequence of events
 ------------------
 
@@ -26,7 +39,7 @@ Sequence of events
  d. The target table is output to disk as a set of FITS files
  organized by healpix pixel, for archival purposes. 
 
-2. Tiling
+2. Tiling (call it a design)
 
  a. A set of fields are defined that cover the area with the
  appropriate density. This will almost certainly be a by-hand

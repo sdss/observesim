@@ -1,0 +1,77 @@
+A basic task that needs to be performed is to decide what cadence to
+take in each field. This task is closely related to deciding which
+fibers to assign to which target for each design. 
+
+Here we treat the cadences as defined by a set of exposures, each of
+which has a "day" and a "softness" associated with it. The first
+exposure on the list has day=0 (though in principle, other exposures
+can have negative "day" values). 
+
+Determining the Cadence Consistency Matrix
+==========================================
+
+In each field, there is a suite of cadences desired for each
+target. We need to decide which cadence to actually pick. We will
+start by determining which cadences are consistent. We need to know
+the answer to the question:
+
+ "Is cadence i achievable in a field with cadence j?"
+
+For example, a single exposure cadence is always achievable, but if we
+need two exposures on a target in cadence i then its achievability
+depends on the requirements on their cadence and what is on offer
+under cadence j. That is, if cadence i needs a month separation, but
+cadence j has yearly separations, then it won't work. 
+
+If we can determine this, we can construct a "cadence consistency
+matrix", C_{ij} which contains the answer to the above question
+encoded as a 0 or 1 (i.e. False or True). Note that this matrix is
+decidedly not symmetric. This matrix will be the basis on which we
+make decisions about which cadences to go for. 
+
+To determine the cadence consistency matrix, we have to look at the
+individual exposures. Imagine we want to get exposures in the cadence
+specified in cadence i. Well, the first exposure in the list needs to
+correspond to some exposure in cadence j. So we will check each
+possibility in turn.  
+
+For each choice of day_i(0) = day_j(jstart), we now create an Exposure
+Consistency Matrix. The exposure consistency matrix contains the
+answer to the question for each i', j':
+
+ "Is exposure i' consistent with exposure j' offset by day_j(jstart)?"
+
+The Exposure Consistency Matrix, E_{ij} is 0s and 1s. The condition
+that the cadence i is achievable under cadence j is equivalent to
+being able to construct a matrix w_{ij} for which the following is
+true for some choice of jstart:
+
+ w_{ij} <= E_{ij} for all i, j, AND 
+ \sum_i w_{ij} <= 1 for all j, AND
+ \sum_j w_{j} == 1 for all i
+
+The w_{ij} are the "solutions" -- the choices of which exposures for
+cadence i to put in which exposures for cadence j.
+
+The Exposure Consistency Matrix and its solutions will be important in
+selecting targets to assign to fibers for each design as well.
+
+The solutions to the Exposure Consistency Matrix problem can be found
+with standard techniques in constraint programming. Thus, we can
+determine the Cadence Consistency Matrix.
+
+Using the Cadence Consistency Matrix
+====================================
+
+Once we have a Cadence Consistency Matrix, we can evaluate what
+happens for each choice of primary cadence. 
+
+For each primary cadence, we then know which set of targets can be
+included in the cadence. A rough estimate of the value of the cadence
+can be determined from the set of targets which can be included (some
+weighted sum of their values), and a rough estimate of cost can be
+determined from the number of exposures. For the first cut of cadences
+across the sky, we could start with this.
+
+A more accurate evaluation would result from assigning fibers to each
+one. I haven't yet thought through exactly how to do this.
