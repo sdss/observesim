@@ -279,3 +279,117 @@ class CadenceList(object):
             return(count, solutions)
         else:
             return(count)
+
+    def pack_targets(self, target_cadences=None, field_cadence=None,
+                     value=None):
+        ntargets = len(target_cadences)
+        nepochs = self.cadences[field_cadence].nexposures
+        if(value is None):
+            value = np.ones(ntargets)
+        else:
+            value = np.array(value)
+
+        pack = []
+        epochs = [0] * nepochs
+
+        # Find solutions for each target
+        for target_cadence in target_cadences:
+            count, solns = self.cadence_consistency(target_cadence,
+                                                    field_cadence,
+                                                    return_solutions=True)
+            target = []
+            for isoln in solns:
+                soln_epochs = epochs.copy()
+                for i in isoln:
+                    soln_epochs[i] = 1
+                    target.append(soln_epochs)
+            pack.append(target)
+
+        solver = pywrapcp.Solver("pack_targets")
+
+        # Create variables for each epoch of each solution of each target
+        packvar = []
+        indxt = 0
+        for target in pack:
+            indxs = 0
+            targetvar = []
+            for soln in target:
+                indxe = 0
+                solnvar = []
+                for epoch in soln:
+                    name = "{t}-{s}-{e}".format(t=indxt, s=indxt, e=indxe)
+                    solnvar.append(solver.BoolVar(name))
+                    indxe = indxe + 1
+                indxs = indxs + 1
+                targetvar.append(solnvar)
+            indxt = indxt + 1
+            packvar.append(targetvar)
+
+        # Constraint for each solution that all or none of
+        # its epochs, and only those epochs, are used
+        for target, targetvar in zip(pack, packvar):
+            for soln, solnvar in zip(target, targetvar):
+                firstvar = None
+                for epoch, epochvar in zip(soln, solnvar):
+                    if(epoch):
+                        if(firstvar):
+                            solver.Add(epochvar == firstvar)
+                        else:
+                            firstvar = epochvar
+                    else:
+                        solver.Add(epochvar == 0)
+
+        # Constraint for each epoch that only one total
+        # target is taken
+        for iepoch in range(nepochs):
+            e = [solnvar[iepoch] for targetvar in packvar
+                 for solnvar in targetvar]
+            solver.Add(solver.Sum(e) <= 1)
+
+        # Constraint that only one solution for each target
+        # is taken.
+        target_valvars = []
+        for val, targetvar in zip(value, packvar):
+            solnused = []
+            for solnvar in targetvar:
+                solnused.append(solver.Sum(solnvar) > 0)
+            target_got = solver.Sum(solnused)
+            target_valvar = target_got * int(val)
+            target_valvars.append(target_valvar)
+            solver.Add(target_got <= 1)
+
+        allvars = [epochvar for targetvar in packvar
+                   for solnvar in targetvar for epochvar in solnvar]
+
+        objective_expr = solver.IntVar(0, int(value.sum()), "value")
+        solver.Add(objective_expr == solver.Sum(target_valvars))
+        objective = solver.Maximize(objective_expr, 1)
+
+        db = solver.Phase(allvars, solver.CHOOSE_FIRST_UNBOUND,
+                          solver.ASSIGN_MIN_VALUE)
+
+        # Create a solution collector.
+        collector = solver.LastSolutionCollector()
+
+        # Add the decision variables.
+        for allvar in allvars:
+            collector.Add(allvar)
+
+        # Add the objective.
+        collector.AddObjective(objective_expr)
+
+        success = solver.Solve(db, [objective, collector])
+        if(success is False):
+            print("Problem in solver.")
+            return(None)
+
+        epoch_targets = np.zeros(nepochs, dtype=np.int32) - 1
+        if collector.SolutionCount() > 0:
+            best_solution = collector.SolutionCount() - 1
+            for itarget, targetvar in zip(range(ntargets), packvar):
+                for solnvar in targetvar:
+                    for iepoch, epochvar in zip(range(nepochs), solnvar):
+                        if(collector.Value(best_solution, epochvar)):
+                            epoch_targets[iepoch] = itarget
+
+        return(epoch_targets)
