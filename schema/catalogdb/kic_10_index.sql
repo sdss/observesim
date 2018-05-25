@@ -22,7 +22,6 @@ CREATE INDEX CONCURRENTLY kepler_input_10_jmag_index ON catalogdb.kepler_input_1
 CREATE INDEX CONCURRENTLY kepler_input_10_hmag_index ON catalogdb.kepler_input_10 using BTREE (kic_hmag);
 CREATE INDEX CONCURRENTLY kepler_input_10_kmag_index ON catalogdb.kepler_input_10 using BTREE (kic_kmag);
 CREATE INDEX CONCURRENTLY kepler_input_10_kepmag_index ON catalogdb.kepler_input_10 using BTREE (kic_kepmag);
-/* CREATE INDEX CONCURRENTLY kepler_input_10_kepler_id_index ON catalogdb.kepler_input_10 using BTREE (kic_kepler_id); */
 CREATE INDEX CONCURRENTLY kepler_input_10_glon_index ON catalogdb.kepler_input_10 using BTREE (kic_glon);
 CREATE INDEX CONCURRENTLY kepler_input_10_glat_index ON catalogdb.kepler_input_10 using BTREE (kic_glat);
 
