@@ -1,5 +1,4 @@
 #! /usr/bin/bash
 # encoding: utf-8
 
-
-ls /scratch/general/lustre/u0449727/wise/irsa.ipac.caltech.edu/data/download/wise-allwise/*.bz2 | parallel -j25 "psql -U sdss sdss5db -c \"\copy catalogdb.allwise FROM program 'bzcat {}' WITH CSV;\""
+ls /scratch/general/lustre/u0449727/wise/prepCSV/* | parallel -j25 "psql -U sdss sdss5db -c \"\copy catalogdb.allwise FROM {} with delimiter '|' CSV;\""
