@@ -4,7 +4,6 @@ scheduling system for SDSS-V.
 Notes from discussion:
 ----------------------
 
-* Tile -> design
 * Need to build in flexibility to get some objects of a class?
 * What cadence classes are most important? How do we quantify this?
 * What is criterion for adding a design?
@@ -30,65 +29,68 @@ Sequence of events
  containing the RA/Dec.
 
  c. "target" is run. It receives input only from catalogdb.  It fills
- a table in targetdb which has: targeting bit mask, epochs, exposures
- per epoch, the ideal cadence per epoch (in days since first epoch),
- the softness in the cadence requirement per epoch (in units of
- days), and a name for the category of cadences. Skies and standards
- are included in this list of targets.
+ a table in targetdb which has:
+
+  * targeting bit mask
+  * cadence category
+
+  Skies and standards are included in this list of targets.
+
+  Each cadence category has the following information:
+
+  * nexposures:
+	    number of exposures in the field total.
+  * epoch:
+	    for each epoch, ideal number of days since first epoch
+  * softness:
+	    for each epoch, a quantification in days of how soft the
+	    requirement is
+  * lunation:
+	    for each epoch, the maximum moon lunation (lunation is equal to
+	    moon illumination, or 0 if moon is below the horizon)
 
  d. The target table is output to disk as a set of FITS files
  organized by healpix pixel, for archival purposes. 
 
-2. Tiling (call it a design)
+2. Design
 
  a. A set of fields are defined that cover the area with the
  appropriate density. This will almost certainly be a by-hand
  task.
 
- b. Teams define the cadence which they need for each field,
- driven by the targets it covers.
-
-  * epochs:
-	    number of epochs necessary for the field. 
-  * exposures:
-	    number of exposures in each epoch of the field.
-  * ideal cadence:
-	    for each epoch, ideal number of days since first epoch
-  * cadence softness:
-	    for each epoch, a quantification in days of how soft the
-	    requirement is
-  * cadence name:
-	    name of cadence desired for the pixel
+ b. Teams define the cadence category which they need for each field,
+ driven by the targets it covers. Note that the cadence category for
+ a field does NOT need to be the same as any of the targets.
 
  Although ultimately the requirement is on the cadence and S/N of
  individual targets, in order to observe a target, you need to target
  the whole region around it, which is why these requirements come in
  at the field level.
 
- c. "tiling" is run. Note that the iterative sequence below is an
+ c. "design" is run. Note that the iterative sequence below is an
  attempt to cast this difficult global problem into a set of tractable
  ones. This is still R&D.
 
-  i. The code defines a set of tiles (zero or more for each field),
+  i. The code defines a set of designs (zero or more for each field),
      and determine which exposures of which targets are taken in each
-     tile. Note that at this stage there is no cadence requirement
+     designs. Note that at this stage there is no cadence requirement
      imposed. This can be done with a network flow as done for the
 		 plates. It establishes a starting point for the observations that
 		 at least observes everything. Skies and standards are included.
 
-  ii. Given the set of tiles, tiling defines a sequence of
+  ii. Given the set of designs, we define a sequence of
       observations based on the cadence criteria for each field and
       the LST opportunity of each field. How to approach this is
       unclear, but constraint programming techniques may work.
 
-  iii. Each tile now has specific planned sequence. In this context,
-       we now assign targets to the tiles applying cadence criteria. 
+  iii. Each design now has specific planned sequence. In this context,
+       we now assign targets to the designs applying cadence criteria. 
        Again constraint programming may work here, but how to solve
 			 this is unclear. Skies and standards are included.
 
   iv. There may be some iteration in the above steps.
 
-  v. For each tile, we need to define some window of opportunity for
+  v. For each design, we need to define some window of opportunity for
      its observation in the plan.
 
 3. Training the strategy:
@@ -96,9 +98,9 @@ Sequence of events
  a. Define a global metric for assessing success. This metric should
  be based on the outcomes for the targets (not the fields). 
 
- b. Define a strategy for selecting the next tile based on its
+ b. Define a strategy for selecting the next design based on its
  observability and its window of opportunity. The strategy may allow a
- periodic rerunning of tiling based on achieved results.  The strategy
+ periodic rerunning of design based on achieved results.  The strategy
  may have tunable parameters. 
 
  c. Run simulations under that strategy.
@@ -113,20 +115,20 @@ Sequence of events
 
 4. Survey operations
 
- a. Prior to the survey, the targets and tiles are prepared. This means
+ a. Prior to the survey, the targets and designs are prepared. This means
     designing and running targeting software across the whole sky, and 
-    designing a full set of tiles.
+    designing a full set of designs.
 
- b. Each night, the tiles and fiber plan is used throughout the night
-    to pick the next tile to observe and its duration or S/N
+ b. Each night, the designs and fiber plan is used throughout the night
+    to pick the next design to observe and its duration or S/N
     requirement for that night. At this point targets-of-opportunity  
     may be added. The configuration used for each observation is stored 
     and the results of each exposure is stored. Once the duration or 
-    S/N requirement is hit for a tile it is not reobserved that night.
+    S/N requirement is hit for a design it is not reobserved that night.
 
  c. Each morning, the fpsdb database is updated with the results of
-    the night. The status of each tile and overall fiber plan for the
-    tiles may be updated as well. This retile may mean, for example, that
+    the night. The status of each design and overall fiber plan for the
+    designs may be updated as well. This redesign may mean, for example, that
     individual fibers that performed either better or worse than
     expected may be reassigned in the future-looking fiber plan
     (expressed in the "fiber" table of fpsdb). 
@@ -134,8 +136,8 @@ Sequence of events
 fpsdb should be designed to be lightweight. It would be instantiated
 at Utah, LCO, and APO. Targets would be designated for one or other or
 both. A daytime process would need to update the Utah version based on
-LCO and based on APO, perform retiling, and push back the full updated
-database to the observatories. If connectivity was lost, the retiling
+LCO and based on APO, perform redesign, and push back the full updated
+database to the observatories. If connectivity was lost, the redesign
 operation would be skipped that day and updates would happen later.
 
 Software products
@@ -152,7 +154,7 @@ ultimately we should be refactoring into separate products:
 
 * target: to run targeting
 
-* tile: to run tiling
+* design: to create designs
 
 * scheduler: software to run scheduler
 
@@ -200,7 +202,7 @@ Standards
    specified in decimal years, and with proper motions called "pmra"
    and "pmdec" in mas / year.
 
- * All field or tile center coordinates are given in columns  named
+ * All field or design center coordinates are given in columns  named
    "racen", "deccen", which are 64-bit precision and given in J2000
    deg.
  
