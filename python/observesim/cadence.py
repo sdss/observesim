@@ -84,6 +84,7 @@ class CadenceList(object):
 """
         cadence = Cadence(*args, **kwargs)
         self.cadences.append(cadence)
+        self.ncadences = self.ncadences + 1
 
     def exposure_consistency(self, epoch_i=None, lunation_i=None,
                              softness_i=None, epoch_j=None,
@@ -393,3 +394,21 @@ class CadenceList(object):
                             epoch_targets[iepoch] = itarget
 
         return(epoch_targets)
+
+    def toarray(self):
+        nexps = np.array([c.nexposures for c in self.cadences])
+        max_nexp = nexps.max()
+        cadence0 = [('cadenceid', np.int32),
+                    ('nexposures', np.int32),
+                    ('epoch', np.float64, max_nexp),
+                    ('lunation', np.float32, max_nexp),
+                    ('softness', np.float32, max_nexp)]
+        cads = np.zeros(self.ncadences, dtype=cadence0)
+        for indx, ccadence in zip(np.arange(self.ncadences), self.cadences):
+            nexp = self.cadences[indx].nexposures
+            cads['cadenceid'][indx] = indx
+            cads['nexposures'][indx] = nexp
+            cads['epoch'][indx, 0:nexp] = self.cadences[indx].epoch
+            cads['softness'][indx, 0:nexp] = self.cadences[indx].softness
+            cads['lunation'][indx, 0:nexp] = self.cadences[indx].lunation
+        return(cads)
