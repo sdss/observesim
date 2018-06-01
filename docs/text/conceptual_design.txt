@@ -13,8 +13,8 @@ Notes from discussion:
   future opportunity.
 * SPIE: queue-interested group -- Austin area
 
-Sequence of events
-------------------
+Elements of Observing Strategy
+------------------------------
 
 1. Targeting
 
@@ -28,90 +28,89 @@ Sequence of events
  healpix pixel (nside=64, which is a bit less than 1 deg on a side)
  containing the RA/Dec.
 
- c. "target" is run. It receives input only from catalogdb.  It fills
- a table in targetdb which has:
+ c. "target" is run. It receives input only from catalogdb. The
+ operations team provides tools to extract catalog objects and their
+ information, and to write results into targetdb. The mapper teams
+ provide code that identifies targets using those tools to interact
+ with the databases. Skies and standards are included in the list of
+ targets.  A notion would be to run this code healpix by healpix,
+ since interacting with the database on an object-by-object basis may
+ introduce excessive overhead. The target process produces a table in
+ targetdb which has:
 
+  * catalogdb ID
   * targeting bit mask
+  * value(s)
   * cadence category
+  * version
 
-  Skies and standards are included in this list of targets.
+ How we handle versioning is a bit unclear as yet.
 
-  Each cadence category has the following information:
+ Each cadence category has the following information:
 
   * nexposures:
 	    number of exposures in the field total.
-  * epoch:
-	    for each epoch, ideal number of days since first epoch
-  * softness:
-	    for each epoch, a quantification in days of how soft the
-	    requirement is
-  * lunation:
+  * epoch[]:
+	    for each exposure, ideal number of days since first epoch
+  * softness[]:
+	    for each exposure, a quantification in days of how soft the
+	    epoch requirement is
+  * lunation[]:
 	    for each epoch, the maximum moon lunation (lunation is equal to
 	    moon illumination, or 0 if moon is below the horizon)
 
  d. The target table is output to disk as a set of FITS files
  organized by healpix pixel, for archival purposes. 
 
-2. Design
+2. Strategic Design
+
+This occurs prior to the survey, and its purpose is to establish an
+overall plan that is workable and will achieve the goals of the
+project. We expect these tasks to be iterated with changes in choices
+and approaches based on simulations.
 
  a. A set of fields are defined that cover the area with the
- appropriate density. This will almost certainly be a by-hand
- task.
+    appropriate density. This will almost certainly be a by-hand task.
 
- b. Teams define the cadence category which they need for each field,
- driven by the targets it covers. Note that the cadence category for
- a field does NOT need to be the same as any of the targets.
+ b. "design" is run for each field. For each field, we choose a set of
+	   possible cadences, and assign targets to fibers under that
+	   cadence. Our first path forward will be as follows: (i) to
+	   consider the unassigned targets available to each robot in turn,
+	   and pack the epochs of that robot with the targets to maximize
+	   total value; (ii) to allow trades at each epoch to free up robots
+	   that are then allocated again. At this stage we need to
+	   incorporate the robot constraints, which is not solved at this
+	   point. Skies and standards are included. A total value for each
+	   cadence choice is defined based on the net results.
 
- Although ultimately the requirement is on the cadence and S/N of
- individual targets, in order to observe a target, you need to target
- the whole region around it, which is why these requirements come in
- at the field level.
+ c. We then model the survey time availability as a function of
+    LST. There is a total number of exposures available at each
+    LST. For each LST, a specific set of fields is observable. 
+		Each field can be observed under one choice of cadence, which
+		costs a certain number of exposures. The result tells us which
+		cadences to approach in which field will maximize the value.
 
- c. "design" is run. Note that the iterative sequence below is an
- attempt to cast this difficult global problem into a set of tractable
- ones. This is still R&D.
+ d. We assess the results in terms of the targets achieved and
+	  fields observed and adjust values until a satisfactory result
+		emerges.
 
-  i. The code defines a set of designs (zero or more for each field),
-     and determine which exposures of which targets are taken in each
-     designs. Note that at this stage there is no cadence requirement
-     imposed. This can be done with a network flow as done for the
-		 plates. It establishes a starting point for the observations that
-		 at least observes everything. Skies and standards are included.
+3. Simulation:
 
-  ii. Given the set of designs, we define a sequence of
-      observations based on the cadence criteria for each field and
-      the LST opportunity of each field. How to approach this is
-      unclear, but constraint programming techniques may work.
-
-  iii. Each design now has specific planned sequence. In this context,
-       we now assign targets to the designs applying cadence criteria. 
-       Again constraint programming may work here, but how to solve
-			 this is unclear. Skies and standards are included.
-
-  iv. There may be some iteration in the above steps.
-
-  v. For each design, we need to define some window of opportunity for
-     its observation in the plan.
-
-3. Training the strategy:
-
- a. Define a global metric for assessing success. This metric should
- be based on the outcomes for the targets (not the fields). 
-
- b. Define a strategy for selecting the next design based on its
- observability and its window of opportunity. The strategy may allow a
+ a. Define a strategy for selecting the next design based on its
+ observability and its cadence. The strategy may allow a
  periodic rerunning of design based on achieved results.  The strategy
  may have tunable parameters. 
 
- c. Run simulations under that strategy.
+ b. Run simulations under that strategy.
 
- d. Iterate on the strategy parameters to achieve best results on
- global metric.
+ c. Iterate on the strategy parameters to achieve best results on
+ some global metric.
 
- e. Assess strategy based on individual program outcomes.
+ d. Assess strategy based on individual program outcomes.
 
- f. Iterate on choices of (a) and (b) to best achieve outcomes of (e),
- whatever that means.
+ e. Iterate on choices of the global metric in (c), the strategy (a),
+ and also the values that go into the strategic design, to best
+ achieve outcomes of (d), whatever that means.
 
 4. Survey operations
 
@@ -119,19 +118,19 @@ Sequence of events
     designing and running targeting software across the whole sky, and 
     designing a full set of designs.
 
- b. Each night, the designs and fiber plan is used throughout the night
-    to pick the next design to observe and its duration or S/N
-    requirement for that night. At this point targets-of-opportunity  
-    may be added. The configuration used for each observation is stored 
-    and the results of each exposure is stored. Once the duration or 
-    S/N requirement is hit for a design it is not reobserved that night.
+ b. Each night, the strategy from (3) is used throughout the night to
+    pick the next design to observe. At this point
+    targets-of-opportunity may be added. The configuration used for
+    each observation is stored and the results of each exposure is
+    stored. At this stage we use S/N criteria to decide whether to
+		an full exposure is achieved on a design.
 
  c. Each morning, the fpsdb database is updated with the results of
-    the night. The status of each design and overall fiber plan for the
-    designs may be updated as well. This redesign may mean, for example, that
-    individual fibers that performed either better or worse than
-    expected may be reassigned in the future-looking fiber plan
-    (expressed in the "fiber" table of fpsdb). 
+    the night. The status of each design and overall fiber plan for
+    the designs may be updated as well. This redesign may mean, for
+    example, that individual fibers that performed either better or
+    worse than expected may be reassigned in the future-looking fiber
+    plan (expressed in the "fiber" table of fpsdb).
 
 fpsdb should be designed to be lightweight. It would be instantiated
 at Utah, LCO, and APO. Targets would be designated for one or other or
@@ -146,11 +145,7 @@ Software products
 Right now everything is being developed in observesim. However,
 ultimately we should be refactoring into separate products:
 
-* catalogdb: to create and access catalogdb
-
-* targetdb: to create and access targetdb
-
-* fpsdb: to create and access fpsdb
+* sdssdb: to create and access fpsdb, targetdb, catalogdb
 
 * target: to run targeting
 
@@ -188,8 +183,8 @@ Glossary
 * Field: refers to an RA/Dec center associated with a pointing of one
   of the telescopes.
 
-* Tile: refers to an observation of the field, which may consist of
-  one or more configurations, observed back-to-back.
+* Design: refers to the design of an observation of the field, which
+  consists of which fibers are assigned to which targets.
 
 * Configuration: refers to the conditions of an actual exposure of
   a field, and the specific assignments of fibers to targets.
