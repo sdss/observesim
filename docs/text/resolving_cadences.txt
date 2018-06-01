@@ -5,17 +5,21 @@ fibers to assign to which target for each design.
 Here we treat the cadences as defined by a set of exposures, each of
 which has a "day" and a "softness" associated with it. The first
 exposure on the list has day=0 (though in principle, other exposures
-can have negative "day" values). 
+can have negative "day" values).
 
-Determining the Cadence Consistency Matrix
-==========================================
+Cadence Consistency Matrix
+==========================
 
-In each field, there is a suite of cadences desired for each
-target. We need to decide which cadence to actually pick. We will
-start by determining which cadences are consistent. We need to know
-the answer to the question:
+For a given field, it will have some cadence. For each robot in the
+field, it can reach certain targets, which have some cadence
+requirements.
+
+We need to know the answer to the question:
 
  "Is cadence i achievable in a field with cadence j?"
+
+where we might as well find out the answer for all pairs of cadences
+under consideration.
 
 For example, a single exposure cadence is always achievable, but if we
 need two exposures on a target in cadence i then its achievability
@@ -27,7 +31,8 @@ If we can determine this, we can construct a "cadence consistency
 matrix", C_{ij} which contains the answer to the above question
 encoded as a 0 or 1 (i.e. False or True). Note that this matrix is
 decidedly not symmetric. This matrix will be the basis on which we
-make decisions about which cadences to go for. 
+make decisions about which targets the robots in a given field with a
+chosen cadence should look for.
 
 To determine the cadence consistency matrix, we have to look at the
 individual exposures. Imagine we want to get exposures in the cadence
@@ -53,25 +58,38 @@ true for some choice of jstart:
 The w_{ij} are the "solutions" -- the choices of which exposures for
 cadence i to put in which exposures for cadence j.
 
-The Exposure Consistency Matrix and its solutions will be important in
-selecting targets to assign to fibers for each design as well.
-
 The solutions to the Exposure Consistency Matrix problem can be found
 with standard techniques in constraint programming. Thus, we can
 determine the Cadence Consistency Matrix.
 
-Using the Cadence Consistency Matrix
-====================================
+Packing Targets into a Cadence
+==============================
 
-Once we have a Cadence Consistency Matrix, we can evaluate what
-happens for each choice of primary cadence. 
+For each robot in a field observed under a certain cadence, there are
+then some set of targets available to it. We want then to pack those
+targets into the field cadence in such a way as to maximize the
+science (i.e. by getting the most targets, or something). 
 
-For each primary cadence, we then know which set of targets can be
-included in the cadence. A rough estimate of the value of the cadence
-can be determined from the set of targets which can be included (some
-weighted sum of their values), and a rough estimate of cost can be
-determined from the number of exposures. For the first cut of cadences
-across the sky, we could start with this.
+We can solve this problem in a similar way to solving the exposure
+consistency matrix. In this case we construct a matrix A_{ijk}, where
+i indexes the target, j indexes all the patterns that solve the
+the ECM for the target i cadence under the field cadence, and k
+indexes the epoch. Note this isn't quite a 3D matrix, because there
+are different numbers J of patterns for each target cadence. A_{ijk}
+is tells you whether for target i, under pattern j, at epoch k, the
+target would be observed. 
 
-A more accurate evaluation would result from assigning fibers to each
-one. I haven't yet thought through exactly how to do this.
+Then you need to find w_{ijk} such that:
+
+ w_{ijk} <= A_{ijk} 
+ \sum_{ij} w_{ijk} <= 1 (the robot can only observe one target each epoch)
+ \sum_{j} [(\sum_k w_{ijk}) > 0] <= 1 (only one cadence j chosen for a target)
+ w_{ijk} = w_{ijk'} for any choices k, k' (all epochs in a cadence, or none)
+
+If you assign a value to each target i, you can define a total value:
+
+ V = \sum_i v_i [(\sum_jk w_{ijk}) > 0] 
+
+Constraint programming techniques can then find solution w_{ijk} that
+maximize the value, and you then known for each epoch k which target i
+to observe. 
