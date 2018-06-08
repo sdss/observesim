@@ -108,11 +108,12 @@ class Field(object):
             nexp = ccadence['nexposures']
             self.cadencelist.add_cadence(nexposures=ccadence['nexposures'],
                                          lunation=ccadence['lunation'][0:nexp],
-                                         epoch=ccadence['epoch'][0:nexp],
+                                         delta=ccadence['delta'][0:nexp],
                                          softness=ccadence['softness'][0:nexp])
         return
 
     def radec2xy(self, ra=None, dec=None):
+        # Yikes!
         scale = 218.
         x = (ra - self.racen) * np.cos(self.deccen * np.pi / 180.) * scale
         y = (dec - self.deccen) * scale

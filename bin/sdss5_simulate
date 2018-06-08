@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser(description=description, usage=usage)
 parser.add_argument("-b", "--base", dest="base", type=str,
                     required=True, help="output FITS base name")
 parser.add_argument("-p", "--plan", dest="plan", type=str,
-                    required=False, help="tiling plan",
+                    required=False, help="design plan",
                     default='plan-0')
 parser.add_argument("-s", "--seed", dest="seed", type=int,
                     required=False, help="random seed",
@@ -47,7 +47,7 @@ weather = observesim.weather.Weather(mjd_start=scheduler.start,
 observe = observesim.observe.Observe()
 
 # Initialize observedb
-scheduler.initdb(tiling=plan)
+scheduler.initdb(designbase=plan)
 scheduler.set_priority_all(scheduler.mjds[0])
 
 # Loop through nights
@@ -63,16 +63,16 @@ for mjd in scheduler.mjds:
         nextchange_all = np.array([nextchange_weather, nextchange_on])
         nextchange = np.min(nextchange_all)
         if((isclear == True) and (onoff == 'on')):
-            tileid = scheduler.nexttile(mjd=curr_mjd)
-            if(tileid is not None):
-                duration = scheduler.tile.duration[tileid]
+            designid = scheduler.nextdesign(mjd=curr_mjd)
+            if(designid is not None):
+                duration = scheduler.design.duration[designid]
                 curr_mjd = curr_mjd + duration
                 if(curr_mjd > nextchange):
                     duration = (duration - (curr_mjd - nextchange))
                     curr_mjd = nextchange
-                result = observe.result(mjd=curr_mjd, tileid=tileid,
+                result = observe.result(mjd=curr_mjd, designid=designid,
                                         duration=duration)
-                scheduler.update(tileid=tileid, result=result)
+                scheduler.update(designid=designid, result=result)
         else:
             if(nextchange > curr_mjd):
                 curr_mjd = nextchange
