@@ -48,7 +48,9 @@ observe = observesim.observe.Observe()
 
 # Initialize observedb
 scheduler.initdb(designbase=plan)
-scheduler.set_priority_all(scheduler.mjds[0])
+# scheduler.set_priority_all(scheduler.mjds[0])
+
+duration = np.float32(18. / 60. / 24.)
 
 # Loop through nights
 for mjd in scheduler.mjds:
@@ -63,16 +65,15 @@ for mjd in scheduler.mjds:
         nextchange_all = np.array([nextchange_weather, nextchange_on])
         nextchange = np.min(nextchange_all)
         if((isclear == True) and (onoff == 'on')):
-            designid = scheduler.nextdesign(mjd=curr_mjd)
-            if(designid is not None):
-                duration = scheduler.design.duration[designid]
+            fieldid = scheduler.nextfield(mjd=curr_mjd)
+            if(fieldid is not None):
                 curr_mjd = curr_mjd + duration
                 if(curr_mjd > nextchange):
                     duration = (duration - (curr_mjd - nextchange))
                     curr_mjd = nextchange
-                result = observe.result(mjd=curr_mjd, designid=designid,
+                result = observe.result(mjd=curr_mjd, fieldid=fieldid,
                                         duration=duration)
-                scheduler.update(designid=designid, result=result)
+                scheduler.update(fieldid=fieldid, result=result)
         else:
             if(nextchange > curr_mjd):
                 curr_mjd = nextchange

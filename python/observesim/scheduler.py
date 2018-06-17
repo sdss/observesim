@@ -5,8 +5,9 @@ import PyAstronomy.pyasl as pyasl
 import astropy.units as units
 import astropy.time as atime
 import pydl.pydlutils.yanny as yanny
-import observesim.design
+import observesim.fields
 import observesim.observations
+import observesim.cadence
 from observesim.moonphase import moonphase2
 from observesim.sunpos2 import sunpos2
 
@@ -556,7 +557,7 @@ class Scheduler(Master):
         Observer to use for scheduling
 
     fields : Fields object
-        object accessing list of designs
+        object for fields
 
     observations : Observations object
         object accessing list of observations
@@ -570,18 +571,13 @@ class Scheduler(Master):
 
     observable(mjd=mjd) : return fieldids observable at mjd
 
-    set_priority_all(mjd=mjd) : reset all priorities
-
-    set_priority(fieldid=fieldid, mjd=mjd) : reset priority for one field
-
     update(fieldid=fieldid, result=result) : update observations with result
 
     Comments:
     --------
 
     Scheduling proceeds conceptually as follows
-         - designs are limited to set that are conceivably observable
-         - highest priority designs to observe are selected among the
+         - fields are limited to set that are conceivably observable
          - A strategy to optimize completion
 
     In this default Scheduler, the strategy is a completely heuristic one
@@ -599,55 +595,20 @@ class Scheduler(Master):
         return
 
     def initdb(self, designbase='plan-0'):
-        """Initialize Scheduler designs and observation lists
+        """Initialize Scheduler fields and observation lists
         """
-        filebase = os.path.join(os.getenv('OBSERVESIM_DIR'),
-                                'data', 'tiling', designbase + "-designs")
-        self.cadences = observesim.cadence.CadenceFile(filebase=filebase)
-        self.fields = observesim.fields.FieldsFile(filebase=filebase)
+        filebase = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
+                                designbase)
+        self.cadencelist = observesim.cadence.CadenceList()
+        self.cadencelist.fromfits(filename=filebase + "-cadences.fits")
+        self.fields = observesim.fields.Fields()
+        self.fields.fromfits(filename=filebase + "-fields-" +
+                             self.observatory + ".fits")
         self.observations = observesim.observations.Observations(observatory=self.observatory)
         return
 
-    def set_priority(self, fieldid=None, mjd=None):
-        """Set priority for a single field
-
-        Parameters:
-        ----------
-
-        fieldid : np.int32, int
-            fieldid for field to set priority for
-
-        mjd : np.float64
-            current MJD (only use observations prior to MJD)
-
-        Comments:
-        --------
-
-        Sets Scheduler.design.priority for designid
-"""
-        observations = self.observations.forfield(fieldid=fieldid, mjd=mjd)
-        tsn2 = observations['sn2'].sum()
-        if(tsn2 > 2500.):
-            self.fields.priority[fieldid] = self.design._limit
-        else:
-            self.fields.priority[fieldid] = 1
-        return
-
-    def set_priority_all(self, mjd=None):
-        """Set status of all designs (typically for beginning of night)
-
-        Parameters:
-        ----------
-
-        mjd : np.float64
-            current MJD (only use observations prior to MJD)
-"""
-        for fieldid in self.fields.fieldid:
-            self.set_priority(mjd=mjd, fieldid=fieldid)
-        return
-
     def observable(self, mjd=None, check_lunation=True, check_cadence=True):
-        """Return array of designs observable
+        """Return array of fields observable
 
         Parameters:
         ----------
@@ -661,68 +622,52 @@ class Scheduler(Master):
         lunation = self.lunation(mjd)
         observable = (alt > 0.) & (airmass < self.airmass_limit)
         if(check_cadence):
-            for indx in np.arange(len(observable)):
+            indxs = np.where(self.fields.nextmjd > mjd)[0]
+            observable[indxs] = False
+            indxs = np.where(self.fields.nextmjd <= mjd)[0]
+            for indx in indxs:
                 if(observable[indx]):
-                    cadence = self.cadences[self.fields.cadence[indx]]
-                    observations = self.observations.forfield(fieldid=fieldid, mjd=mjd)
-                    observable[indx] = cadence.evaluate_next(observations.mjd,
-                                                             mjd, lunation,
+                    cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
+                    iobservations = self.fields.observations[indx]
+                    mjd_past = self.observations.mjd[iobservations]
+                    observable[indx] = cadence.evaluate_next(mjd_past=mjd_past,
+                                                             mjd_next=mjd,
+                                                             lunation_next=lunation,
                                                              check_lunation=check_lunation)
 
         iobservable = np.where(observable)[0]
-        return self.field.fieldid[iobservable]
+        return self.fields.fieldid[iobservable]
 
-    def highest_priority(self, designid=None):
-        """Return the designids which are in the highest priority class
-
-        Parameters:
-        ----------
-
-        designid : ndarray  of np.int32
-            array of designid values
-
-        Returns:
-        -------
-
-        highest_designid : ndarray of np.int32
-            array of designid values in highest priority class
-"""
-        priority = self.field.priority[designid]
-        highest_priority = priority.min()
-        ihighest_priority = np.where(priority == highest_priority)[0]
-        priority_designid = designid[ihighest_priority]
-        return(priority_designid)
-
-    def pick(self, mjd=None, designid=None):
-        """Return the designid to pick from using heuristic strategy
+    def pick(self, mjd=None, fieldid=None):
+        """Return the fieldid to pick from using heuristic strategy
 
         Parameters:
         ----------
 
-        designid : ndarray  of np.int32
-            array of designid values
+        fieldid : ndarray  of np.int32
+            array of available fieldid values
 
         Returns:
         -------
 
-        pick_designid : ndarray of np.int32
-            designid
+        pick_fieldid : ndarray of np.int32
+            fieldid
 """
         lst = self.lst(mjd)
-        ha = self.ralst2ha(ra=self.design.racen[designid], lst=lst)
+        ha = self.ralst2ha(ra=self.fields.racen[fieldid], lst=lst)
         iha = np.int32(np.floor(np.abs(ha) / 5.))
         minha = iha.min()
         iminha = np.where(iha == minha)[0]
-        dec = self.design.deccen[designid[iminha]]
+        dec = self.fields.deccen[fieldid[iminha]]
         if(self.observatory == 'apo'):
             ipick = np.argmin(dec)
         else:
             ipick = np.argmax(dec)
-        pick_designid = designid[iminha[ipick]]
-        return(pick_designid)
+        pick_fieldid = fieldid[iminha[ipick]]
+        return(pick_fieldid)
 
     def nextfield(self, mjd=None):
-        """Picks the next design to observe
+        """Picks the next field to observe
 
         Parameters:
         ----------
@@ -730,16 +675,17 @@ class Scheduler(Master):
         mjd : np.float64
             Current MJD (days)
 
-
         Returns:
         --------
 
         fieldid : np.int32, int
-            ID of design to observe
+            ID of field to observe
 """
         observable_fieldid = self.observable(mjd=mjd)
-        highest_fieldid = self.highest_priority(fieldid=observable_fieldid)
-        fieldid = self.pick(fieldid=highest_fieldid, mjd=mjd)
+        if(len(observable_fieldid) == 0):
+            observable_fieldid = self.observable(mjd=mjd,
+                                                 check_cadence=False)
+        fieldid = self.pick(fieldid=observable_fieldid, mjd=mjd)
         return(fieldid)
 
     def update(self, fieldid=None, result=None):
@@ -757,20 +703,19 @@ class Scheduler(Master):
         Comments:
         ---------
 
-        Updates the Scheduler.observations object
 """
         (alt, az) = self.radec2altaz(mjd=result['mjd'],
-                                     ra=self.field.racen[fieldid],
-                                     dec=self.field.deccen[fieldid])
+                                     ra=self.fields.racen[fieldid],
+                                     dec=self.fields.deccen[fieldid])
         airmass = self.alt2airmass(alt)
         lunation = self.lunation(result['mjd'])
         lst = self.lst(result['mjd'])
-        self.observations.add(fieldid=fieldid,
-                              mjd=result['mjd'],
-                              duration=result['duration'],
-                              sn2=result['sn2'],
-                              lunation=lunation,
-                              airmass=airmass,
-                              lst=lst)
-        self.set_priority(fieldid=fieldid, mjd=result['mjd'])
+        iobs = self.observations.add(fieldid=fieldid,
+                                     mjd=result['mjd'],
+                                     duration=result['duration'],
+                                     sn2=result['sn2'],
+                                     lunation=lunation,
+                                     airmass=airmass,
+                                     lst=lst)
+        self.fields.add_observations(result['mjd'], fieldid, iobs)
         return

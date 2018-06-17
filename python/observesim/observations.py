@@ -83,7 +83,7 @@ class Observations(object):
         self.lst = np.append(self.lst,
                              np.array([np.float32(lst)]))
         self.nobservations = len(self.fieldid)
-        return
+        return(self.nobservations - 1)
 
     def forfield(self, mjd=None, fieldid=None):
         indx = np.where((self.mjd <= mjd) &

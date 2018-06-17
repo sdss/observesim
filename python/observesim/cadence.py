@@ -1,6 +1,17 @@
 import numpy as np
 import itertools
+import fitsio
 from ortools.constraint_solver import pywrapcp
+
+
+# Class to define a singleton
+class CadenceSingleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(CadenceSingleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
 
 
 class Cadence(object):
@@ -60,44 +71,22 @@ class Cadence(object):
             length = 1
         return np.zeros(length, dtype=dtype) + quantity
 
-    def fits(self, epoch=None, lunation=-1., check_lunation=True):
-        fit = (np.abs(epoch - self.epoch) <= self.softness)
-        if(check_lunation):
-            fit = fit & (lunation <= self.lunation)
-        ifit = np.where(fit)[0]
-        return(ifit)
-
-    def evaluate(self, epochs=None, lunations=None, check_lunation=True):
-        iobs = np.zeros(self.nexposures) - 1
-        icad = np.zeros(len(epochs)) - 1
-        for indx, epoch, lunation in zip(np.arange(len(epochs)), epochs,
-                                         lunations):
-            ifit = self.fits(epoch=epoch, lunation=lunation,
-                             check_lunation=check_lunation)
-            if(len(ifit) > 0):
-                iok = np.where(iobs[ifit] == -1)[0]
-                if(len(iok) > 0):
-                    iobs[ifit[iok[0]]] = indx
-                    icad[indx] = ifit[iok[0]]
-        return(icad, iobs)
-
     def evaluate_next(self, mjd_past=None, mjd_next=None,
-                      lunation_past=None, lunation_next=None,
-                      check_lunation=True):
-        mjd_past = self._arrayify(mjd_past)
-        icad, iobs = self.evaluate(mjd_past - mjd_past.min(),
-                                   lunation_past,
-                                   check_lunation=check_lunation)
-        ifit = self.fits(epoch=mjd_next - mjd_past.min(),
-                         lunation=lunation_next, check_lunation=check_lunation)
-        iok = np.where(iobs[ifit] == -1)[0]
-        if(len(iok) > 0):
-            return True
-        else:
-            return False
+                      lunation_next=None, check_lunation=True):
+        nexposures_past = len(mjd_past)
+        if(nexposures_past >= self.nexposures):
+            return(False)
+        ok_lunation = ((lunation_next < self.lunation[nexposures_past]) |
+                       (check_lunation is False))
+        if(nexposures_past == 0):
+            return(ok_lunation)
+        delta = mjd_next - mjd_past[nexposures_past - 1]
+        dlo = self.delta[nexposures_past] - self.softness[nexposures_past]
+        dhi = self.delta[nexposures_past] + self.softness[nexposures_past]
+        return(ok_lunation & (delta >= dlo) & (delta <= dhi))
 
 
-class CadenceList(object):
+class CadenceList(object, metaclass=CadenceSingleton):
     """List of cadences available
 
     Parameters:
@@ -109,19 +98,27 @@ class CadenceList(object):
     ncadences : np.int32, int
          number of different cadences
 
-    cadences : list
-         list of Cadence objects
+    cadences : dictionary
+         dictionary of Cadence objects
 """
     def __init__(self):
         self.ncadences = 0
-        self.cadences = []
+        self.cadences = dict()
         return
 
-    def add_cadence(self, *args, **kwargs):
+    def reset(self):
+        self.ncadences = 0
+        self.cadences = dict()
+        return
+
+    def add_cadence(self, name=None, *args, **kwargs):
         """Add a cadence to the list of cadences
 
         Parameters:
         ----------
+
+        name : string
+            dictionary name of cadence
 
         nexposures : np.int32
             number of exposures (default 1)
@@ -136,7 +133,7 @@ class CadenceList(object):
             allowance for variation from cadence (default [1.])
 """
         cadence = Cadence(*args, **kwargs)
-        self.cadences.append(cadence)
+        self.cadences[name] = cadence
         self.ncadences = self.ncadences + 1
 
     def check_exposures(self, one=None, two=None, indx2=None):
@@ -145,11 +142,11 @@ class CadenceList(object):
         Parameters:
         ----------
 
-        one : int
-            index for cadence #1
+        one : string
+            name of cadence #1
 
-        two : int
-            index for cadence #2
+        two : string
+            name of cadence #2
 
         indx2 : ndarray of np.int32
             exposures in cadence #2
@@ -181,11 +178,11 @@ class CadenceList(object):
         Parameters:
         ----------
 
-        one : int
-            index for cadence #1
+        one : string
+            name of cadence #1
 
-        two : int
-            index for cadence #2
+        two : string
+            name of cadence #2
 
         return_solutions: boolean
             return list of solutions? (default False)
@@ -229,11 +226,11 @@ class CadenceList(object):
         Parameters:
         ----------
 
-        target_cadences : ndarray of np.int32
-            indices for the target cadences
+        target_cadences : list of strings
+            names of the target cadences
 
-        field_cadence : int, np.int32
-            index for field cadence
+        field_cadence : string
+            name of field cadence
 
         value : ndarray of np.float32
             value for each target
@@ -362,6 +359,22 @@ class CadenceList(object):
 
         return(epoch_targets)
 
+    def fromarray(self, cadences_array=None):
+        self.ncadence = len(cadences_array)
+        for ccadence in cadences_array:
+            nexp = ccadence['nexposures']
+            self.add_cadence(nexposures=ccadence['nexposures'],
+                             lunation=ccadence['lunation'][0:nexp],
+                             delta=ccadence['delta'][0:nexp],
+                             softness=ccadence['softness'][0:nexp],
+                             name=ccadence['cadence'].decode().strip())
+        return
+
+    def fromfits(self, filename=None):
+        self.cadences_fits = fitsio.read(filename)
+        self.fromarray(self.cadences_fits)
+        return
+
     def toarray(self):
         """Return cadences as a record array
 
@@ -371,19 +384,20 @@ class CadenceList(object):
         cadences : ndarray
             information on each cadence
 """
-        nexps = np.array([c.nexposures for c in self.cadences])
+        nexps = np.array([c.nexposures for c in self.cadences.values()])
         max_nexp = nexps.max()
-        cadence0 = [('cadenceid', np.int32),
+        cadence0 = [('cadence', np.dtype('a20')),
                     ('nexposures', np.int32),
                     ('delta', np.float64, max_nexp),
                     ('lunation', np.float32, max_nexp),
                     ('softness', np.float32, max_nexp)]
         cads = np.zeros(self.ncadences, dtype=cadence0)
-        for indx, ccadence in zip(np.arange(self.ncadences), self.cadences):
-            nexp = self.cadences[indx].nexposures
-            cads['cadenceid'][indx] = indx
+        names = self.cadences.keys()
+        for indx, name in zip(np.arange(self.ncadences), names):
+            nexp = self.cadences[name].nexposures
+            cads['cadence'][indx] = name
             cads['nexposures'][indx] = nexp
-            cads['delta'][indx, 0:nexp] = self.cadences[indx].delta
-            cads['softness'][indx, 0:nexp] = self.cadences[indx].softness
-            cads['lunation'][indx, 0:nexp] = self.cadences[indx].lunation
+            cads['delta'][indx, 0:nexp] = self.cadences[name].delta
+            cads['softness'][indx, 0:nexp] = self.cadences[name].softness
+            cads['lunation'][indx, 0:nexp] = self.cadences[name].lunation
         return(cads)

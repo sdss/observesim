@@ -49,9 +49,6 @@ class Field(object):
     deccen : np.float64
         boresight Dec, J2000 deg
 
-    cadencelist : CadenceList object
-        cadences of targets in the field, and field cadence
-
     field_cadence : int, np.int32
         index of field cadence in cadencelist
 
@@ -100,17 +97,6 @@ class Field(object):
         except TypeError:
             length = 1
         return np.zeros(length, dtype=dtype) + quantity
-
-    def read_cadences(self, filename=None):
-        self.cadences_fits = fitsio.read(filename)
-        self.ncadence = len(self.cadences_fits)
-        for ccadence in self.cadences_fits:
-            nexp = ccadence['nexposures']
-            self.cadencelist.add_cadence(nexposures=ccadence['nexposures'],
-                                         lunation=ccadence['lunation'][0:nexp],
-                                         delta=ccadence['delta'][0:nexp],
-                                         softness=ccadence['softness'][0:nexp])
-        return
 
     def radec2xy(self, ra=None, dec=None):
         # Yikes!

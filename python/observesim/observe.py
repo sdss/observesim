@@ -27,14 +27,14 @@ class Observe(object):
         self._result0 = np.zeros(1, dtype=self._result_dtype)
         pass
 
-    def result(self, tileid=None, duration=None, mjd=None):
+    def result(self, fieldid=None, duration=None, mjd=None):
         """Return simulated result of an observation
 
         Parameters:
         ----------
 
-        tileid : int, np.int32
-            id of tile to observe
+        fieldid : int, np.int32
+            id of field to observe
 
         duration : float, np.float64
             duration of observation (days)

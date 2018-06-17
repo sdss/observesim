@@ -13,6 +13,8 @@ import numpy as np
 import fitsio
 import matplotlib.pyplot as plt
 import mpl_toolkits.basemap as basemap
+import observesim.fields
+import observesim.cadence
 from observesim.scheduler import dateandtime2mjd
 
 
@@ -43,9 +45,9 @@ def scatter(m, ax, ra, dec, **kwargs):
 
 def plot_field(ax=None, fields=None, value=None, title=None):
     m = set_moll(ax)
-    scatter(m, ax, fields['ra'], fields['dec'], s=1, color='pink')
+    scatter(m, ax, fields.racen, fields.deccen, s=1, color='pink')
     igd = np.where(value > 0)[0]
-    sc = scatter(m, ax, fields['ra'][igd], fields['dec'][igd],
+    sc = scatter(m, ax, fields.racen[igd], fields.deccen[igd],
                  c=np.log10(value[igd]), s=2)
     ax.set_title(title, fontsize=8)
     f.colorbar(sc, ax=ax)
@@ -58,37 +60,43 @@ description = "Plot QA for a simulation of the SDSS-V schedule"
 parser = argparse.ArgumentParser(description=description, usage=usage)
 parser.add_argument("-b", "--base", dest="base", type=str,
                     required=True, help="observation FITS file base")
+parser.add_argument("-p", "--plan", dest="plan", type=str,
+                    required=True, help="plans name")
 parser.add_argument("-t", "--telescope", dest="telescope", type=str,
                     required=False, help="telescope ('apo' or 'lco')",
                     default='apo')
 args = parser.parse_args()
 base = args.base
+plan = args.plan
 observatory = args.telescope
 
-tiles_file = os.path.join(os.getenv('OBSERVESIM_DIR'), 'data', 'tiling',
-                          '{base}-tiles-{obs}.fits'.format(base=base,
-                                                           obs=observatory))
-fields_file = os.path.join(os.getenv('OBSERVESIM_DIR'), 'data', 'tiling',
-                           '{base}-fields-{obs}.fits'.format(base=base,
+fields_file = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
+                           '{plan}-fields-{obs}.fits'.format(plan=plan,
                                                              obs=observatory))
+fields = observesim.fields.Fields()
+fields.fromfits(fields_file)
+
+cadences_file = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
+                             '{plan}-cadences.fits'.format(plan=plan,
+                                                           obs=observatory))
+cadencelist = observesim.cadence.CadenceList()
+cadencelist.fromfits(cadences_file)
+
 observations_file = '{base}-{observatory}-observations.fits'.format(base=base,
                                                                     observatory=observatory)
-
-fields = fitsio.read(fields_file)
-tiles = fitsio.read(tiles_file)
 observations = fitsio.read(observations_file)
 
-duration = np.zeros(len(fields))
+duration = np.zeros(fields.nfields)
 for o in observations:
-    cdur = duration[tiles['IFIELD'][o['tileid']]]
-    duration[tiles['IFIELD'][o['tileid']]] = cdur + o['duration']
+    cdur = duration[o['fieldid']]
+    duration[o['fieldid']] = cdur + o['duration']
 duration = duration * 24.
 
-desired_duration = np.zeros(len(fields))
-for indx in np.arange(len(tiles)):
-    findx = tiles['IFIELD'][indx]
-    desired_duration[findx] = (desired_duration[findx] +
-                               0.25 * tiles['NEXP'][indx])
+desired_duration = np.zeros(fields.nfields)
+for indx in np.arange(fields.nfields):
+    ccadence = cadencelist.cadences[fields.cadence[indx]]
+    desired_duration[indx] = (desired_duration[indx] +
+                              0.25 * ccadence.nexposures)
 
 f, ax = plt.subplots(3, figsize=(6, 8))
 
@@ -117,12 +125,12 @@ for indx in np.arange(len(axes)):
     mjd_start = dateandtime2mjd(date=dates[indx])
     mjd_end = dateandtime2mjd(date=dates[indx + 1])
 
-    duration = np.zeros(len(fields))
+    duration = np.zeros(fields.nfields)
     iyear = np.where((observations['mjd'] >= mjd_start) &
                      (observations['mjd'] < mjd_end))[0]
     for o in observations[iyear]:
-        cdur = duration[tiles['IFIELD'][o['tileid']]]
-        duration[tiles['IFIELD'][o['tileid']]] = cdur + o['duration']
+        cdur = duration[o['fieldid']]
+        duration[o['fieldid']] = cdur + o['duration']
     duration = duration * 24.
 
     title_template = 'Exposure per field in season {start}-{end}'
@@ -136,27 +144,27 @@ f.savefig(progress_figure)
 
 plt.clf()
 
-first_mjd = np.zeros(len(fields))
-ofields = tiles['IFIELD'][observations['tileid']]
-for fieldid in np.arange(len(fields)):
+first_mjd = np.zeros(fields.nfields)
+ofields = observations['fieldid']
+for fieldid in np.arange(fields.nfields):
     ifield = np.where(ofields == fieldid)[0]
     if(len(ifield) > 0):
         first_mjd[ofields[ifield]] = observations['mjd'][ifield].min()
 
 cadence_figures = []
-labels = np.unique(fields['label'])
+labels = np.unique(fields.cadence)
 for label in labels:
-    itype = np.where(fields['label'][ofields] == label)[0]
+    itype = np.where(np.array(fields.cadence)[ofields] == label)[0]
     dmjd = (observations['mjd'] - first_mjd[ofields])[itype]
     iplot = np.where(dmjd != 0)[0]
     plt.figure(figsize=(6, 4))
     h = plt.hist(np.log10(dmjd[iplot]), bins=160, range=np.log10([0.01, 1600.]))
-    plt.title('{label} cadence results'.format(label=label.decode().strip().upper()))
+    plt.title('{label} cadence results'.format(label=str(label).strip().upper()))
     plt.xlabel('log$_{10}$ difference in days')
     plt.ylabel('number of observations')
     cadence_figure = '{base}-{obs}-cadence-{label}.png'.format(base=base,
                                                                obs=observatory,
-                                                               label=label.decode().strip().lower()) 
+                                                               label=str(label).strip().lower()) 
     plt.savefig(cadence_figure)
     plt.clf()
     cadence_figures.append(cadence_figure)
