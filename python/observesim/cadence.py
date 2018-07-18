@@ -215,7 +215,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
         self.cadences[name] = cadence
         self.ncadences = self.ncadences + 1
 
-    def check_exposures(self, one=None, two=None, indx2=None, sub1=None):
+    def check_exposures(self, one=None, two=None, indx2=None, sub1=None,
+                        epoch_level=False):
         """Is exposure set in cadence two consistent with cadence one?
 
         Parameters:
@@ -229,12 +230,31 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         indx2 : ndarray of np.int32
             exposures in cadence #2
+
+        epoch_level : boolean
+            compare sequences at epoch level not exposure level (default True)
 """
         eps = 1.e-4  # generously deal with round-off
+        nexp = len(indx2)
 
         if(sub1 is None):
-            sub1 = np.arange(self.cadences[one].nexposures)
-        nexp = len(indx2)
+            if(epoch_level):
+                sub1 = np.arange(self.cadences[one].nepochs)
+            else:
+                sub1 = np.arange(self.cadences[one].nexposures)
+
+        # Check number of exposures, if at epoch level
+        if(epoch_level):
+            for indx in np.arange(nexp):
+                if(self.cadences[one].epoch_nexposures[sub1[indx]] >
+                   self.cadences[two].epoch_nexposures[indx2[indx]]):
+                    return(False)
+
+        # For the subsequent checks, convert to exposure index if we
+        # are at the epoch level
+        if(epoch_level):
+            indx2 = self.cadences[two].epoch_indx[indx2]
+            sub1 = self.cadences[one].epoch_indx[sub1]
 
         # Check lunations
         for indx in np.arange(nexp):
@@ -263,7 +283,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         return(True)
 
-    def cadence_consistency(self, one, two, return_solutions=True):
+    def cadence_consistency(self, one, two, return_solutions=True,
+                            epoch_level=False):
         """Is cadence #1 consistent with cadence #2?
 
         Parameters:
@@ -293,14 +314,18 @@ class CadenceList(object, metaclass=CadenceSingleton):
         A solution is a set of N_1 exposures within cadence 2, which
         satisfy the requirements for cadence 1.
 """
-        indx2 = np.arange(self.cadences[two].nexposures)
+        if(epoch_level):
+            n1 = self.cadences[one].nepochs
+            n2 = self.cadences[two].nepochs
+        else:
+            n1 = self.cadences[one].nexposures
+            n2 = self.cadences[two].nexposures
 
         # Check which exposures you can start on
         possibles = []
-        for first in np.arange(self.cadences[two].nexposures -
-                               self.cadences[one].nexposures + 1):
+        for first in np.arange(n2 - n1 + 1):
             ok = self.check_exposures(one=one, two=two, indx2=[first],
-                                      sub1=[0])
+                                      sub1=[0], epoch_level=epoch_level)
             if(ok):
                 possibles.append([first])
         if(len(possibles) == 0):
@@ -311,23 +336,23 @@ class CadenceList(object, metaclass=CadenceSingleton):
                 return(success)
 
         # Now find sequences starting from there
-        for nsub1 in np.arange(self.cadences[one].nexposures - 1) + 2:
+        for nsub1 in np.arange(n1 - 1) + 2:
             current_possibles = possibles
             possibles = []
             for indx in range(len(current_possibles)):
                 possible = current_possibles[indx]
                 remaining_start = possible[-1] + 1
-                nremaining = self.cadences[two].nexposures - possible[-1] - 1
+                nremaining = n2 - possible[-1] - 1
                 ok = 1
-                if(nremaining >=
-                   self.cadences[one].nexposures - len(possible)):
+                if(nremaining >= n1 - len(possible)):
                     for next_possible in (remaining_start +
                                           np.arange(nremaining)):
                         try_possible = possible.copy()
                         try_possible.append(next_possible)
                         ok = self.check_exposures(one=one, two=two,
                                                   indx2=try_possible,
-                                                  sub1=np.arange(nsub1))
+                                                  sub1=np.arange(nsub1),
+                                                  epoch_level=epoch_level)
                         if(ok):
                             possibles.append(try_possible)
             if(len(possibles) == 0):
