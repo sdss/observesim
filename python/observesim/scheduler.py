@@ -621,9 +621,15 @@ class Scheduler(Master):
         airmass = self.alt2airmass(alt)
         lunation = self.lunation(mjd)
         observable = (alt > 0.) & (airmass < self.airmass_limit)
+        iobs = np.where(observable)[0]
         if(check_cadence):
             indxs = np.where(self.fields.nextmjd > mjd)[0]
             observable[indxs] = False
+            iob = np.where(observable)[0]
+            #if(len(iob) == 0):
+                #fitsio.write('test.fits', self.fields.nextmjd, clobber=True)
+                #fitsio.write('test.fits', np.int32((alt > 0.) & (airmass < self.airmass_limit)))
+                #sys,exit(1)
             indxs = np.where(self.fields.nextmjd <= mjd)[0]
             for indx in indxs:
                 if(observable[indx]):
@@ -683,6 +689,7 @@ class Scheduler(Master):
 """
         observable_fieldid = self.observable(mjd=mjd)
         if(len(observable_fieldid) == 0):
+            # print("Nothing observable")
             observable_fieldid = self.observable(mjd=mjd,
                                                  check_cadence=False)
         fieldid = self.pick(fieldid=observable_fieldid, mjd=mjd)
