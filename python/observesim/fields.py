@@ -90,14 +90,22 @@ class Fields(object, metaclass=FieldsSingleton):
         fields : ndarray
             information on each field
 """
+        maxn = np.array([len(x) for x in self.observations]).max()
+        if(maxn == 1):
+            maxn = 2
         fields0 = [('fieldid', np.int32),
                    ('racen', np.float64),
                    ('deccen', np.float64),
-                   ('cadence', 'O')]
+                   ('cadence', np.dtype('a20')),
+                   ('nobservations', np.int32),
+                   ('observations', np.int32, maxn)]
         fields = np.zeros(self.nfields, dtype=fields0)
         fields['fieldid'] = self.fieldid
         fields['racen'] = self.racen
         fields['deccen'] = self.deccen
         for indx in np.arange(self.nfields):
             fields['cadence'][indx] = self.cadence[indx]
+            fields['nobservations'][indx] = len(self.observations[indx])
+            if(fields['nobservations'][indx] > 0):
+                fields['observations'][indx][0:fields['nobservations'][indx]] = self.observations[indx]
         return(fields)
