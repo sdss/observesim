@@ -82,3 +82,8 @@ outobstemplate = "{base}-{observatory}-observations.fits"
 outobsfile = outobstemplate.format(base=base, observatory=observatory)
 fitsio.write(outobsfile, scheduler.observations.toarray(),
              clobber=True)
+
+outobstemplate = "{base}-{observatory}-fields.fits"
+outobsfile = outobstemplate.format(base=base, observatory=observatory)
+fitsio.write(outobsfile, scheduler.fields.toarray(),
+             clobber=True)
