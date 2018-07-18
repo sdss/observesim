@@ -21,47 +21,84 @@ class Cadence(object):
     ----------
 
     nexposures : np.int32
-        number of exposures (default 1)
+        number of exposures
 
     lunation : ndarray of np.float32
-        maximum lunation for each exposure (default [1.])
+        maximum lunation for each exposure
 
     delta : ndarray of np.float32
-        day for exposure (default [0.])
+        desired offset for each exposure from previous (days)
 
-    softness : ndarray of np.float32
-        allowance for variation from cadence (default [1.])
+    delta_min : ndarray of np.float32
+        minimum delta to allow (days)
+
+    delta_max : ndarray of np.float32
+        maximum delta to allow (days)
 
     Attributes:
     ----------
 
     nexposures : np.int32
-        number of exposures (default 1)
+        number of exposures
 
     lunation : ndarray of np.float32
-        maximum lunation for each exposure (default [1.])
+        maximum lunation for each exposure
 
     delta : ndarray of np.float32
-        day for exposure (default [0.])
+        desired offset for each exposure from previous (days)
 
-    epoch : ndarray of np.float32
-        day for exposure (default [0.])
+    delta_min : ndarray of np.float32
+        minimum delta to allow (days)
 
-    softness : ndarray of np.float32
-        allowance for variation from cadence (default [1.])
+    delta_max : ndarray of np.float32
+        maximum delta to allow (days)
+
+    nepochs : np.int32
+        number of epochs
+
+    epoch_indx : ndarray of np.int32
+        index into delta for first exposure at each epoch
+
+    epoch_delta : ndarray of np.float32
+        day for each separate epoch
+
+    epoch_nexposures : ndarray of np.float32
+        number of exposures for each separate epoch
 
     Methods:
     -------
-
-    fits(epoch=epoch) : into which parts of cadence an epoch can belong
 """
-    def __init__(self, nexposures=1, lunation=1., delta=0., softness=1.):
+    def __init__(self, nexposures=None, lunation=None, delta=None,
+                 delta_min=None, delta_max=None):
         self.nexposures = np.int32(nexposures)
         self.lunation = np.zeros(self.nexposures, dtype=np.float32) + lunation
         self.delta = np.zeros(self.nexposures, dtype=np.float32) + delta
-        self.epoch = self.delta.cumsum()
-        self.softness = np.zeros(self.nexposures, dtype=np.float32) + softness
+        self.delta_min = (np.zeros(self.nexposures, dtype=np.float32) +
+                          delta_min)
+        self.delta_max = (np.zeros(self.nexposures, dtype=np.float32) +
+                          delta_max)
+        self._create_epochs()
         return
+
+    def __str__(self):
+        out = "nexposures={nexposures}\n".format(nexposures=self.nexposures)
+        out = out + " lunation = "
+        for i in np.arange(self.nexposures):
+            out = out + " {l:.3f}".format(l=self.lunation[i])
+        out = out + "\n"
+        out = out + " delta = "
+        for i in np.arange(self.nexposures):
+            out = out + " {d:.3f}".format(d=self.delta[i])
+        out = out + "\n"
+        out = out + " delta_min = "
+        for i in np.arange(self.nexposures):
+            out = out + " {s:.3f}".format(s=self.delta_min[i])
+        out = out + "\n"
+        out = out + " delta_max = "
+        for i in np.arange(self.nexposures):
+            out = out + " {s:.3f}".format(s=self.delta_max[i])
+        out = out + "\n"
+        return(out)
 
     def _arrayify(self, quantity=None, dtype=np.float64):
         """Cast quantity as ndarray of numpy.float64"""
@@ -70,6 +107,25 @@ class Cadence(object):
         except TypeError:
             length = 1
         return np.zeros(length, dtype=dtype) + quantity
+
+    def _create_epochs(self):
+        epoch_indx = [0]
+        self.nepochs = 1
+        for indx in np.arange(self.nexposures - 1) + 1:
+            if(self.delta[indx] > 0.):
+                epoch_indx.append(indx)
+                self.nepochs = self.nepochs + 1
+        self.epoch_indx = np.array(epoch_indx, dtype=np.int32)
+        self.epoch_delta = self.delta[self.epoch_indx]
+        self.epoch_delta_min = self.delta_min[self.epoch_indx]
+        self.epoch_delta_max = self.delta_max[self.epoch_indx]
+        self.epoch_lunation = self.lunation[self.epoch_indx]
+        self.epoch_nexposures = np.zeros(self.nepochs, dtype=np.int32)
+        for indx in np.arange(self.nepochs - 1):
+            self.epoch_nexposures[indx] = (self.epoch_indx[indx + 1] -
+                                           self.epoch_indx[indx])
+        self.epoch_nexposures[-1] = self.nexposures - self.epoch_indx[-1]
+        return
 
     def evaluate_next(self, mjd_past=None, mjd_next=None,
                       lunation_next=None, check_lunation=True):
@@ -81,13 +137,13 @@ class Cadence(object):
         if(nexposures_past == 0):
             return(ok_lunation)
         delta = mjd_next - mjd_past[nexposures_past - 1]
-        dlo = self.delta[nexposures_past] - self.softness[nexposures_past]
-        dhi = self.delta[nexposures_past] + self.softness[nexposures_past]
+        dlo = self.delta_min[nexposures_past]
+        dhi = self.delta_max[nexposures_past]
         return(ok_lunation & (delta >= dlo) & (delta <= dhi))
 
 
 class CadenceList(object, metaclass=CadenceSingleton):
-    """List of cadences available
+    """List of cadences available (singleton)
 
     Parameters:
     ----------
@@ -100,6 +156,25 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
     cadences : dictionary
          dictionary of Cadence objects
+
+    Methods:
+    -------
+
+    reset() : remove all the current cadences
+    add_cadence() : add a new cadence
+    check_exposures() : are two exposure sets consistent?
+    cadence_consistency(): is cadence #1 consistent with cadence #2?
+    pack_targets(): find best way to pack targets into a cadence
+    fromarray(): add to cadence list from an ndarray
+    fromfits(): add to cadence list from a FITS file
+    toarray(): return an ndarray with cadence list
+
+    Notes:
+    -----
+
+    This is a singleton, so there can only be one CadenceList defined
+    within any session.
+
 """
     def __init__(self):
         self.ncadences = 0
@@ -107,6 +182,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         return
 
     def reset(self):
+        """Reset cadence list to be empty"""
         self.ncadences = 0
         self.cadences = dict()
         return
@@ -129,14 +205,17 @@ class CadenceList(object, metaclass=CadenceSingleton):
         delta : ndarray of np.float32
             day for exposure (default [0.])
 
-        softness : ndarray of np.float32
+        delta_min : ndarray of np.float32
+            allowance for variation from cadence (default [1.])
+
+        delta_max : ndarray of np.float32
             allowance for variation from cadence (default [1.])
 """
         cadence = Cadence(*args, **kwargs)
         self.cadences[name] = cadence
         self.ncadences = self.ncadences + 1
 
-    def check_exposures(self, one=None, two=None, indx2=None):
+    def check_exposures(self, one=None, two=None, indx2=None, sub1=None):
         """Is exposure set in cadence two consistent with cadence one?
 
         Parameters:
@@ -151,24 +230,36 @@ class CadenceList(object, metaclass=CadenceSingleton):
         indx2 : ndarray of np.int32
             exposures in cadence #2
 """
+        eps = 1.e-4  # generously deal with round-off
+
+        if(sub1 is None):
+            sub1 = np.arange(self.cadences[one].nexposures)
         nexp = len(indx2)
 
         # Check lunations
         for indx in np.arange(nexp):
-            if(self.cadences[one].lunation[indx] <
-               self.cadences[two].lunation[indx2[indx]]):
+            if(self.cadences[one].lunation[sub1[indx]] <
+               self.cadences[two].lunation[indx2[indx]] - eps):
                 return(False)
 
         # Check deltas
         for indx in np.arange(nexp - 1) + 1:
-            delta1 = self.cadences[one].delta[indx]
-            softness1 = self.cadences[one].softness[indx]
+            delta1 = self.cadences[one].delta[sub1[indx]]
+            dlo1 = self.cadences[one].delta_min[sub1[indx]]
+            dhi1 = self.cadences[one].delta_max[sub1[indx]]
             delta2 = self.cadences[two].delta[indx2[indx - 1] + 1:indx2[indx] + 1].sum()
-            softness2 = self.cadences[two].softness[indx2[indx - 1] + 1:indx2[indx] + 1].sum()
-            if(delta1 - softness1 > delta2 - softness2):
-                return(False)
-            if(delta1 + softness1 < delta2 + softness2):
-                return(False)
+            dlo2 = self.cadences[two].delta_min[indx2[indx - 1] + 1:indx2[indx] + 1].sum()
+            dhi2 = self.cadences[two].delta_max[indx2[indx - 1] + 1:indx2[indx] + 1].sum()
+            if(delta1 > 0.):  # normal case
+                if(dlo1 >= dlo2 - eps):
+                    return(False)
+                if(dhi1 <= dhi2 + eps):
+                    return(False)
+            else:  # adjacent exposures
+                if(indx2[indx] > indx2[indx - 1] + 1):  # must be adjacent
+                    return(False)
+                if(delta2 > 0.):  # must be adjacent
+                    return(False)
 
         return(True)
 
@@ -203,15 +294,48 @@ class CadenceList(object, metaclass=CadenceSingleton):
         satisfy the requirements for cadence 1.
 """
         indx2 = np.arange(self.cadences[two].nexposures)
-        sequences = itertools.combinations(indx2,
-                                           self.cadences[one].nexposures)
+
+        # Check which exposures you can start on
         possibles = []
-        for sequence in sequences:
-            ok = self.check_exposures(one=one, two=two, indx2=sequence)
+        for first in np.arange(self.cadences[two].nexposures -
+                               self.cadences[one].nexposures + 1):
+            ok = self.check_exposures(one=one, two=two, indx2=[first],
+                                      sub1=[0])
             if(ok):
-                possibles.append(np.array(sequence))
-                if(return_solutions is False):
-                    return(True)
+                possibles.append([first])
+        if(len(possibles) == 0):
+            success = 0
+            if(return_solutions):
+                return(success, possibles)
+            else:
+                return(success)
+
+        # Now find sequences starting from there
+        for nsub1 in np.arange(self.cadences[one].nexposures - 1) + 2:
+            current_possibles = possibles
+            possibles = []
+            for indx in range(len(current_possibles)):
+                possible = current_possibles[indx]
+                remaining_start = possible[-1] + 1
+                nremaining = self.cadences[two].nexposures - possible[-1] - 1
+                ok = 1
+                if(nremaining >=
+                   self.cadences[one].nexposures - len(possible)):
+                    for next_possible in (remaining_start +
+                                          np.arange(nremaining)):
+                        try_possible = possible.copy()
+                        try_possible.append(next_possible)
+                        ok = self.check_exposures(one=one, two=two,
+                                                  indx2=try_possible,
+                                                  sub1=np.arange(nsub1))
+                        if(ok):
+                            possibles.append(try_possible)
+            if(len(possibles) == 0):
+                success = 0
+                if(return_solutions):
+                    return(success, possibles)
+                else:
+                    return(success)
 
         success = len(possibles) > 0
         if(return_solutions):
@@ -360,17 +484,40 @@ class CadenceList(object, metaclass=CadenceSingleton):
         return(epoch_targets)
 
     def fromarray(self, cadences_array=None):
-        self.ncadence = len(cadences_array)
+        """Add cadences to ccadence list from an array
+
+        Parameters:
+        -----------
+
+        cadences_array : ndarray
+            ndarray with columns 'nexposures', 'lunation', 'delta',
+            'delta_min', 'delta_max', 'cadence'
+"""
         for ccadence in cadences_array:
             nexp = ccadence['nexposures']
             self.add_cadence(nexposures=ccadence['nexposures'],
                              lunation=ccadence['lunation'][0:nexp],
                              delta=ccadence['delta'][0:nexp],
-                             softness=ccadence['softness'][0:nexp],
+                             delta_min=ccadence['delta_min'][0:nexp],
+                             delta_max=ccadence['delta_max'][0:nexp],
                              name=ccadence['cadence'].decode().strip())
         return
 
     def fromfits(self, filename=None):
+        """Add cadences to ccadence list from a FITS file
+
+        Parameters:
+        -----------
+
+        filename : str
+            File name to read from
+
+        Notes:
+        -----
+
+        Expects a valid FITS file with columns 'nexposures',
+            'lunation', 'delta', 'delta_min', 'delta_max', 'cadence'
+"""
         self.cadences_fits = fitsio.read(filename)
         self.fromarray(self.cadences_fits)
         return
@@ -390,7 +537,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
                     ('nexposures', np.int32),
                     ('delta', np.float64, max_nexp),
                     ('lunation', np.float32, max_nexp),
-                    ('softness', np.float32, max_nexp)]
+                    ('delta_max', np.float32, max_nexp),
+                    ('delta_min', np.float32, max_nexp)]
         cads = np.zeros(self.ncadences, dtype=cadence0)
         names = self.cadences.keys()
         for indx, name in zip(np.arange(self.ncadences), names):
@@ -398,6 +546,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             cads['cadence'][indx] = name
             cads['nexposures'][indx] = nexp
             cads['delta'][indx, 0:nexp] = self.cadences[name].delta
-            cads['softness'][indx, 0:nexp] = self.cadences[name].softness
+            cads['delta_min'][indx, 0:nexp] = self.cadences[name].delta_min
+            cads['delta_max'][indx, 0:nexp] = self.cadences[name].delta_max
             cads['lunation'][indx, 0:nexp] = self.cadences[name].lunation
         return(cads)
