@@ -50,11 +50,12 @@ Elements of Observing Strategy
 
   * nexposures:
 	    number of exposures in the field total.
-  * epoch[]:
-	    for each exposure, ideal number of days since first epoch
-  * softness[]:
-	    for each exposure, a quantification in days of how soft the
-	    epoch requirement is
+  * delta[]:
+	    for each exposure, ideal number of days since last exposure
+  * delta_low[]:
+	    for each exposure, tolerance on low side of delta
+  * delta_high[]:
+	    for each exposure, tolerance on high side of delta
   * lunation[]:
 	    for each epoch, the maximum moon lunation (lunation is equal to
 	    moon illumination, or 0 if moon is below the horizon)
