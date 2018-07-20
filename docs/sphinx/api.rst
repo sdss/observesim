@@ -16,12 +16,17 @@ Reference for Observing Simulation for SDSS-V
 ..
 .. .. toctree::
 ..
+..     observesim.cadence
 ..     observesim.scheduler
 ..     observesim.fields
 ..     observesim.observations
 ..     observesim.weather
 ..     observesim.observe
 
+
+.. automodapi:: observesim.cadence
+   :no-inheritance-diagram:
+   :headings: ~^
 
 .. automodapi:: observesim.scheduler
    :no-inheritance-diagram:
