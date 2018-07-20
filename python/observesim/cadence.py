@@ -397,26 +397,28 @@ class CadenceList(object, metaclass=CadenceSingleton):
         not observe partial cadences.
 """
         ntargets = len(target_cadences)
-        nepochs = self.cadences[field_cadence].nexposures
+        nepochs_field = self.cadences[field_cadence].nepochs
+        nexposures_field = self.cadences[field_cadence].nexposures
         if(value is None):
             value = np.ones(ntargets)
         else:
             value = np.array(value)
 
         pack = []
-        epochs = [0] * nepochs
+        epochs = [0] * nepochs_field
 
         # Find solutions for each target
         for target_cadence in target_cadences:
             count, solns = self.cadence_consistency(target_cadence,
                                                     field_cadence,
-                                                    return_solutions=True)
+                                                    return_solutions=True,
+                                                    epoch_level=True)
             target = []
             for isoln in solns:
                 soln_epochs = epochs.copy()
                 for i in isoln:
                     soln_epochs[i] = 1
-                    target.append(soln_epochs)
+                target.append(soln_epochs)
             pack.append(target)
 
         solver = pywrapcp.Solver("pack_targets")
@@ -424,15 +426,22 @@ class CadenceList(object, metaclass=CadenceSingleton):
         # Create variables for each epoch of each solution of each target
         packvar = []
         indxt = 0
-        for target in pack:
+        for target, target_cadence in zip(pack, target_cadences):
             indxs = 0
             targetvar = []
             for soln in target:
                 indxe = 0
                 solnvar = []
+                target_indx = 0
                 for epoch in soln:
                     name = "{t}-{s}-{e}".format(t=indxt, s=indxt, e=indxe)
-                    solnvar.append(solver.BoolVar(name))
+                    if(epoch):
+                        nexposures = int(self.cadences[target_cadence].epoch_nexposures[target_indx])
+                        epochvar = solver.IntVar([0, nexposures], name)
+                        target_indx = target_indx + 1
+                    else:
+                        epochvar = solver.IntVar([0], name)
+                    solnvar.append(epochvar)
                     indxe = indxe + 1
                 indxs = indxs + 1
                 targetvar.append(solnvar)
@@ -440,25 +449,29 @@ class CadenceList(object, metaclass=CadenceSingleton):
             packvar.append(targetvar)
 
         # Constraint for each solution that all or none of
-        # its epochs, and only those epochs, are used
-        for target, targetvar in zip(pack, packvar):
+        # its epochs, and only those epochs, are used, and that
+        # each of the epochs has exactly the right number of
+        # exposures.
+        for target, targetvar, target_cadence in zip(pack, packvar,
+                                                     target_cadences):
             for soln, solnvar in zip(target, targetvar):
                 firstvar = None
                 for epoch, epochvar in zip(soln, solnvar):
                     if(epoch):
                         if(firstvar):
-                            solver.Add(epochvar == firstvar)
+                            solver.Add((epochvar > 0) == (firstvar > 0))
                         else:
                             firstvar = epochvar
                     else:
                         solver.Add(epochvar == 0)
 
-        # Constraint for each epoch that only one total
-        # target is taken
-        for iepoch in range(nepochs):
+        # Constraint for each epoch that no more than
+        # the total number of available exposures is taken
+        for iepoch in range(nepochs_field):
             e = [solnvar[iepoch] for targetvar in packvar
                  for solnvar in targetvar]
-            solver.Add(solver.Sum(e) <= 1)
+            solver.Add(solver.Sum(e) <=
+                       int(self.cadences[field_cadence].epoch_nexposures[iepoch]))
 
         # Constraint that only one solution for each target
         # is taken.
@@ -497,16 +510,31 @@ class CadenceList(object, metaclass=CadenceSingleton):
             print("Problem in solver.")
             return(None)
 
-        epoch_targets = np.zeros(nepochs, dtype=np.int32) - 1
+        # Retrieve list of targets for each epoch
+        epoch_targets = [np.zeros(0, dtype=np.int32)] * nepochs_field
         if collector.SolutionCount() > 0:
             best_solution = collector.SolutionCount() - 1
             for itarget, targetvar in zip(range(ntargets), packvar):
                 for solnvar in targetvar:
-                    for iepoch, epochvar in zip(range(nepochs), solnvar):
+                    for iepoch, epochvar in zip(range(nepochs_field), solnvar):
                         if(collector.Value(best_solution, epochvar)):
-                            epoch_targets[iepoch] = itarget
+                            epoch_targets[iepoch] = np.append(epoch_targets[iepoch], itarget)
 
-        return(epoch_targets)
+        # Now convert into list of targets for each exposure
+        exposure_targets = np.zeros(nexposures_field, dtype=np.int32) - 1
+        iexposure = 0
+        target_epoch = np.zeros(len(target_cadences), dtype=np.int32)
+        for iepoch in np.arange(nepochs_field, dtype=np.int32):
+            for itarget in np.arange(len(epoch_targets[iepoch]), dtype=np.int32):
+                ctarget = epoch_targets[iepoch][itarget]
+                ccadence = self.cadences[target_cadences[ctarget]]
+                nexposures = ccadence.epoch_nexposures[target_epoch[ctarget]]
+                for indx in iexposure + np.arange(nexposures):
+                    exposure_targets[indx] = ctarget
+                iexposure = iexposure + nexposures
+                target_epoch[ctarget] = target_epoch[ctarget] + 1
+
+        return(epoch_targets, exposure_targets)
 
     def fromarray(self, cadences_array=None):
         """Add cadences to ccadence list from an array
