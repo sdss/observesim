@@ -35,6 +35,9 @@ class Cadence(object):
     delta_max : ndarray of np.float32
         maximum delta to allow (days)
 
+    instrument : list of str
+            instrument for each exposure
+
     Attributes:
     ----------
 
@@ -53,14 +56,14 @@ class Cadence(object):
     delta_max : ndarray of np.float32
         maximum delta to allow (days)
 
+    instrument : list of str
+            instrument for each exposure
+
     nepochs : np.int32
         number of epochs
 
     epoch_indx : ndarray of np.int32
         index into delta for first exposure at each epoch
-
-    epoch_delta : ndarray of np.float32
-        day for each separate epoch
 
     epoch_nexposures : ndarray of np.float32
         number of exposures for each separate epoch
@@ -69,9 +72,12 @@ class Cadence(object):
     -------
 """
     def __init__(self, nexposures=None, lunation=None, delta=None,
-                 delta_min=None, delta_max=None):
+                 delta_min=None, delta_max=None, instrument=None):
         self.nexposures = np.int32(nexposures)
         self.lunation = np.zeros(self.nexposures, dtype=np.float32) + lunation
+        if(len(instrument) != nexposures):
+            print("WHI")
+        self.instrument = instrument
         self.delta = np.zeros(self.nexposures, dtype=np.float32) + delta
         self.delta_min = (np.zeros(self.nexposures, dtype=np.float32) +
                           delta_min)
@@ -81,6 +87,10 @@ class Cadence(object):
         return
 
     def __str__(self):
+        return(self.exposure_text())
+
+    def exposure_text(self):
+        """Display list of exposures as text"""
         out = "nexposures={nexposures}\n".format(nexposures=self.nexposures)
         out = out + " lunation = "
         for i in np.arange(self.nexposures):
@@ -98,6 +108,40 @@ class Cadence(object):
         for i in np.arange(self.nexposures):
             out = out + " {s:.3f}".format(s=self.delta_max[i])
         out = out + "\n"
+        out = out + " instrument = "
+        for i in np.arange(self.nexposures):
+            out = out + " {s}".format(s=self.instrument[i])
+        out = out + "\n"
+        return(out)
+
+    def epoch_text(self):
+        """Display list of epochs as text"""
+        epoch_indx = self.epoch_indx
+        out = "nepochs={nepochs}\n".format(nepochs=self.nepochs)
+        out = out + " nexposures = "
+        for i in np.arange(self.nepochs):
+            out = out + " {l}".format(l=self.epoch_nexposures[i])
+        out = out + "\n"
+        out = out + " lunation = "
+        for i in np.arange(self.nepochs):
+            out = out + " {l:.3f}".format(l=self.lunation[epoch_indx[i]])
+        out = out + "\n"
+        out = out + " delta = "
+        for i in np.arange(self.nepochs):
+            out = out + " {d:.3f}".format(d=self.delta[epoch_indx[i]])
+        out = out + "\n"
+        out = out + " delta_min = "
+        for i in np.arange(self.nepochs):
+            out = out + " {s:.3f}".format(s=self.delta_min[epoch_indx[i]])
+        out = out + "\n"
+        out = out + " delta_max = "
+        for i in np.arange(self.nepochs):
+            out = out + " {s:.3f}".format(s=self.delta_max[epoch_indx[i]])
+        out = out + "\n"
+        out = out + " instrument = "
+        for i in np.arange(self.nepochs):
+            out = out + " {s}".format(s=self.instrument[epoch_indx[i]])
+        out = out + "\n"
         return(out)
 
     def _arrayify(self, quantity=None, dtype=np.float64):
@@ -109,6 +153,7 @@ class Cadence(object):
         return np.zeros(length, dtype=dtype) + quantity
 
     def _create_epochs(self):
+        """Define epochs based on exposure list"""
         epoch_indx = [0]
         self.nepochs = 1
         for indx in np.arange(self.nexposures - 1) + 1:
@@ -116,10 +161,6 @@ class Cadence(object):
                 epoch_indx.append(indx)
                 self.nepochs = self.nepochs + 1
         self.epoch_indx = np.array(epoch_indx, dtype=np.int32)
-        self.epoch_delta = self.delta[self.epoch_indx]
-        self.epoch_delta_min = self.delta_min[self.epoch_indx]
-        self.epoch_delta_max = self.delta_max[self.epoch_indx]
-        self.epoch_lunation = self.lunation[self.epoch_indx]
         self.epoch_nexposures = np.zeros(self.nepochs, dtype=np.int32)
         for indx in np.arange(self.nepochs - 1):
             self.epoch_nexposures[indx] = (self.epoch_indx[indx + 1] -
@@ -129,6 +170,7 @@ class Cadence(object):
 
     def evaluate_next(self, mjd_past=None, mjd_next=None,
                       lunation_next=None, check_lunation=True):
+        """Evaluate next choice of observation (not well-tested)"""
         nexposures_past = len(mjd_past)
         if(nexposures_past >= self.nexposures):
             return(False)
@@ -168,6 +210,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
     fromarray(): add to cadence list from an ndarray
     fromfits(): add to cadence list from a FITS file
     toarray(): return an ndarray with cadence list
+    epoch_array(): return an ndarray with epoch-oriented list of cadences
 
     Notes:
     -----
@@ -210,13 +253,16 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         delta_max : ndarray of np.float32
             allowance for variation from cadence (default [1.])
+
+        instrument : list of str
+            instrument for each exposure
 """
         cadence = Cadence(*args, **kwargs)
         self.cadences[name] = cadence
         self.ncadences = self.ncadences + 1
 
     def check_exposures(self, one=None, two=None, indx2=None, sub1=None,
-                        epoch_level=False):
+                        epoch_level=True):
         """Is exposure set in cadence two consistent with cadence one?
 
         Parameters:
@@ -284,7 +330,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         return(True)
 
     def cadence_consistency(self, one, two, return_solutions=True,
-                            epoch_level=False):
+                            epoch_level=True):
         """Is cadence #1 consistent with cadence #2?
 
         Parameters:
@@ -298,6 +344,9 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         return_solutions: boolean
             return list of solutions? (default False)
+
+        epoch_level : boolean
+            compare sequences at epoch level not exposure level (default True)
 
         Returns:
         -------
@@ -387,8 +436,11 @@ class CadenceList(object, metaclass=CadenceSingleton):
         Returns:
         -------
 
-        epoch_targets : ndarray of np.int32
-            indices of targets observed for each epoch of field cadence
+        epoch_targets : list of ndarray of np.int32
+            for each epoch, list of target indices
+
+        exposure_targets : ndarray of np.int32
+            for each epoch, target index
 
         Notes:
         -----
@@ -543,17 +595,19 @@ class CadenceList(object, metaclass=CadenceSingleton):
         -----------
 
         cadences_array : ndarray
-            ndarray with columns 'nexposures', 'lunation', 'delta',
-            'delta_min', 'delta_max', 'cadence'
+            ndarray with columns 'NEXPOSURES', 'LUNATION', 'DELTA',
+            'DELTA_MIN', 'DELTA_MAX', 'CADENCE', 'INSTRUMENT'
 """
         for ccadence in cadences_array:
-            nexp = ccadence['nexposures']
-            self.add_cadence(nexposures=ccadence['nexposures'],
-                             lunation=ccadence['lunation'][0:nexp],
-                             delta=ccadence['delta'][0:nexp],
-                             delta_min=ccadence['delta_min'][0:nexp],
-                             delta_max=ccadence['delta_max'][0:nexp],
-                             name=ccadence['cadence'].decode().strip())
+            nexp = ccadence['NEXPOSURES']
+            instruments = [ii.decode().strip() for ii in ccadence['INSTRUMENT'][0:nexp]]
+            self.add_cadence(nexposures=ccadence['NEXPOSURES'],
+                             lunation=ccadence['LUNATION'][0:nexp],
+                             delta=ccadence['DELTA'][0:nexp],
+                             delta_min=ccadence['DELTA_MIN'][0:nexp],
+                             delta_max=ccadence['DELTA_MAX'][0:nexp],
+                             name=ccadence['CADENCE'].decode().strip(),
+                             instrument=instruments)
         return
 
     def fromfits(self, filename=None):
@@ -568,8 +622,9 @@ class CadenceList(object, metaclass=CadenceSingleton):
         Notes:
         -----
 
-        Expects a valid FITS file with columns 'nexposures',
-            'lunation', 'delta', 'delta_min', 'delta_max', 'cadence'
+        Expects a valid FITS file with columns 'NEXPOSURES',
+            'LUNATION', 'DELTA', 'DELTA_MIN', 'DELTA_MAX', 'CADENCE',
+            'INSTRUMENT'
 """
         self.cadences_fits = fitsio.read(filename)
         self.fromarray(self.cadences_fits)
@@ -586,20 +641,57 @@ class CadenceList(object, metaclass=CadenceSingleton):
 """
         nexps = np.array([c.nexposures for c in self.cadences.values()])
         max_nexp = nexps.max()
-        cadence0 = [('cadence', np.dtype('a20')),
-                    ('nexposures', np.int32),
-                    ('delta', np.float64, max_nexp),
-                    ('lunation', np.float32, max_nexp),
-                    ('delta_max', np.float32, max_nexp),
-                    ('delta_min', np.float32, max_nexp)]
+        cadence0 = [('CADENCE', np.dtype('a40')),
+                    ('NEXPOSURES', np.int32),
+                    ('DELTA', np.float64, max_nexp),
+                    ('LUNATION', np.float32, max_nexp),
+                    ('DELTA_MAX', np.float32, max_nexp),
+                    ('DELTA_MIN', np.float32, max_nexp),
+                    ('INSTRUMENT', np.dtype('a10'), max_nexp)]
         cads = np.zeros(self.ncadences, dtype=cadence0)
         names = self.cadences.keys()
         for indx, name in zip(np.arange(self.ncadences), names):
             nexp = self.cadences[name].nexposures
-            cads['cadence'][indx] = name
-            cads['nexposures'][indx] = nexp
-            cads['delta'][indx, 0:nexp] = self.cadences[name].delta
-            cads['delta_min'][indx, 0:nexp] = self.cadences[name].delta_min
-            cads['delta_max'][indx, 0:nexp] = self.cadences[name].delta_max
-            cads['lunation'][indx, 0:nexp] = self.cadences[name].lunation
+            cads['CADENCE'][indx] = name
+            cads['NEXPOSURES'][indx] = nexp
+            cads['DELTA'][indx, 0:nexp] = self.cadences[name].delta
+            cads['DELTA_MIN'][indx, 0:nexp] = self.cadences[name].delta_min
+            cads['DELTA_MAX'][indx, 0:nexp] = self.cadences[name].delta_max
+            cads['LUNATION'][indx, 0:nexp] = self.cadences[name].lunation
+            cads['INSTRUMENT'][indx, 0:nexp] = self.cadences[name].instrument
+        return(cads)
+
+    def epoch_array(self):
+        """Return cadence epoches as a record array
+
+        Returns:
+        -------
+
+        cadences : ndarray
+            information on each cadence
+"""
+        neps = np.array([c.nepochs for c in self.cadences.values()])
+        max_nep = neps.max()
+        cadence0 = [('CADENCE', np.dtype('a40')),
+                    ('NEPOCHS', np.int32),
+                    ('NEXPOSURES', np.int32, max_nep),
+                    ('DELTA', np.float64, max_nep),
+                    ('LUNATION', np.float32, max_nep),
+                    ('DELTA_MAX', np.float32, max_nep),
+                    ('DELTA_MIN', np.float32, max_nep),
+                    ('INSTRUMENT', np.dtype('a10'), max_nep)]
+        cads = np.zeros(self.ncadences, dtype=cadence0)
+        names = self.cadences.keys()
+        for indx, name in zip(np.arange(self.ncadences), names):
+            nep = self.cadences[name].nepochs
+            cads['CADENCE'][indx] = name
+            cads['NEPOCHS'][indx] = nep
+            epoch_indx = self.cadences[name].epoch_indx
+            cads['NEXPOSURES'][indx, 0:nep] = self.cadences[name].epoch_nexposures
+            cads['DELTA'][indx, 0:nep] = self.cadences[name].delta[epoch_indx]
+            cads['DELTA_MIN'][indx, 0:nep] = self.cadences[name].delta_min[epoch_indx]
+            cads['DELTA_MAX'][indx, 0:nep] = self.cadences[name].delta_max[epoch_indx]
+            cads['LUNATION'][indx, 0:nep] = self.cadences[name].lunation[epoch_indx]
+            instruments = [self.cadences[name].instrument[i] for i in epoch_indx]
+            cads['INSTRUMENT'][indx][0:nep] = instruments
         return(cads)
