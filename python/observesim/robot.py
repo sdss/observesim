@@ -122,7 +122,7 @@ class Robot(object):
         self.ycen = rfp['ycen']
         self.assignment = rfp['assignment']
         self.boss = ((self.assignment == "BOSS") |
-                        (self.assignment == "BA"))
+                     (self.assignment == "BA"))
         self.apogee = (self.assignment == "BA")
         return
 
@@ -176,28 +176,49 @@ class Robot(object):
 
         return
 
+    def corners(self):
+        rmax = np.sqrt(self.xcen**2 + self.ycen**2).max() + self.outer_reach
+        hsqrt3 = np.sqrt(3.) * 0.5
+        xcorners = np.array([- rmax, - 0.5 * rmax, 0.5 * rmax, rmax,
+                             0.5 * rmax, - 0.5 * rmax, - rmax],
+                            dtype=np.float32)
+        ycorners = np.array([0., - hsqrt3 * rmax, - hsqrt3 * rmax, 0.,
+                             hsqrt3 * rmax, hsqrt3 * rmax, 0.],
+                            dtype=np.float32)
+        return(xcorners, ycorners)
+
+    def within_corners(self, x=None, y=None):
+        xc, yc = self.corners()
+        within = np.ones(len(x), dtype=np.int32)
+        for indx in np.arange(len(xc) - 1):
+            xe = 0.5 * (xc[indx] + xc[indx + 1])
+            ye = 0.5 * (yc[indx] + yc[indx + 1])
+            d = (xe * x + ye * y) / (xe * xe + ye * ye)
+            within[d > 1.] = 0
+        return(within)
+
     def positioners(self, x=None, y=None):
         distances = np.sqrt((x - self.xcen)**2 + (y - self.ycen)**2)
         imatch = np.where((distances > self.inner_reach) &
                           (distances < self.outer_reach))[0]
         return self.positionerid[imatch]
 
-    def targets(self, positionerid=None, x=None, y=None, type=None):
+    def targets(self, positionerid=None, x=None, y=None,
+                requires_apogee=None, requires_boss=None):
         xcen = self.xcen[self.indx[positionerid]]
         ycen = self.ycen[self.indx[positionerid]]
         distances = np.sqrt((x - xcen)**2 + (y - ycen)**2)
         within = ((distances > self.inner_reach) &
                   (distances < self.outer_reach))
-        if(type is not None):
-            istype = np.zeros(len(x), dtype=np.bool)
-            if(self.apogee[self.indx[positionerid]]):
-                iapogee = np.where(type == 'apogee')[0]
-                istype[iapogee] = 1
-            if(self.boss[self.indx[positionerid]]):
-                iboss = np.where(type == 'boss')[0]
-                istype[iboss] = 1
-        else:
-            istype = np.ones(len(x), dtype=np.bool)
+        istype = np.ones(len(x), dtype=np.bool)
+        if(requires_apogee is not None):
+            if(self.apogee[self.indx[positionerid]] == 0):
+                iapogee = np.where(requires_apogee)[0]
+                istype[iapogee] = 0
+        if(requires_boss is not None):
+            if(self.boss[self.indx[positionerid]] == 0):
+                iboss = np.where(requires_boss)[0]
+                istype[iboss] = 0
         imatch = np.where(within & istype)[0]
         return imatch
 
