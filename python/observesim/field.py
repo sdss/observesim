@@ -87,7 +87,7 @@ class Field(object):
         self.racen = racen
         self.deccen = deccen
         self.cadencelist = cadence.CadenceList()
-        self.field_cadence = 0
+        self.field_cadence = ''
         return
 
     def _arrayify(self, quantity=None, dtype=np.float64):
@@ -105,6 +105,13 @@ class Field(object):
         y = (dec - self.deccen) * scale
         return(x, y)
 
+    def xy2radec(self, x=None, y=None):
+        # Yikes!
+        scale = 218.
+        ra = self.racen + (x / scale) / np.cos(self.deccen * np.pi / 180.)
+        dec = self.deccen + (y / scale)
+        return(ra, dec)
+
     def read_targets(self, filename=None):
         self.target_fits = fitsio.read(filename)
         self.ntarget = len(self.target_fits)
@@ -112,7 +119,8 @@ class Field(object):
         self.target_dec = self.target_fits['dec']
         self.target_x, self.target_y = self.radec2xy(self.target_ra,
                                                      self.target_dec)
-        self.target_cadence = self.target_fits['cadence']
+        self.target_cadence = np.array([c.decode().strip()
+                                        for c in self.target_fits['cadence']])
         self.target_type = np.array([t.decode().strip()
                                      for t in self.target_fits['type']])
         return
@@ -141,22 +149,31 @@ class Field(object):
         self.assignments = (np.zeros((self.robot.npositioner, nexposures),
                                      dtype=np.int32) - 1)
         got_target = np.zeros(self.ntarget, dtype=np.int32)
-        ok_cadence = np.zeros(self.target_cadence.max() + 1, np.bool)
-        for icadence in np.unique(self.target_cadence):
-            ok_cadence[icadence] = self.cadencelist.cadence_consistency(icadence, self.field_cadence)
-        iok = np.where(ok_cadence[self.target_cadence])[0]
+        ok_cadence = dict()
+        for curr_cadence in np.unique(self.target_cadence):
+            ok_cadence[curr_cadence] = self.cadencelist.cadence_consistency(curr_cadence, self.field_cadence, return_solutions=False)
+        ok = [ok_cadence[tcadence] for tcadence in self.target_cadence]
+        iok = np.where(np.array(ok))[0]
         if(len(iok) == 0):
             return
         for indx in np.arange(self.robot.npositioner):
             positionerid = self.robot.positionerid[indx]
             ileft = np.where(got_target[iok] == 0)[0]
             if(len(ileft) > 0):
+                requires_apogee = np.array([self.cadencelist.cadences[c].requires_apogee
+                                            for c in self.target_cadence[iok[ileft]]])
+                requires_boss = np.array([self.cadencelist.cadences[c].requires_boss
+                                          for c in self.target_cadence[iok[ileft]]])
                 it = self.robot.targets(positionerid=positionerid,
                                         x=self.target_x[iok[ileft]],
                                         y=self.target_y[iok[ileft]],
-                                        type=self.target_type[iok[ileft]])
+                                        requires_apogee=requires_apogee,
+                                        requires_boss=requires_boss)
                 if(len(it) > 0):
-                    itarget = self.cadencelist.pack_targets(self.target_cadence[iok[ileft[it]]], self.field_cadence)
-                    got_target[iok[ileft[it[itarget]]]] = 1
-                    self.assignments[indx, :] = iok[ileft[it[itarget]]]
+                    epoch_targets, itarget = self.cadencelist.pack_targets(self.target_cadence[iok[ileft[it]]], self.field_cadence)
+                    iassigned = np.where(itarget >= 0)[0]
+                    nassigned = len(iassigned)
+                    if(nassigned > 0):
+                        got_target[iok[ileft[it[itarget[iassigned]]]]] = 1
+                        self.assignments[indx, 0:nassigned] = iok[ileft[it[itarget[iassigned]]]]
         return
