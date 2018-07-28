@@ -1,18 +1,6 @@
 This document describes a conceptual design for the targeting and
 scheduling system for SDSS-V.
 
-Notes from discussion:
-----------------------
-
-* Need to build in flexibility to get some objects of a class?
-* What cadence classes are most important? How do we quantify this?
-* What is criterion for adding a design?
-* Can we quantify value? 
-* Queue observing for HET: weights, synoptic targets,
-  etc. Supercommittee proposes different weights. Weight includes
-  future opportunity.
-* SPIE: queue-interested group -- Austin area
-
 Elements of Observing Strategy
 ------------------------------
 
@@ -154,7 +142,7 @@ ultimately we should be refactoring into separate products:
 
 * scheduler: software to run scheduler
 
-* configure: software to assign and test fiber configurations
+* kaiju: software to assign and test fiber configurations
 
 * observesim: software to run simulations of above
 
