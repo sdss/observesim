@@ -75,15 +75,23 @@ class Cadence(object):
                  delta_min=None, delta_max=None, instrument=None):
         self.nexposures = np.int32(nexposures)
         self.lunation = np.zeros(self.nexposures, dtype=np.float32) + lunation
-        if(len(instrument) != nexposures):
-            print("WHI")
-        self.instrument = instrument
+        self.instrument = np.array(instrument)
         self.delta = np.zeros(self.nexposures, dtype=np.float32) + delta
         self.delta_min = (np.zeros(self.nexposures, dtype=np.float32) +
                           delta_min)
         self.delta_max = (np.zeros(self.nexposures, dtype=np.float32) +
                           delta_max)
         self._create_epochs()
+        iapogee = np.where(self.instrument == 'apogee')[0]
+        if(len(iapogee) > 0):
+            self.requires_apogee = 1
+        else:
+            self.requires_apogee = 0
+        iboss = np.where(self.instrument == 'boss')[0]
+        if(len(iboss) > 0):
+            self.requires_boss = 1
+        else:
+            self.requires_boss = 0
         return
 
     def __str__(self):
