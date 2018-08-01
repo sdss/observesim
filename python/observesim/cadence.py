@@ -325,9 +325,9 @@ class CadenceList(object, metaclass=CadenceSingleton):
             dlo2 = self.cadences[two].delta_min[indx2[indx - 1] + 1:indx2[indx] + 1].sum()
             dhi2 = self.cadences[two].delta_max[indx2[indx - 1] + 1:indx2[indx] + 1].sum()
             if(delta1 > 0.):  # normal case
-                if(dlo1 >= dlo2 - eps):
+                if(dlo1 > dlo2 + eps):
                     return(False)
-                if(dhi1 <= dhi2 + eps):
+                if(dhi1 < dhi2 - eps):
                     return(False)
             else:  # adjacent exposures
                 if(indx2[indx] > indx2[indx - 1] + 1):  # must be adjacent
