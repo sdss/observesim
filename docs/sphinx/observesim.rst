@@ -5,8 +5,6 @@ observesim
 .. toctree::
    :maxdepth: 2
 
-   observesim.scheduler
-
 
 
 Indices and tables

@@ -24,18 +24,6 @@ Reference for Observing Simulation for SDSS-V
 ..     observesim.observe
 
 
-.. automodapi:: observesim.cadence
-   :no-inheritance-diagram:
-   :headings: ~^
-
-.. automodapi:: observesim.scheduler
-   :no-inheritance-diagram:
-   :headings: ~^
-
-.. automodapi:: observesim.observations
-   :no-inheritance-diagram:
-   :headings: ~^
-
 .. automodapi:: observesim.observe
    :no-inheritance-diagram:
    :headings: ~^
