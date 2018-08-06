@@ -203,6 +203,7 @@ class Robot(object):
 
         return np.array([pos_to_index[np.where(pos_to_index[:, 1] == ii)][0][0]
                          for ii in np.where(collides)[0]])
+
     def corners(self):
         rmax = np.sqrt(self.xcen**2 + self.ycen**2).max() + self.outer_reach
         hsqrt3 = np.sqrt(3.) * 0.5
