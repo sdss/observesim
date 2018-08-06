@@ -1,8 +1,0 @@
-typedef struct {
-  char observatory[100];
-  double longitude;
-  double latitude;
-} OBSERVATORY;
-
-OBSERVATORY apo -105.82027778 32.7797556
-OBSERVATORY lco -70.6926 -29.0146

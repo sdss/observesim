@@ -20,8 +20,8 @@ import shapely.geometry
 import observesim.db.peewee.targetdb as targetdb
 from observesim.utils import assign_targets_draining, xy2tp
 
-__all__ = ['Robot', 'Configuration']
 
+__all__ = ['Robot', 'Configuration']
 
 """Robot module class.
 
@@ -65,8 +65,8 @@ class Robot(object):
     assignment : list of strings
         assignment name
 
-    optical : ndarray of np.boolean
-        positioner has an optical fiber
+    boss : ndarray of np.boolean
+        positioner has a BOSS fiber
 
     apogee : ndarray of np.boolean
         positioner has an APOGEE fiber
@@ -81,11 +81,12 @@ class Robot(object):
     -------
 
     positioners() : which positioners can reach a given x, y
+    targets() : which x, y positions are reachable by a positioner
 
     Notes:
     -----
 
-    Some positions may be fiducials (neither optical nor apogee).
+    Some positions may be fiducials (neither boss nor apogee).
 """
     def __init__(self, db=True, fps_layout='central_park'):
         if(db):
@@ -110,17 +111,18 @@ class Robot(object):
         rfpfile = os.path.join(os.getenv("OBSERVESIM_DIR"),
                                "data", "fps_RTConfig.txt")
         rfp = ascii.read(rfpfile)
-        self.positionerid = np.arange(len(rfp), dtype=np.int32) + 1
+        self.npositioner = len(rfp)
+        self.positionerid = np.arange(self.npositioner, dtype=np.int32) + 1
         self.indx = dict()
-        for (indx, pid) in zip(np.arange(len(rfp)), self.positionerid):
+        for (indx, pid) in zip(np.arange(self.npositioner), self.positionerid):
             self.indx[pid] = indx
         self.row = rfp['row']
         self.pos = rfp['pos']
         self.xcen = rfp['xcen']
         self.ycen = rfp['ycen']
         self.assignment = rfp['assignment']
-        self.optical = ((self.assignment == "BOSS") |
-                        (self.assignment == "BA"))
+        self.boss = ((self.assignment == "BOSS") |
+                     (self.assignment == "BA"))
         self.apogee = (self.assignment == "BA")
         return
 
@@ -149,10 +151,11 @@ class Robot(object):
                   .where(targetdb.FPSLayout.label == fps_layout)
                  ).dicts()
 
+        self.npositioner = nactuators
         self.positionerid = np.zeros(nactuators, dtype=np.int32)
         self.xcen = np.zeros(nactuators, dtype=np.float32)
         self.ycen = np.zeros(nactuators, dtype=np.float32)
-        self.optical = np.zeros(nactuators, dtype=np.bool)
+        self.boss = np.zeros(nactuators, dtype=np.bool)
         self.apogee = np.zeros(nactuators, dtype=np.bool)
         self.fiducial = np.zeros(nactuators, dtype=np.bool)
         self.indx = dict()
@@ -169,7 +172,7 @@ class Robot(object):
             if(fiber['spectrograph'] == 'APOGEE'):
                 self.apogee[self.indx[fiber['id']]] = True
             if(fiber['spectrograph'] == 'BOSS'):
-                self.optical[self.indx[fiber['id']]] = True
+                self.boss[self.indx[fiber['id']]] = True
 
         return
 
@@ -200,6 +203,26 @@ class Robot(object):
 
         return np.array([pos_to_index[np.where(pos_to_index[:, 1] == ii)][0][0]
                          for ii in np.where(collides)[0]])
+    def corners(self):
+        rmax = np.sqrt(self.xcen**2 + self.ycen**2).max() + self.outer_reach
+        hsqrt3 = np.sqrt(3.) * 0.5
+        xcorners = np.array([- rmax, - 0.5 * rmax, 0.5 * rmax, rmax,
+                             0.5 * rmax, - 0.5 * rmax, - rmax],
+                            dtype=np.float32)
+        ycorners = np.array([0., - hsqrt3 * rmax, - hsqrt3 * rmax, 0.,
+                             hsqrt3 * rmax, hsqrt3 * rmax, 0.],
+                            dtype=np.float32)
+        return(xcorners, ycorners)
+
+    def within_corners(self, x=None, y=None):
+        xc, yc = self.corners()
+        within = np.ones(len(x), dtype=np.int32)
+        for indx in np.arange(len(xc) - 1):
+            xe = 0.5 * (xc[indx] + xc[indx + 1])
+            ye = 0.5 * (yc[indx] + yc[indx + 1])
+            d = (xe * x + ye * y) / (xe * xe + ye * ye)
+            within[d > 1.] = 0
+        return(within)
 
     def positioners(self, x=None, y=None):
         distances = np.sqrt((x - self.xcen)**2 + (y - self.ycen)**2)
@@ -207,17 +230,28 @@ class Robot(object):
                           (distances < self.outer_reach))[0]
         return self.positionerid[imatch]
 
-    def targets(self, positionerid=None, x=None, y=None):
+    def targets(self, positionerid=None, x=None, y=None,
+                requires_apogee=None, requires_boss=None):
         xcen = self.xcen[self.indx[positionerid]]
         ycen = self.ycen[self.indx[positionerid]]
         distances = np.sqrt((x - xcen)**2 + (y - ycen)**2)
-        imatch = np.where((distances > self.inner_reach) &
-                          (distances < self.outer_reach))[0]
+        within = ((distances > self.inner_reach) &
+                  (distances < self.outer_reach))
+        istype = np.ones(len(x), dtype=np.bool)
+        if(requires_apogee is not None):
+            if(self.apogee[self.indx[positionerid]] == 0):
+                iapogee = np.where(requires_apogee)[0]
+                istype[iapogee] = 0
+        if(requires_boss is not None):
+            if(self.boss[self.indx[positionerid]] == 0):
+                iboss = np.where(requires_boss)[0]
+                istype[iboss] = 0
+        imatch = np.where(within & istype)[0]
         return imatch
 
     def covered(self, x=None, y=None, type=None):
-        if(type is 'optical'):
-            iposid = np.where(self.optical > 0)[0]
+        if(type is 'boss'):
+            iposid = np.where(self.boss > 0)[0]
         else:
             iposid = np.where(self.apogee > 0)[0]
         covered = np.zeros(len(x), dtype=np.int32)
@@ -228,8 +262,8 @@ class Robot(object):
         return(covered)
 
     def assign(self, x=None, y=None, type=None):
-        if(type is 'optical'):
-            iposid = np.where(self.optical > 0)[0]
+        if(type is 'boss'):
+            iposid = np.where(self.boss > 0)[0]
         else:
             iposid = np.where(self.apogee > 0)[0]
         positionerids = np.zeros(len(x), dtype=np.int32) - 1
@@ -244,6 +278,20 @@ class Robot(object):
                 positionerids[ifree[imatch[0]]] = positionerid
                 targets[iposid[indx]] = ifree[imatch[0]]
         return(positionerids, targets)
+
+    def plot(self, xoff=0., yoff=0.):
+        nth = 30
+        th = np.arange(nth) / np.float32(nth) * np.pi * 2.
+        xc = np.cos(th) * self.outer_reach
+        yc = np.sin(th) * self.outer_reach
+        for xcen, ycen, apogee, boss in zip(self.xcen, self.ycen,
+                                            self.apogee, self.boss):
+            x = xcen + xc
+            y = ycen + yc
+            if(boss):
+                plt.plot(x + xoff, y + yoff, color='black', linewidth=1)
+            if(apogee):
+                plt.plot(x + xoff, y + yoff, color='red', linewidth=1)
 
 
 class Configuration(object):
