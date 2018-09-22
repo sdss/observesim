@@ -12,7 +12,7 @@ Schema
 
 The data used for survey simulations is stored in the SDSS-V dedicated database ``sdss5db``, in particular in the ``targetdb`` schema. The following links give access to the :download:`graffle <../../schema/targetdb.graffle>` (:download:`PDF <../../schema/targetdb.pdf>`) and the :download:`SQL <../../schema/targetdb.sql>` files that implement the ``targetdb`` schema.
 
-The current version of the schema is ``v0.3.4``. If you make modifications to the schema, please remember to update the version in both the graffle and SQL file.
+The current version of the schema is ``v0.3.5``. If you make modifications to the schema, please remember to update the version in both the graffle and SQL file.
 
 
 What's in targetdb?
@@ -166,6 +166,8 @@ As usual, and in both the peewee and SQLAlchemy implementations, models have the
 
 Loading targetdb
 ----------------
+
+.. warning:: The current version of the loading scripts for targetdb do not populate cadence information. The cadence values need to be loaded independently.
 
 At this time, ``targetdb`` has been loaded using a series of (to a certain degree) mock catalogues for the different subprograms for MWM and BHM. The data is described in `this wiki page <https://internal.sdss.org/trac/as4/wiki/Targetlist>`__ and the files used for loading can be found `here <https://data.sdss.org/sas/mangawork/users/u0931042/sdss5_target_list/>`__. In particular, the file `target_list.dat <https://data.sdss.org/sas/mangawork/users/u0931042/sdss5_target_list/target_list.dat>`__ contains a table with the files to load and the mapping of column names for each one of them. This file can be used with ``observesim loaddb`` (see below) to ingest the data to targetdb.
 
