@@ -12,10 +12,10 @@ import logging
 import pathlib
 
 import numpy as np
-
 from astropy import table
 
 from observesim import log
+
 from .peewee import targetdb
 
 
@@ -167,6 +167,11 @@ def load_targets(filename, verbose=False, remove=False, profile=None):
     if profile:
         log.info(f'setting DB profile {profile!r}')
         targetdb.database.connect_from_config(profile)
+    else:
+        log.info('autoconnecting to DB')
+        targetdb.database.autoconnect()
+
+    assert targetdb.database.connected, 'not connected to DB'
 
     filename = pathlib.Path(filename)
     assert filename.exists()
@@ -228,8 +233,9 @@ def load_targets(filename, verbose=False, remove=False, profile=None):
                 field_pks[np.where(catalogue[row['field']] == field)] = field_pk
 
         # Creates unique cadence rows and returns a list of pks to assign to target_cadence_pk
-        log.debug('adding cadence data')
-        target_cadence_pks = _create_cadence_records(catalogue, row)
+        # log.debug('adding cadence data')
+        # target_cadence_pks = _create_cadence_records(catalogue, row)
+        target_cadence_pks = [None] * len(catalogue)
 
         # Loads magnitude data
         magnitude_pks = _load_magnitude(catalogue, row)
@@ -281,7 +287,7 @@ def load_fibres(filename, layout_name, verbose=False, remove=False, profile=None
         verbose (bool):
             Determines the level of verbosity.
         remove (bool):
-            If ``True``, the fiber, actuator, and fiber configuation tables
+            If ``True``, the fibre, actuator, and fibre configuration tables
             will be truncated before inserting new records.
         profile (str):
             Profile to use to connect to the DB.
@@ -296,6 +302,11 @@ def load_fibres(filename, layout_name, verbose=False, remove=False, profile=None
     if profile:
         log.info(f'setting DB profile {profile!r}')
         targetdb.database.connect_from_config(profile)
+    else:
+        log.info('autoconnecting to DB')
+        targetdb.database.autoconnect()
+
+    assert targetdb.database.connected, 'not connected to DB'
 
     filename = pathlib.Path(filename)
     assert filename.exists()

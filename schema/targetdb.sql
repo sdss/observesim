@@ -1,6 +1,6 @@
 /*
 
-targetDB schema version v0.3.4
+targetDB schema version v0.3.5
 
 Created Jan 2018 - J. Sánchez-Gallego
 
@@ -78,11 +78,14 @@ CREATE TABLE targetdb.target_completion (
 	label TEXT);
 
 CREATE TABLE targetdb.target_cadence (
-	pk serial PRIMARY KEY NOT NULL,
-	n_epochs INTEGER,
-	cadence INTEGER,
-	cadence_code SMALLINT,
-	n_exp_per_epoch SMALLINT);
+    pk integer PRIMARY KEY NOT NULL,
+    name text,
+    nexposures integer,
+    delta real[],
+    lunation real[],
+    delta_max real[],
+    delta_min real[],
+    spectrograph_pk integer[]);
 
 CREATE TABLE targetdb.spectrograph (
 	pk serial PRIMARY KEY NOT NULL,

@@ -18,8 +18,8 @@ import shapely.affinity
 import shapely.geometry
 
 import observesim.db.peewee.targetdb as targetdb
-import matplotlib.pyplot as plt
 from observesim.utils import assign_targets_draining, xy2tp
+
 
 __all__ = ['Robot', 'Configuration']
 
@@ -175,6 +175,34 @@ class Robot(object):
                 self.boss[self.indx[fiber['id']]] = True
 
         return
+
+    def positioner_overlaps(self, positionerid):
+        """For a ``positionerid`` returns a list of overlapping positionerids.
+
+        A positioner is consider to overlap with ``positionerid`` if their
+        beta arms can tocuh in any way, that is, if their distance is less
+        than twice the added lenghts of the alpha and beta arms.
+
+        """
+
+        xcen = self.xcen
+        ycen = self.ycen
+
+        pos = np.array([xcen, ycen]).T
+        pos[self.fiducial] = np.nan
+
+        idx = self.indx[positionerid]
+        this_pos = pos[idx]
+
+        pos_to_index = np.array(list(self.indx.items()), dtype=np.int)
+
+        distance = np.sqrt(np.sum((pos - this_pos)**2, axis=1))
+
+        collides = distance <= (2 * (self._ralpha + self._rbeta))
+        collides[idx] = False  # Don't collide with ourselves
+
+        return np.array([pos_to_index[np.where(pos_to_index[:, 1] == ii)][0][0]
+                         for ii in np.where(collides)[0]])
 
     def corners(self):
         rmax = np.sqrt(self.xcen**2 + self.ycen**2).max() + self.outer_reach
@@ -390,16 +418,23 @@ class Configuration(object):
              (self.robot._rbeta, +arm_width / 2.),
              (self.robot._rbeta * (1 - fraction), arm_width / 2.)])
 
+        # A fiducial is just a shapely Point. This is mostly a placeholder
+        # right now since we consider fiducials cannot collide with
+        # positioners.
+        actuator = shapely.geometry.Point(0, 0)
+
         polygons = []
 
-        # Removes fiducials
-        theta_phi = self.theta_phi[~self.robot.fiducial]
-
         n_positioner = 0
-        for theta, phi in theta_phi:
+        for theta, phi in self.theta_phi:
 
-            xcen = self.robot.xcen[~self.robot.fiducial][n_positioner]
-            ycen = self.robot.ycen[~self.robot.fiducial][n_positioner]
+            xcen = self.robot.xcen[n_positioner]
+            ycen = self.robot.ycen[n_positioner]
+
+            if self.robot.fiducial[n_positioner]:
+                polygons.append(shapely.affinity.translate(actuator, xoff=xcen, yoff=ycen))
+                n_positioner += 1
+                continue
 
             alpha_arm_end = (xcen + self.robot._ralpha * np.cos(np.radians(theta)),
                              ycen + self.robot._ralpha * np.sin(np.radians(theta)))
@@ -440,26 +475,17 @@ class Configuration(object):
         collisioned = np.zeros(self.theta_phi.shape[0], dtype=np.bool)
         collision_polygons = self.get_polygons(only_collision=True)
 
-        # We need to keep two indices here because theta_phi's length
-        # includes fiducials while collision_polygons only contains real
-        # positoiners.
-
-        ii_polygon = 0
         for ii in range(self.theta_phi.shape[0]):
-            if np.any(np.isnan(self.theta_phi[ii, :])):  # Skips fiducials
+            if self.robot.fiducial[ii]:  # Skips fiducials
                 continue
-            beta_arm_ii = collision_polygons[ii_polygon]
-            jj_polygon = ii_polygon + 1
+            beta_arm_ii = collision_polygons[ii]
             for jj in range(ii + 1, self.theta_phi.shape[0]):
-                if np.any(np.isnan(self.theta_phi[jj, :])):
+                if self.robot.fiducial[ii]:
                     continue
-                beta_arm_jj = collision_polygons[jj_polygon]
+                beta_arm_jj = collision_polygons[jj]
                 if beta_arm_jj.intersects(beta_arm_ii):
                     collisioned[ii] = True
                     collisioned[jj] = True
-
-                jj_polygon += 1
-            ii_polygon += 1
 
         return collisioned
 

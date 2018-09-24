@@ -8,17 +8,14 @@
 # @Copyright: José Sánchez-Gallego
 
 
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
+from __future__ import absolute_import, division, print_function
 
 import socket
 import warnings
 
-from peewee import OperationalError
-from playhouse.postgres_ext import PostgresqlExtDatabase
+from peewee import OperationalError, PostgresqlDatabase
 
-from observesim import log, config
+from observesim import config, log
 
 
 __all__ = ['database', 'DatabaseConnection']
@@ -43,27 +40,31 @@ class DatabaseConnection(PostgresqlExtDatabase):
         self.connected = False
 
         if autoconnect:
-
-            log.debug('autoconnecting to database ...')
-
-            hostname = socket.getfqdn()
-            if hostname.endswith('sdss.org') or hostname.endswith('utah.edu'):
-                profile = 'utah'
-                log.debug(f'found a Utah hostname. Trying {profile!r} profile')
-                self.connect_from_config(profile)
-            else:
-                for profile in sorted(config['database'].keys()):
-                    log.debug(f'trying profile {profile!r}')
-                    self.connect_from_config(profile, warn_on_fail=False)
-                    if self.connected is True:
-                        log.info(f'connected to database {self.database!r} '
-                                 f'using profile {profile!r}')
-                        return
-                    else:
-                        log.debug(f'failed to connect with profile {profile!r}')
+            self.autoconnect()
 
         if profile:
             self.connect_from_config(profile)
+
+    def autoconnect(self):
+        """Does its best to connect to a valid database."""
+
+        log.debug('autoconnecting to database ...')
+
+        hostname = socket.getfqdn()
+        if hostname.endswith('sdss.org') or hostname.endswith('utah.edu'):
+            profile = 'utah'
+            log.debug(f'found a Utah hostname. Trying {profile!r} profile')
+            self.connect_from_config(profile)
+        else:
+            for profile in sorted(config['database'].keys()):
+                log.debug(f'trying profile {profile!r}')
+                self.connect_from_config(profile, warn_on_fail=False)
+                if self.connected is True:
+                    log.info(f'connected to database {self.database!r} '
+                             f'using profile {profile!r}')
+                    return
+                else:
+                    log.debug(f'failed to connect with profile {profile!r}')
 
     def _test_connection(self, warn_on_fail=None):
         """Checks whether the connection is correct."""
@@ -109,4 +110,4 @@ class DatabaseConnection(PostgresqlExtDatabase):
             return False
 
 
-database = DatabaseConnection()
+database = DatabaseConnection(autoconnect=False)
