@@ -12,6 +12,7 @@ import re
 from peewee import TextField, IntegerField, AutoField, DateTimeField
 from peewee import BigIntegerField, ForeignKeyField, FloatField
 from peewee import ManyToManyField, Model
+from playhouse.postgres_ext import ArrayField
 
 from . import database
 
@@ -227,6 +228,21 @@ class TargetCadence(BaseModel):
 
     class Meta:
         table_name = 'target_cadence'
+        schema = 'targetdb'
+
+
+class TargetCadence2(BaseModel):
+    name = TextField(null=True)
+    nexposures = IntegerField(null=True)
+    delta = ArrayField(field_class=FloatField, null=True)
+    lunation = ArrayField(field_class=FloatField, null=True)
+    delta_min = ArrayField(field_class=FloatField, null=True)
+    delta_max = ArrayField(field_class=FloatField, null=True)
+    spectrograph_pk = ArrayField(field_class=IntegerField, null=True)
+    pk = AutoField()
+
+    class Meta:
+        table_name = 'target_cadence2'
         schema = 'targetdb'
 
 

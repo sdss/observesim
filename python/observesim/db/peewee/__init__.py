@@ -15,7 +15,8 @@ from __future__ import absolute_import
 import socket
 import warnings
 
-from peewee import PostgresqlDatabase, OperationalError
+from peewee import OperationalError
+from playhouse.postgres_ext import PostgresqlExtDatabase
 
 from observesim import log, config
 
@@ -23,8 +24,8 @@ from observesim import log, config
 __all__ = ['database', 'DatabaseConnection']
 
 
-class DatabaseConnection(PostgresqlDatabase):
-    """Customised `PostgresqlDatabase` connection.
+class DatabaseConnection(PostgresqlExtDatabase):
+    """Customised `PostgresqlExtDatabase` connection.
 
     If ``autoconnect=True``, tries to determine the correct connection
     parameters based on the hostname. If a valid connection cannot be
