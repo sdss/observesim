@@ -35,7 +35,18 @@ Dependencies:
 """
 
 
-class Robot(object):
+# Class to define a singleton
+class RobotSingleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(RobotSingleton,
+                                        cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+
+class Robot(object, metaclass=RobotSingleton):
     """Robot class
 
     Parameters:
@@ -80,6 +91,7 @@ class Robot(object):
     Methods:
     -------
 
+    reset() : reset the robot
     positioners() : which positioners can reach a given x, y
     targets() : which x, y positions are reachable by a positioner
 
@@ -88,7 +100,12 @@ class Robot(object):
 
     Some positions may be fiducials (neither boss nor apogee).
 """
-    def __init__(self, db=True, fps_layout='central_park'):
+    def __init__(self, **kwargs):
+        self.reset(**kwargs)
+        return
+
+    def reset(self, db=True, fps_layout='central_park'):
+        """Reset robot"""
         if(db):
             self._read_db(fps_layout=fps_layout)
         else:
@@ -97,7 +114,7 @@ class Robot(object):
         return
 
     def _set_parameters(self):
-        """Set basic paramaters"""
+        """Set basic parameters"""
         self._ralpha = 7.4  # alpha arm radius in mm
         self._rbeta = 15.0  # beta arm radius in mm
         self._pitch = self._ralpha + self._rbeta

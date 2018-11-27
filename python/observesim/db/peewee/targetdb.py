@@ -10,7 +10,8 @@
 import re
 
 from peewee import (AutoField, BigIntegerField, DateTimeField, FloatField,
-                    ForeignKeyField, IntegerField, ManyToManyField, Model, TextField)
+                    ForeignKeyField, IntegerField, ManyToManyField, Model,
+                    TextField)
 from playhouse.postgres_ext import ArrayField
 
 from . import database
@@ -225,24 +226,35 @@ class Fiber(BaseModel):
 
 
 class TargetCadence(BaseModel):
+    cadence = IntegerField(null=True)
+    cadence_code = IntegerField(null=True)
+    n_epochs = IntegerField(null=True)
+    n_exp_per_epoch = IntegerField(null=True)
     pk = AutoField()
-    name = TextField(null=False)
-    nexposures = IntegerField(null=True)
-    delta = ArrayField(field_class=FloatField, null=True)
-    lunation = ArrayField(field_class=FloatField, null=True)
-    delta_max = ArrayField(field_class=FloatField, null=True)
-    delta_min = ArrayField(field_class=FloatField, null=True)
-    spectrograph_pk = ArrayField(field_class=IntegerField, null=False)
 
     class Meta:
         table_name = 'target_cadence'
         schema = 'targetdb'
 
-    @property
-    def spectrographs(self):
-        """Returns a list of spectrographs associated with this cadence."""
-
-        return Spectrograph.select().where(Spectrograph.pk << self.spectrograph_pk)
+#class TargetCadence(BaseModel):
+#    pk = AutoField()
+#    name = TextField(null=False)
+#    nexposures = IntegerField(null=True)
+#    delta = ArrayField(field_class=FloatField, null=True)
+#    lunation = ArrayField(field_class=FloatField, null=True)
+#    delta_max = ArrayField(field_class=FloatField, null=True)
+#    delta_min = ArrayField(field_class=FloatField, null=True)
+#    spectrograph_pk = ArrayField(field_class=IntegerField, null=False)
+#
+#    class Meta:
+#        table_name = 'target_cadence'
+#        schema = 'targetdb'
+#
+#    @property
+#    def spectrographs(self):
+#        """Returns a list of spectrographs associated with this cadence."""
+#
+#        return Spectrograph.select().where(Spectrograph.pk << self.spectrograph_pk)
 
 
 class TargetCadence2(BaseModel):

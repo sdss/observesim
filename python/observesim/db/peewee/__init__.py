@@ -13,7 +13,8 @@ from __future__ import absolute_import, division, print_function
 import socket
 import warnings
 
-from peewee import OperationalError, PostgresqlDatabase
+from peewee import OperationalError
+from playhouse.postgres_ext import PostgresqlExtDatabase
 
 from observesim import config, log
 
