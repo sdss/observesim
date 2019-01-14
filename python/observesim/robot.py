@@ -12,6 +12,8 @@ import astropy.io.ascii as ascii
 import matplotlib.patches
 import matplotlib.pyplot as plt
 import matplotlib.transforms
+from matplotlib.patches import Wedge, Polygon
+from matplotlib.collections import PatchCollection
 import numpy as np
 import numpy.random as random
 import shapely.affinity
@@ -104,7 +106,7 @@ class Robot(object, metaclass=RobotSingleton):
         self.reset(**kwargs)
         return
 
-    def reset(self, db=True, fps_layout='central_park'):
+    def reset(self, db=True, fps_layout='filled_hex'):
         """Reset robot"""
         if(db):
             self._read_db(fps_layout=fps_layout)
@@ -298,18 +300,32 @@ class Robot(object, metaclass=RobotSingleton):
         return(positionerids, targets)
 
     def plot(self, xoff=0., yoff=0.):
-        nth = 30
-        th = np.arange(nth) / np.float32(nth) * np.pi * 2.
-        xc = np.cos(th) * self.outer_reach
-        yc = np.sin(th) * self.outer_reach
-        for xcen, ycen, apogee, boss in zip(self.xcen, self.ycen,
-                                            self.apogee, self.boss):
-            x = xcen + xc
-            y = ycen + yc
-            if(boss):
-                plt.plot(x + xoff, y + yoff, color='black', linewidth=1)
-            if(apogee):
-                plt.plot(x + xoff, y + yoff, color='red', linewidth=1)
+        fig, ax = plt.subplots()
+
+        width = (self.outer_reach - self.inner_reach)
+
+        ax.scatter(self.xcen, self.ycen, s=4)
+
+        indx = np.where(self.apogee)[0]
+        patches_apogee = []
+        for xcen, ycen in zip(self.xcen[indx], self.ycen[indx]):
+            patches_apogee.append(Wedge((xcen, ycen), self.outer_reach, 0, 360,
+                                        width=width))
+        p = PatchCollection(patches_apogee, alpha=0.3, color='red')
+        ax.add_collection(p)
+
+        indx = np.where(self.boss & ~self.apogee)[0]
+        patches_boss = []
+        for xcen, ycen in zip(self.xcen[indx], self.ycen[indx]):
+            patches_boss.append(Wedge((xcen, ycen), self.outer_reach, 0, 360,
+                                        width=width))
+        p = PatchCollection(patches_boss, alpha=0.3, color='blue')
+        ax.add_collection(p)
+
+        plt.xlabel('xfocal (mm)')
+        plt.ylabel('xfocal (mm)')
+
+        return
 
 
 class Configuration(object):
