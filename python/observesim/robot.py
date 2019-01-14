@@ -16,10 +16,14 @@ from matplotlib.patches import Wedge, Polygon
 from matplotlib.collections import PatchCollection
 import numpy as np
 import numpy.random as random
-import shapely.affinity
-import shapely.geometry
 
-import observesim.db.peewee.targetdb as targetdb
+try:
+    import shapely.affinity
+    import shapely.geometry
+except ModuleNotFoundError:
+    pass
+
+import sdssdb.peewee.sdss5db.targetdb as targetdb
 from observesim.utils import assign_targets_draining, xy2tp
 
 
@@ -147,7 +151,6 @@ class Robot(object, metaclass=RobotSingleton):
 
     def _read_db(self, fps_layout='central_park'):
         """Read db and set settings (not functional yet)"""
-        targetdb.database.connect_from_config('local')
 
         actuators = (targetdb.Actuator.select()
                      .order_by(targetdb.Actuator.id)
