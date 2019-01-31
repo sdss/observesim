@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import mpl_toolkits.basemap as basemap
 import observesim.fields
 import observesim.cadence
-from observesim.scheduler import dateandtime2mjd
+from roboscheduler.scheduler import dateandtime2mjd
 
 
 def set_moll(ax):

@@ -11,7 +11,7 @@ import argparse
 import numpy as np
 import fitsio
 import observesim.weather
-import observesim.scheduler
+import roboscheduler.scheduler
 import observesim.observe
 
 # Read arguments
@@ -40,7 +40,7 @@ if(observatory == 'lco'):
     fclear = 0.7
 
 # Set up schedule and weather
-scheduler = observesim.scheduler.Scheduler(observatory=observatory)
+scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory)
 weather = observesim.weather.Weather(mjd_start=scheduler.start,
                                      mjd_end=scheduler.end,
                                      seed=seed, fclear=fclear)
