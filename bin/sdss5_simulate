@@ -8,6 +8,7 @@ from __future__ import absolute_import
 # Perform an SDSS-V simulation
 
 import argparse
+import time
 import numpy as np
 import fitsio
 import observesim.weather
@@ -52,12 +53,19 @@ scheduler.initdb(designbase=plan)
 
 duration = np.float32(18. / 60. / 24.)
 
+lsts = list()
+observed = list()
+
+startTime = time.time()
 # Loop through nights
 for mjd in scheduler.mjds:
     mjd_evening_twilight = scheduler.evening_twilight(mjd)
     mjd_morning_twilight = scheduler.morning_twilight(mjd)
     curr_mjd = mjd_evening_twilight
-    print(curr_mjd)
+    int_mjd = int(curr_mjd)
+    if int_mjd % 100 == 0:
+        print("!!!!", int_mjd)
+    # print(int_mjd)
     while(curr_mjd < mjd_morning_twilight and
           curr_mjd < scheduler.end_mjd()):
         isclear, nextchange_weather = weather.clear(mjd=curr_mjd)
@@ -65,18 +73,39 @@ for mjd in scheduler.mjds:
         nextchange_all = np.array([nextchange_weather, nextchange_on])
         nextchange = np.min(nextchange_all)
         if((isclear == True) and (onoff == 'on')):
-            fieldid = scheduler.nextfield(mjd=curr_mjd)
+            maxExp = int((nextchange - curr_mjd)//duration)
+            fieldid, nexposures = scheduler.nextfield(mjd=curr_mjd,
+                                                      maxExp=maxExp)
             if(fieldid is not None):
+                for i in range(nexposures):
+                    # add each exposure
+                    lsts.append(scheduler.lst(curr_mjd)[0])
+                    observed.append(scheduler.fields.racen[fieldid])
+                    curr_mjd = curr_mjd + duration
+                    if(curr_mjd > nextchange):
+                        duration = (duration - (curr_mjd - nextchange))
+                        curr_mjd = nextchange
+
+                    result = observe.result(mjd=curr_mjd, fieldid=fieldid,
+                                            duration=duration)
+                    scheduler.update(fieldid=fieldid, result=result)
+            else:
+                lsts.append(scheduler.lst(curr_mjd)[0])
+                observed.append(-1)
                 curr_mjd = curr_mjd + duration
-                if(curr_mjd > nextchange):
-                    duration = (duration - (curr_mjd - nextchange))
-                    curr_mjd = nextchange
-                result = observe.result(mjd=curr_mjd, fieldid=fieldid,
-                                        duration=duration)
-                scheduler.update(fieldid=fieldid, result=result)
         else:
             if(nextchange > curr_mjd):
                 curr_mjd = nextchange
+
+endTime = time.time()
+
+assert len(lsts) == len(observed), "lst tracking munged"
+with open("{base}lst_tracking.dat".format(base=base), "w") as df:
+    print("lst, obs", file=df)
+    for l, o in zip(lsts, observed):
+        print("{}, {}".format(l, o), file=df)
+
+print("completed in {}".format(endTime-startTime))
 
 outobstemplate = "{base}-{observatory}-observations.fits"
 outobsfile = outobstemplate.format(base=base, observatory=observatory)
