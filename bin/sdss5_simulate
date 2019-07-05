@@ -74,6 +74,9 @@ for mjd in scheduler.mjds:
         nextchange = np.min(nextchange_all)
         if((isclear == True) and (onoff == 'on')):
             maxExp = int((nextchange - curr_mjd)//duration)
+            if maxExp == 0:
+                curr_mjd = curr_mjd + duration
+                continue
             fieldid, nexposures = scheduler.nextfield(mjd=curr_mjd,
                                                       maxExp=maxExp)
             if(fieldid is not None):
@@ -107,12 +110,12 @@ with open("{base}lst_tracking.dat".format(base=base), "w") as df:
 
 print("completed in {}".format(endTime-startTime))
 
-outobstemplate = "{base}-{observatory}-observations.fits"
-outobsfile = outobstemplate.format(base=base, observatory=observatory)
+outobstemplate = "{base}{plan}-{observatory}-observations.fits"
+outobsfile = outobstemplate.format(base=base, plan=plan, observatory=observatory)
 fitsio.write(outobsfile, scheduler.observations.toarray(),
              clobber=True)
 
-outobstemplate = "{base}-{observatory}-fields.fits"
-outobsfile = outobstemplate.format(base=base, observatory=observatory)
+outobstemplate = "{base}{plan}-{observatory}-fields.fits"
+outobsfile = outobstemplate.format(base=base, plan=plan, observatory=observatory)
 fitsio.write(outobsfile, scheduler.fields.toarray(),
              clobber=True)
