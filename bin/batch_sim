@@ -7,6 +7,7 @@ from __future__ import absolute_import
 
 # Perform an SDSS-V simulation
 
+import os
 import argparse
 import time
 import numpy as np
@@ -125,15 +126,24 @@ parser.add_argument("-n", "--number", dest="number", type=int,
 parser.add_argument("-m", "--multi", dest="multi", type=int,
                     required=False, help="number of processes to use",
                     default=-1)
+parser.add_argument("-v", "--version", dest="version", type=str,
+                    required=False, help="use versioned directory for output",
+                    default=None)
 args = parser.parse_args()
 base = args.base
 plan = args.plan
 observatory = args.telescope
 number = args.number
 multi = args.multi
+version = args.version
 
-# for i in range(6):
-#     runSim(i, base, plan, observatory)
+if version is not None:
+    base = os.path.join(base, version)
+    try:
+        os.makedirs(base)
+    except:
+        pass
+    base += "/"
 
 if multi == -1:
     for i in range(number):
