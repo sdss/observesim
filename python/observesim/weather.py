@@ -63,6 +63,7 @@ class Weather(object):
     def _initialize_conditions(self, seed=1):
         """Initialize the pattern of clear weather."""
         if seed is not None:
+            print("!!using psuedo-random weather!!")
             np.random.seed(seed)
         nsigma = self.sigma / self.dmjd
         psigma = 1. / nsigma

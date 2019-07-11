@@ -34,19 +34,25 @@ def runSim(args):
     scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory)
     weather = observesim.weather.Weather(mjd_start=scheduler.start,
                                          mjd_end=scheduler.end,
-                                         seed=None, fclear=fclear)
+                                         seed=idx, fclear=fclear)
     observe = observesim.observe.Observe()
     scheduler.initdb(designbase=plan)
 
     duration = np.float32(18. / 60. / 24.)
     lsts = list()
     observed = list()
+    weather_used = dict()
 
     startTime = time.time()
     # Loop through nights
     for mjd in scheduler.mjds:
+        # uncomment to do a quick check
+        # if mjd > 59200:
+        #     continue
+        exp_tonight = 0
         mjd_evening_twilight = scheduler.evening_twilight(mjd)
         mjd_morning_twilight = scheduler.morning_twilight(mjd)
+        night_len = mjd_morning_twilight - mjd_evening_twilight
         curr_mjd = mjd_evening_twilight
         int_mjd = int(curr_mjd)
         if int_mjd % 100 == 0:
@@ -56,7 +62,7 @@ def runSim(args):
               curr_mjd < scheduler.end_mjd()):
             isclear, nextchange_weather = weather.clear(mjd=curr_mjd)
             onoff, nextchange_on = scheduler.on(mjd=curr_mjd)
-            nextchange_all = np.array([nextchange_weather, nextchange_on])
+            nextchange_all = np.array([nextchange_weather, nextchange_on, mjd_morning_twilight])
             nextchange = np.min(nextchange_all)
             if((isclear == True) and (onoff == 'on')):
                 maxExp = int((nextchange - curr_mjd)//duration)
@@ -72,19 +78,24 @@ def runSim(args):
                         observed.append(scheduler.fields.racen[fieldid])
                         curr_mjd = curr_mjd + duration
                         if(curr_mjd > nextchange):
-                            duration = (duration - (curr_mjd - nextchange))
-                            curr_mjd = nextchange
+                            print("NOOOO! BAD!")
 
                         result = observe.result(mjd=curr_mjd, fieldid=fieldid,
                                                 duration=duration)
                         scheduler.update(fieldid=fieldid, result=result)
+
+                        exp_tonight += duration
                 else:
                     lsts.append(scheduler.lst(curr_mjd)[0])
                     observed.append(-1)
                     curr_mjd = curr_mjd + duration
+                    exp_tonight += duration
             else:
                 if(nextchange > curr_mjd):
                     curr_mjd = nextchange
+            # if exp_tonight > night_len:
+            #     print("over", mjd)
+        weather_used[mjd] = {"length": night_len, "observed": exp_tonight}
 
     endTime = time.time()
 
@@ -93,6 +104,11 @@ def runSim(args):
         print("lst, obs", file=df)
         for l, o in zip(lsts, observed):
             print("{}, {}".format(l, o), file=df)
+
+    with open("{base}weather_tracking_{idx}.dat".format(base=base, idx=idx), "w") as df:
+        print("mjd, length, observed", file=df)
+        for m, o in weather_used.items():
+            print("{}, {}, {}".format(m, o["length"], o["observed"]), file=df)
 
     print("completed in {}".format(endTime-startTime))
 
@@ -147,7 +163,7 @@ if version is not None:
 
 if multi == -1:
     for i in range(number):
-        runSim(i, base, plan, observatory)
+        runSim((i, base, plan, observatory))
 
 else:
     assert multi > 1, "must use more than 1 process for multi argument"
