@@ -17,6 +17,19 @@ import roboscheduler.scheduler
 import observesim.observe
 
 
+def sortFields(fieldids, nexps, priorities, exp, maxTime=0):
+    dtype = [('field', int), ('nexp', int), ('priority', float), ("exp", float)]
+    values = [(f, n, p, a) for f, n, p, a in zip(fieldids, nexps, priorities, exp)]
+    arrified = np.array(values, dtype=dtype)
+    sortedFields = np.sort(arrified, order='priority')
+
+    for f in sortedFields:
+        if f["exp"] * f["nexp"] < maxTime:
+            return f["field"], f["nexp"]
+
+    return -1, -1
+
+
 def runSim(args):
     """ run a simulation
     """
@@ -35,10 +48,17 @@ def runSim(args):
     weather = observesim.weather.Weather(mjd_start=scheduler.start,
                                          mjd_end=scheduler.end,
                                          seed=idx, fclear=fclear)
-    observe = observesim.observe.Observe()
     scheduler.initdb(designbase=plan)
+    field_ra = scheduler.fields.racen
+    field_dec = scheduler.fields.deccen
+    cadencelist = scheduler.fields.cadencelist.cadences
+    cadences = scheduler.fields.cadence
 
-    duration = np.float32(18. / 60. / 24.)
+    nom_duration = np.float32(15. / 60. / 24.)
+    cals = np.float32(3. / 60. / 24.)
+    observe = observesim.observe.Observe(defaultExp=nom_duration, 
+                                         cadencelist=cadencelist, cadences=cadences)
+
     lsts = list()
     observed = list()
     weather_used = dict()
@@ -65,23 +85,71 @@ def runSim(args):
             nextchange_all = np.array([nextchange_weather, nextchange_on, mjd_morning_twilight])
             nextchange = np.min(nextchange_all)
             if((isclear == True) and (onoff == 'on')):
-                maxExp = int((nextchange - curr_mjd)//duration)
+                skybrightness = scheduler.skybrightness(curr_mjd)
+                if skybrightness < 0.3:
+                    airmass_weight = 1.05
+                else:
+                    airmass_weight = 0.05
+                maxExp = int((nextchange - curr_mjd)//(nom_duration * 1.3 ** airmass_weight))
                 if maxExp == 0:
-                    curr_mjd = curr_mjd + duration
+                    curr_mjd = curr_mjd + nom_duration
                     continue
                 fieldid, nexposures = scheduler.nextfield(mjd=curr_mjd,
                                                           maxExp=maxExp)
                 if(fieldid is not None):
+                    new_alt, new_az = scheduler.radec2altaz(mjd=curr_mjd, 
+                                                    ra=field_ra[fieldid],
+                                                    dec=field_dec[fieldid])
+                    new_duration = nom_duration * (1/np.cos(np.pi *\
+                                     (90-new_alt) / 180.)) ** airmass_weight
+                    final_alt, final_az = scheduler.radec2altaz(
+                                            mjd=curr_mjd + new_duration * nexposures, 
+                                            ra=field_ra[fieldid],
+                                            dec=field_dec[fieldid])
+                    maxTime = nextchange - curr_mjd
+                    if  maxTime < new_duration * nexposures or \
+                        final_alt < 20:
+                        fieldids, nexps, priorities = scheduler.nextfield(mjd=curr_mjd,
+                                                          maxExp=maxExp, returnAll=True)
+                        alts, azs = scheduler.radec2altaz(mjd=curr_mjd, 
+                                                    ra=field_ra[fieldids],
+                                                    dec=field_dec[fieldids])
+                        adj_exp = nom_duration * np.power((1/np.cos(np.pi * \
+                                            (90 - alts) / 180.)), airmass_weight)
+                        fieldid, nexposures = sortFields(fieldids, nexps, priorities, adj_exp, maxTime=maxTime)
+                        if fieldid == -1:
+                            print("baawaaaaaahhhahahaa :( ")
+                            curr_mjd = curr_mjd + nom_duration/20
+                            continue
+
+                    slewtime = np.float32(2. / 60. / 24.) # times some function of angular distance?
+
+                    curr_mjd = curr_mjd + cals + slewtime
+
                     for i in range(nexposures):
                         # add each exposure
-                        lsts.append(scheduler.lst(curr_mjd)[0])
+                        alt, az = scheduler.radec2altaz(mjd=curr_mjd, 
+                                                    ra=field_ra[fieldid],
+                                                    dec=field_dec[fieldid])
+                        airmass = 1/np.cos(np.pi * (90-alt) / 180.)
                         observed.append(scheduler.fields.racen[fieldid])
-                        curr_mjd = curr_mjd + duration
-                        if(curr_mjd > nextchange):
-                            print("NOOOO! BAD!")
 
                         result = observe.result(mjd=curr_mjd, fieldid=fieldid,
-                                                duration=duration)
+                                                airmass=airmass)
+                        duration = result["duration"]
+                        if duration < 0:
+                            print("HOOOWWWOWOWOWOWW")
+                            print(alt, az, curr_mjd, fieldid)
+
+                        curr_mjd = curr_mjd + duration
+                        lsts.append(scheduler.lst(curr_mjd)[0])
+
+                        if(curr_mjd > nextchange):
+                            oops = (curr_mjd - nextchange) * 24 * 60
+                            if oops > 5:
+                                print("NOOOO! BAD!", oops)
+                                print(i, nexposures, alt)
+                        
                         scheduler.update(fieldid=fieldid, result=result)
 
                         exp_tonight += duration
