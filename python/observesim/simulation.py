@@ -29,13 +29,14 @@ class Simulation(object):
     """A class to encapsulate an SDSS-5 simulation
     """
 
-    def __init__(self, base, plan, observatory, idx=1):
+    def __init__(self, base, plan, observatory, idx=1, schedule="normal"):
         if(observatory == 'apo'):
             fclear = 0.5
         if(observatory == 'lco'):
             fclear = 0.7
         
-        self.scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory)
+        self.scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory,
+                                                           schedule=schedule)
         self.weather = observesim.weather.Weather(mjd_start=self.scheduler.start,
                                              mjd_end=self.scheduler.end,
                                              seed=idx, fclear=fclear)
@@ -102,6 +103,8 @@ class Simulation(object):
                     self.curr_mjd = self.curr_mjd + self.nom_duration/20
                     return -1, -1
             return fieldid, nexposures
+        else:
+            return -1, -1
         # else:
         #     lsts.append(self.scheduler.lst(self.curr_mjd)[0])
         #     observed.append(-1)

@@ -25,12 +25,12 @@ def runSim(args):
     # ###################
     # make sure this starts a clean slate every run!
     # ###################
-    idx, base, plan, observatory = args
+    idx, base, plan, observatory, schedule = args
 
     time.sleep(idx)  # hopefully that avoids read conflicts? xD 
     print("running sim ", idx)
 
-    sim = simulation.Simulation(base, plan, observatory, idx)    
+    sim = simulation.Simulation(base, plan, observatory, idx=idx, schedule=schedule)
 
     startTime = time.time()
     # Loop through nights
@@ -87,6 +87,9 @@ parser.add_argument("-m", "--multi", dest="multi", type=int,
 parser.add_argument("-v", "--version", dest="version", type=str,
                     required=False, help="use versioned directory for output",
                     default=None)
+parser.add_argument("-s", "--schedule", dest="schedule", type=str,
+                    required=False, help="master schedule to use",
+                    default="normal")
 args = parser.parse_args()
 base = args.base
 plan = args.plan
@@ -94,6 +97,7 @@ observatory = args.telescope
 number = args.number
 multi = args.multi
 version = args.version
+schedule = args.schedule
 
 if version is not None:
     base = os.path.join(base, version)
@@ -105,7 +109,7 @@ if version is not None:
 
 if multi == -1:
     for i in range(number):
-        runSim((i, base, plan, observatory))
+        runSim((i, base, plan, observatory, schedule))
 
 else:
     assert multi > 1, "must use more than 1 process for multi argument"
@@ -113,7 +117,7 @@ else:
 
     pool = Pool(multi)
 
-    result = pool.map(runSim, ((i, base, plan, observatory) for i in range(number)))
+    result = pool.map(runSim, ((i, base, plan, observatory, schedule) for i in range(number)))
 
     pool.close()
     pool.join()
