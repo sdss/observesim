@@ -15,19 +15,8 @@ import fitsio
 import observesim.weather
 import roboscheduler.scheduler
 import observesim.observe
+from observesim import simulation
 
-
-def sortFields(fieldids, nexps, priorities, exp, maxTime=0):
-    dtype = [('field', int), ('nexp', int), ('priority', float), ("exp", float)]
-    values = [(f, n, p, a) for f, n, p, a in zip(fieldids, nexps, priorities, exp)]
-    arrified = np.array(values, dtype=dtype)
-    sortedFields = np.sort(arrified, order='priority')
-
-    for f in sortedFields:
-        if f["exp"] * f["nexp"] < maxTime:
-            return f["field"], f["nexp"]
-
-    return -1, -1
 
 
 def runSim(args):
@@ -37,159 +26,44 @@ def runSim(args):
     # make sure this starts a clean slate every run!
     # ###################
     idx, base, plan, observatory = args
-    if(observatory == 'apo'):
-        fclear = 0.5
-    if(observatory == 'lco'):
-        fclear = 0.7
+
     time.sleep(idx)  # hopefully that avoids read conflicts? xD 
     print("running sim ", idx)
-    
-    scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory)
-    weather = observesim.weather.Weather(mjd_start=scheduler.start,
-                                         mjd_end=scheduler.end,
-                                         seed=idx, fclear=fclear)
-    scheduler.initdb(designbase=plan)
-    field_ra = scheduler.fields.racen
-    field_dec = scheduler.fields.deccen
-    cadencelist = scheduler.fields.cadencelist.cadences
-    cadences = scheduler.fields.cadence
 
-    nom_duration = np.float32(15. / 60. / 24.)
-    cals = np.float32(3. / 60. / 24.)
-    observe = observesim.observe.Observe(defaultExp=nom_duration, 
-                                         cadencelist=cadencelist, cadences=cadences)
-
-    lsts = list()
-    observed = list()
-    weather_used = dict()
+    sim = simulation.Simulation(base, plan, observatory, idx)    
 
     startTime = time.time()
     # Loop through nights
-    for mjd in scheduler.mjds:
+    for mjd in sim.scheduler.mjds:
         # uncomment to do a quick check
         # if mjd > 59200:
         #     continue
-        exp_tonight = 0
-        mjd_evening_twilight = scheduler.evening_twilight(mjd)
-        mjd_morning_twilight = scheduler.morning_twilight(mjd)
-        night_len = mjd_morning_twilight - mjd_evening_twilight
-        curr_mjd = mjd_evening_twilight
-        int_mjd = int(curr_mjd)
-        if int_mjd % 100 == 0:
-            print("!!!!", int_mjd)
-        # print(int_mjd)
-        while(curr_mjd < mjd_morning_twilight and
-              curr_mjd < scheduler.end_mjd()):
-            isclear, nextchange_weather = weather.clear(mjd=curr_mjd)
-            onoff, nextchange_on = scheduler.on(mjd=curr_mjd)
-            nextchange_all = np.array([nextchange_weather, nextchange_on, mjd_morning_twilight])
-            nextchange = np.min(nextchange_all)
-            if((isclear == True) and (onoff == 'on')):
-                skybrightness = scheduler.skybrightness(curr_mjd)
-                if skybrightness < 0.3:
-                    airmass_weight = 1.05
-                else:
-                    airmass_weight = 0.05
-                maxExp = int((nextchange - curr_mjd)//(nom_duration * 1.3 ** airmass_weight))
-                if maxExp == 0:
-                    curr_mjd = curr_mjd + nom_duration
-                    continue
-                fieldid, nexposures = scheduler.nextfield(mjd=curr_mjd,
-                                                          maxExp=maxExp)
-                if(fieldid is not None):
-                    new_alt, new_az = scheduler.radec2altaz(mjd=curr_mjd, 
-                                                    ra=field_ra[fieldid],
-                                                    dec=field_dec[fieldid])
-                    new_duration = nom_duration * (1/np.cos(np.pi *\
-                                     (90-new_alt) / 180.)) ** airmass_weight
-                    final_alt, final_az = scheduler.radec2altaz(
-                                            mjd=curr_mjd + new_duration * nexposures, 
-                                            ra=field_ra[fieldid],
-                                            dec=field_dec[fieldid])
-                    maxTime = nextchange - curr_mjd
-                    if  maxTime < new_duration * nexposures or \
-                        final_alt < 20:
-                        fieldids, nexps, priorities = scheduler.nextfield(mjd=curr_mjd,
-                                                          maxExp=maxExp, returnAll=True)
-                        alts, azs = scheduler.radec2altaz(mjd=curr_mjd, 
-                                                    ra=field_ra[fieldids],
-                                                    dec=field_dec[fieldids])
-                        adj_exp = nom_duration * np.power((1/np.cos(np.pi * \
-                                            (90 - alts) / 180.)), airmass_weight)
-                        fieldid, nexposures = sortFields(fieldids, nexps, priorities, adj_exp, maxTime=maxTime)
-                        if fieldid == -1:
-                            print("baawaaaaaahhhahahaa :( ")
-                            curr_mjd = curr_mjd + nom_duration/20
-                            continue
-
-                    slewtime = np.float32(2. / 60. / 24.) # times some function of angular distance?
-
-                    curr_mjd = curr_mjd + cals + slewtime
-
-                    for i in range(nexposures):
-                        # add each exposure
-                        alt, az = scheduler.radec2altaz(mjd=curr_mjd, 
-                                                    ra=field_ra[fieldid],
-                                                    dec=field_dec[fieldid])
-                        airmass = 1/np.cos(np.pi * (90-alt) / 180.)
-                        observed.append(scheduler.fields.racen[fieldid])
-
-                        result = observe.result(mjd=curr_mjd, fieldid=fieldid,
-                                                airmass=airmass)
-                        duration = result["duration"]
-                        if duration < 0:
-                            print("HOOOWWWOWOWOWOWW")
-                            print(alt, az, curr_mjd, fieldid)
-
-                        curr_mjd = curr_mjd + duration
-                        lsts.append(scheduler.lst(curr_mjd)[0])
-
-                        if(curr_mjd > nextchange):
-                            oops = (curr_mjd - nextchange) * 24 * 60
-                            if oops > 5:
-                                print("NOOOO! BAD!", oops)
-                                print(i, nexposures, alt)
-                        
-                        scheduler.update(fieldid=fieldid, result=result)
-
-                        exp_tonight += duration
-                else:
-                    lsts.append(scheduler.lst(curr_mjd)[0])
-                    observed.append(-1)
-                    curr_mjd = curr_mjd + duration
-                    exp_tonight += duration
-            else:
-                if(nextchange > curr_mjd):
-                    curr_mjd = nextchange
-            # if exp_tonight > night_len:
-            #     print("over", mjd)
-        weather_used[mjd] = {"length": night_len, "observed": exp_tonight}
-
+        sim.observeMJD(mjd)
     endTime = time.time()
 
-    assert len(lsts) == len(observed), "lst tracking munged"
-    with open("{base}lst_tracking_{idx}.dat".format(base=base, idx=idx), "w") as df:
-        print("lst, obs", file=df)
-        for l, o in zip(lsts, observed):
-            print("{}, {}".format(l, o), file=df)
+    # assert len(lsts) == len(observed), "lst tracking munged"
+    # with open("{base}lst_tracking_{idx}.dat".format(base=base, idx=idx), "w") as df:
+    #     print("lst, obs", file=df)
+    #     for l, o in zip(lsts, observed):
+    #         print("{}, {}".format(l, o), file=df)
 
-    with open("{base}weather_tracking_{idx}.dat".format(base=base, idx=idx), "w") as df:
-        print("mjd, length, observed", file=df)
-        for m, o in weather_used.items():
-            print("{}, {}, {}".format(m, o["length"], o["observed"]), file=df)
+    # with open("{base}weather_tracking_{idx}.dat".format(base=base, idx=idx), "w") as df:
+    #     print("mjd, length, observed", file=df)
+    #     for m, o in weather_used.items():
+    #         print("{}, {}, {}".format(m, o["length"], o["observed"]), file=df)
 
-    print("completed in {}".format(endTime-startTime))
+    print("{} completed in {}".format(idx, endTime-startTime))
 
     outobstemplate = "{base}{plan}-{observatory}-observations-{idx}.fits"
     outobsfile = outobstemplate.format(base=base, observatory=observatory,
                                        plan=plan, idx=idx)
-    fitsio.write(outobsfile, scheduler.observations.toarray(),
+    fitsio.write(outobsfile, sim.scheduler.observations.toarray(),
                  clobber=True)
 
     outobstemplate = "{base}{plan}-{observatory}-fields-{idx}.fits"
     outobsfile = outobstemplate.format(base=base, observatory=observatory,
                                        plan=plan, idx=idx)
-    fitsio.write(outobsfile, scheduler.fields.toarray(),
+    fitsio.write(outobsfile, sim.scheduler.fields.toarray(),
                  clobber=True)
 
 # Read arguments
