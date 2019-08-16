@@ -19,7 +19,7 @@ class Observe(object):
 
     result() : return result of an observation
 
-"""
+    """
     def __init__(self, defaultExp=None, cadencelist=None, cadences=None):
         """Return simulated result of an observation
 
@@ -72,7 +72,7 @@ class Observe(object):
 
         result : dict
             has keys 'sn2', 'mjd', 'duration'
-"""
+    """
         
         if self.cadences is None or self.cadencelist is None:
             duration = self.defaultExp

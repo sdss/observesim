@@ -36,9 +36,10 @@ def runSim(args):
     # Loop through nights
     for mjd in sim.scheduler.mjds:
         # uncomment to do a quick check
-        # if mjd > 59200:
-        #     continue
+        if mjd > 59200:
+            continue
         sim.observeMJD(mjd)
+    print("skipped for physical obstructions", sim.hit_lims)
     endTime = time.time()
 
     # assert len(lsts) == len(observed), "lst tracking munged"
