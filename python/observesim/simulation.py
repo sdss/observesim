@@ -30,8 +30,8 @@ def sortFields(fieldids, nexps, priorities, exp, maxTime=0):
 
 
 def apoCheck(alt, az):
-    enc = [a > 45 or (z > 100 and z < 80) for a, z in zip(alt, az)]
-    alt =  [a < 96 and a > 30 for a in alt]
+    enc = [a > 45 or z > 100 or z < 80 for a, z in zip(alt, az)]
+    alt = [a < 86 and a > 30 for a in alt]
 
     return np.logical_and(enc, alt)
 
@@ -49,12 +49,14 @@ def accSlewTime(degrees):
 
     return 3 * np.sqrt(2 * degrees / (7 * acc))
 
+
 def decTime(degrees):
     # time for Du Pont to move on dec axis
     if degrees < 61.6:
         return accSlewTime(degrees)
     else:
         return (degrees - 61.6)/0.63 + 84.4
+
 
 def raTime(degrees):
     # time for Du Pont to move on RA axis
