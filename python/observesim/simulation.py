@@ -30,11 +30,38 @@ def sortFields(fieldids, nexps, priorities, exp, maxTime=0):
 
 
 def apoCheck(alt, az):
-    enc = [a > 35 or (z > 100 and z < 80) for a, z in zip(alt, az)]
+    enc = [a > 45 or (z > 100 and z < 80) for a, z in zip(alt, az)]
     alt =  [a < 96 and a > 30 for a in alt]
 
     return np.logical_and(enc, alt)
 
+
+def lcoCheck(alt, az):
+    return alt > 30
+
+
+def accSlewTime(degrees):
+    # compute time for Du Pont with acc/decceleration considered
+    # starting with 1/2*a*t_1^2 + a*t_1*t_2 + 1/2*d*t_2^2 = dist
+    # and a*t_1 = d*t_2, its trivial to solve
+
+    acc = 0.022
+
+    return 3 * np.sqrt(2 * degrees / (7 * acc))
+
+def decTime(degrees):
+    # time for Du Pont to move on dec axis
+    if degrees < 61.6:
+        return accSlewTime(degrees)
+    else:
+        return (degrees - 61.6)/0.63 + 84.4
+
+def raTime(degrees):
+    # time for Du Pont to move on RA axis
+    if degrees < 37.2:
+        return accSlewTime(degrees)
+    else:
+        return (degrees - 37.2)/0.49 + 65.6
 
 
 class Simulation(object):
@@ -48,10 +75,16 @@ class Simulation(object):
             elev = 2788
             self.telescope = {"alt": 30, "az": 90, "par_angle": 0,
                               "alt_slew": 1.5, "az_slew": 2.0, "rot_slew": 2.0}
+            self.obsCheck = apoCheck
+            self.moveTelescope = self.moveSloanTelescope
         if(observatory == 'lco'):
             timezone = "US/Eastern"
             fclear = 0.7
             elev = 2134
+            self.telescope = {"ra": 0, "dec": -30}
+            self.obsCheck = lcoCheck
+            self.moveTelescope = self. moveDuPontTelescope
+
         
         self.scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory,
                                                            schedule=schedule)
@@ -72,6 +105,7 @@ class Simulation(object):
         self.cals = np.float32(3. / 60. / 24.)
         self.observe = observesim.observe.Observe(defaultExp=self.nom_duration, 
                                              cadencelist=cadencelist, cadences=cadences)
+        self.bossReadout = np.float32(70. / 60. / 60. / 24.)
 
         self.curr_mjd = np.float32(1e9)
         
@@ -80,9 +114,22 @@ class Simulation(object):
         self.hit_lims = 0
 
 
+    def moveDuPontTelescope(self, mjd, fieldid):
+        next_ra, next_dec = self.field_ra[fieldid], self.field_dec[fieldid]
+
+        dec_slew = np.abs(next_ra-self.telescope["ra"])
+        ra_slew = np.abs(next_dec-self.telescope["dec"])
+    
+        dec_time = decTime(dec_slew)
+        ra_time = raTime(ra_slew)
+
+        self.telescope["ra"] = self.field_ra[fieldid]
+        self.telescope["dec"] = self.field_dec[fieldid]
+
+        return max([dec_time, ra_time])
+
+
     def moveSloanTelescope(self, mjd, fieldid):
-        # print(mjd, fieldid)
-        # print(self.field_ra[fieldid], self.field_dec[fieldid])
         altaz = self.observatory.altaz(Time(mjd, format="mjd"), self.coord[fieldid])
         alt = altaz.alt.deg
         az = altaz.az.deg
@@ -100,9 +147,6 @@ class Simulation(object):
         self.telescope["az"] = az
         self.telescope["par_angle"] = angle
 
-        # print("dist, alt {} az  {} rot {}".format(alt_slew, az_slew, rot_slew))
-        # print("time, alt {} az  {} rot {}".format(alt_time, az_time, rot_time))
-
         return max([alt_time, az_time, rot_time])
 
 
@@ -111,20 +155,43 @@ class Simulation(object):
            or enclosure, etc
            for any number of mjds, e.g. for a whole observing window
         """
+        # try:
+        #     len(mjd)
+        # except TypeError:
+        #     mjd = [mjd]
+        # good = list()
+        # for m in mjd:
+        #     # print(m, fieldid)
+        #     # print(self.field_ra[fieldid], self.field_dec[fieldid])
+        #     altaz = self.observatory.altaz(Time(0m, format="mjd"), self.coord[fieldid])
+        #     alt = altaz.alt.deg
+        #     az = altaz.az.deg
+        #     good.append(self.obsCheck(alt, az))
+
+        # return np.all(good, axis=0)
+
+        # this way seems to be at least 30% faster?
         try:
             len(mjd)
         except TypeError:
-            mjd = [mjd]
-        good = list()
-        for m in mjd:
-            # print(m, fieldid)
-            # print(self.field_ra[fieldid], self.field_dec[fieldid])
-            altaz = self.observatory.altaz(Time(m, format="mjd"), self.coord[fieldid])
-            alt = altaz.alt.deg
-            az = altaz.az.deg
-            good.append(apoCheck(alt, az))
+            mjd = np.array([mjd])
 
-        return np.all(good, axis=0)
+        try:
+            len(fieldid)
+        except TypeError:
+            fieldid = np.array([fieldid])
+
+
+        altaz = self.observatory.altaz(Time(mjd, format="mjd"), self.coord[fieldid],
+                                       grid_times_targets=True)
+        # altaz shape = (fields x mjds)
+        alt = altaz.alt.deg.flatten()
+        az = altaz.az.deg.flatten()
+        res = self.obsCheck(alt, az)
+        good = res.reshape((len(fieldid), len(mjd)))
+
+        # axis 1 is along fields, I guess...
+        return np.all(good, axis=1)
 
 
     def nextField(self):
@@ -152,8 +219,7 @@ class Simulation(object):
             #                         ra=self.field_ra[fieldid],
             #                         dec=self.field_dec[fieldid])
 
-            site_check = self.siteObs(fieldid, [self.curr_mjd + n*(new_duration/2) for n in range(nexposures*2)])
-            # site_check = self.siteObs(fieldid, [self.curr_mjd + n*(new_duration) for n in range(nexposures)])
+            site_check = self.siteObs(fieldid, [self.curr_mjd + n*(new_duration) for n in range(nexposures)])
             maxTime = self.nextchange - self.curr_mjd
             if  maxTime < new_duration * nexposures or \
                 not site_check:
@@ -161,7 +227,6 @@ class Simulation(object):
                 # print(fieldid, site_check, new_alt, new_az)
                 fieldids, nexps, priorities = self.scheduler.nextfield(mjd=self.curr_mjd,
                                                   maxExp=maxExp, returnAll=True)
-                # obs_fields = self.siteObs(fieldids, [self.curr_mjd + n*(new_duration/2) for n in range(nexposures*2)])
                 obs_fields = self.siteObs(fieldids, [self.curr_mjd + n*(new_duration) for n in range(nexposures)])
                 fieldids = fieldids[obs_fields]
                 nexps = nexps[obs_fields]
@@ -195,7 +260,7 @@ class Simulation(object):
     def observeField(self, fieldid, nexposures):
 
         # slewtime = np.float32(2. / 60. / 24.) # times some function of angular distance?
-        slewtime = self.moveSloanTelescope(self.curr_mjd, fieldid)
+        slewtime = self.moveTelescope(self.curr_mjd, fieldid)
         # print("moved to {} in {} s".format(fieldid, slewtime))
 
         # slewtime is in seconds...
@@ -221,7 +286,7 @@ class Simulation(object):
                 print("HOOOWWWOWOWOWOWW")
                 print(i, alt, az, self.curr_mjd, fieldid)
 
-            self.curr_mjd = self.curr_mjd + duration
+            self.curr_mjd = self.curr_mjd + duration + self.bossReadout
             # lsts.append(self.scheduler.lst(self.curr_mjd)[0])
 
             if(self.curr_mjd > self.nextchange):
@@ -260,6 +325,7 @@ class Simulation(object):
                     self.curr_mjd = self.nextchange
                 continue
             fieldid, nexposures = self.nextField()
+            # print(self.curr_mjd, fieldid, nexposures)
             if fieldid == -1:
                 self.curr_mjd = self.curr_mjd + self.nom_duration * nexposures
                 continue
