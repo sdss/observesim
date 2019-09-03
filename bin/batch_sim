@@ -67,6 +67,12 @@ def runSim(args):
     fitsio.write(outobsfile, sim.scheduler.fields.toarray(),
                  clobber=True)
 
+    outobstemplate = "{base}{plan}-{observatory}-lst-{idx}.fits"
+    outobsfile = outobstemplate.format(base=base, observatory=observatory,
+                                       plan=plan, idx=idx)
+    fitsio.write(outobsfile, sim.lstToArray(),
+                 clobber=True)
+
 # Read arguments
 usage = "sdss5_simulate"
 description = "Simulate the SDSS-V schedule"

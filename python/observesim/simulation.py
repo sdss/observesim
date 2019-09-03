@@ -87,7 +87,10 @@ class Simulation(object):
             self.obsCheck = lcoCheck
             self.moveTelescope = self. moveDuPontTelescope
 
-        
+        self.obsHist ={"lst": list(),
+                       "ra": list(),
+                       "bright": list()}
+
         self.scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory,
                                                            schedule=schedule)
         self.weather = observesim.weather.Weather(mjd_start=self.scheduler.start,
@@ -196,10 +199,15 @@ class Simulation(object):
         return np.all(good, axis=1)
 
 
+    def bright(self, mjd=None):
+        if mjd is None:
+            mjd = self.curr_mjd
+        skybrightness = self.scheduler.skybrightness(mjd)
+        return skybrightness > 0.3
+
     def nextField(self):
         # dark time or brighttime? to guess at how long we need for obs
-        skybrightness = self.scheduler.skybrightness(self.curr_mjd)
-        if skybrightness < 0.3:
+        if not self.bright():
             airmass_weight = 1.05
         else:
             airmass_weight = 0.05
@@ -291,6 +299,10 @@ class Simulation(object):
             self.curr_mjd = self.curr_mjd + duration + self.bossReadout
             # lsts.append(self.scheduler.lst(self.curr_mjd)[0])
 
+            self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
+            self.obsHist["ra"].append(self.field_ra[fieldid])
+            self.obsHist["bright"].append(self.bright())
+
             if(self.curr_mjd > self.nextchange):
                 oops = (self.curr_mjd - self.nextchange) * 24 * 60
                 if oops > 5:
@@ -304,8 +316,6 @@ class Simulation(object):
 
     def observeMJD(self, mjd):
         # uncomment to do a quick check
-        # if mjd > 59200:
-        #     continue
         exp_tonight = 0
         mjd_evening_twilight = self.scheduler.evening_twilight(mjd)
         mjd_morning_twilight = self.scheduler.morning_twilight(mjd)
@@ -335,3 +345,13 @@ class Simulation(object):
 
             
         # weather_used[mjd] = {"length": night_len, "observed": exp_tonight}
+
+    def lstToArray(self):
+        dtype = [('lst', np.float64),
+                   ('ra', np.float64),
+                   ('bright', np.bool_)]
+        lstOut = np.zeros(len(self.obsHist["lst"]), dtype=dtype)
+        lstOut["lst"] = np.array(self.obsHist["lst"])
+        lstOut["ra"] = np.array(self.obsHist["ra"])
+        lstOut["bright"] = np.array(self.obsHist["bright"])
+        return(lstOut)
