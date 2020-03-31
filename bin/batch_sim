@@ -8,10 +8,12 @@ from __future__ import absolute_import
 # Perform an SDSS-V simulation
 
 import os
+import warnings
 import argparse
 import time
 import numpy as np
 import fitsio
+from astropy.utils.exceptions import ErfaWarning
 import observesim.weather
 import roboscheduler.scheduler
 import observesim.observe
@@ -34,11 +36,13 @@ def runSim(args):
 
     startTime = time.time()
     # Loop through nights
-    for mjd in sim.scheduler.mjds:
-        # uncomment to do a quick check
-        # if mjd > 59200:
-        #     continue
-        sim.observeMJD(mjd)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=ErfaWarning)
+        for mjd in sim.scheduler.mjds:
+            # uncomment to do a quick check
+            # if mjd > 59200:
+            #     continue
+            sim.observeMJD(mjd)
     print("skipped for physical obstructions", sim.hit_lims)
     endTime = time.time()
 

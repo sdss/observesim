@@ -89,7 +89,8 @@ class Simulation(object):
 
         self.obsHist ={"lst": list(),
                        "ra": list(),
-                       "bright": list()}
+                       "bright": list(),
+                       "fieldid": list()}
 
         self.scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory,
                                                            schedule=schedule)
@@ -253,7 +254,7 @@ class Simulation(object):
                                     (90 - alts) / 180.)), airmass_weight)
                 fieldid, nexposures = sortFields(fieldids, nexps, priorities, adj_exp, maxTime=maxTime)
                 if fieldid == -1:
-                    print("baawaaaaaahhhahahaa :( ")
+                    # print("baawaaaaaahhhahahaa :( ")
                     # self.curr_mjd = self.curr_mjd + self.nom_duration/20
                     return -1, 1./20
 
@@ -302,6 +303,7 @@ class Simulation(object):
             self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
             self.obsHist["ra"].append(self.field_ra[fieldid])
             self.obsHist["bright"].append(self.bright())
+            self.obsHist["fieldid"].append(fieldid)
 
             if(self.curr_mjd > self.nextchange):
                 oops = (self.curr_mjd - self.nextchange) * 24 * 60
@@ -349,9 +351,11 @@ class Simulation(object):
     def lstToArray(self):
         dtype = [('lst', np.float64),
                    ('ra', np.float64),
-                   ('bright', np.bool_)]
+                   ('bright', np.bool_),
+                   ('fieldid', np.int32)]
         lstOut = np.zeros(len(self.obsHist["lst"]), dtype=dtype)
         lstOut["lst"] = np.array(self.obsHist["lst"])
         lstOut["ra"] = np.array(self.obsHist["ra"])
         lstOut["bright"] = np.array(self.obsHist["bright"])
+        lstOut["fieldid"] = np.array(self.obsHist["fieldid"])
         return(lstOut)
