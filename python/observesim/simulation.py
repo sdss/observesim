@@ -70,7 +70,7 @@ class Simulation(object):
     """A class to encapsulate an SDSS-5 simulation
     """
 
-    def __init__(self, base, plan, observatory, idx=1, schedule="normal"):
+    def __init__(self, plan, observatory, idx=1, schedule="normal"):
         if(observatory == 'apo'):
             timezone = "US/Mountain"
             fclear = 0.5

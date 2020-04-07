@@ -32,7 +32,7 @@ def runSim(args):
     time.sleep(idx)  # hopefully that avoids read conflicts? xD 
     print("running sim ", idx)
 
-    sim = simulation.Simulation(base, plan, observatory, idx=idx, schedule=schedule)
+    sim = simulation.Simulation(plan, observatory, idx=idx, schedule=schedule)
 
     startTime = time.time()
     # Loop through nights
@@ -112,6 +112,13 @@ schedule = args.schedule
 
 if version is not None:
     base = os.path.join(base, version)
+    try:
+        os.makedirs(base)
+    except:
+        pass
+    base += "/"
+else:
+    base = os.path.join(base, plan)
     try:
         os.makedirs(base)
     except:
