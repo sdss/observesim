@@ -23,6 +23,10 @@ header = """<html><head><meta http-equiv="Content-Type" content="text/html; char
 bar_plots = """<a href="{plan}-apo-cadence_bar.pdf"><img src="{plan}-apo-cadence_bar.png" width="600px/"> </a>
 <a href="{plan}-lco-cadence_bar.pdf"><img src="{plan}-lco-cadence_bar.png" width="600px/"> </a>"""
 
+fits_out = """<h2> Output files: </h2>
+<p> Each input field from the rsAllocation file is recorded in a fields file for  <a href="{plan}-apo-fields-0.fits">APO</a> and <a href="{plan}-lco-fields-0.fits">LCO</a>.
+The fields files contain indices into an observations to record info for each observation. <a href="{plan}-apo-observations-0.fits"> APO observations</a>, and <a href="{plan}-lco-observations-0.fits"> LCO observations</a>. </p>"""
+
 table_heads = """<h2>Cumulative Exposures</h2>
 <p> The plots below show the cumulative exposures for each field cadence class over time. A pdf showing all the cumulative plots is available for <a href="{plan}-apo-cumulative.pdf">APO</a> and <a href="{plan}-lco-cumulative.pdf">LCO</a></p>
 
@@ -43,7 +47,7 @@ def writeWebPage(base, plan, version=None):
         v_base = os.path.join(base, plan)
         v_base += "/"
     
-    html = header + "\n" + bar_plots + "\n" + table_heads + "\n"
+    html = header + "\n" + bar_plots + "\n" + fits_out + "\n" + table_heads + "\n"
     html = html.format(plan=plan)
         
     files = os.listdir(v_base)
