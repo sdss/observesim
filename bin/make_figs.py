@@ -6,6 +6,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import fitsio
+import yaml
 
 
 header = """<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
@@ -27,7 +28,29 @@ fits_out = """<h2> Output files: </h2>
 <p> Each input field from the rsAllocation file is recorded in a fields file for  <a href="{plan}-apo-fields-0.fits">APO</a> and <a href="{plan}-lco-fields-0.fits">LCO</a>.
 The fields files contain indices into an observations to record info for each observation. <a href="{plan}-apo-observations-0.fits"> APO observations</a>, and <a href="{plan}-lco-observations-0.fits"> LCO observations</a>. </p>"""
 
-table_heads = """<h2>Cumulative Exposures</h2>
+target_table = """<h2>Summary of Observed Targets </h2>
+<p>For each observation of a field, the targets planned to be observed are specified in an
+rsAssignments file. The targets can therefor be matched to field observations. The results of
+this matching are here for <a href="obsTargets-{plan}-apo.fits">APO</a> 
+and <a href="obsTargets-{plan}-apo.fits">LCO</a>. They can then be sorted by cadence to determine how many
+targets where observed total. The plot below shows a summary of total targets per cadence, note the log
+scale.</p>
+
+<a href="{plan}-target_summary.pdf"><img src="{plan}-target_summary.png" width="900px/"> </a>
+
+<p>Below the total number of targets observed, as well as the number observed at each observatory, 
+is shown. A csv file containing this information is also <a href="{plan}-target_summary.txt">available</a>.</p>
+
+<table><tbody>
+<tr><td><h4>Cadence</h4></td> <td><h4>required</h4></td> 
+<td><h4>total</h4></td> <td><h4>APO</h4></td>
+<td><h4>LCO</h4></td></tr>
+"""
+
+targ_table_row = "<tr><td>{cad}</td> <td>{req}</td> <td>{total}</td> <td>{apo}</td> <td>{lco}</td></tr>"
+
+table_heads = """</tbody></table>
+<h2>Cumulative Exposures</h2>
 <p> The plots below show the cumulative exposures for each field cadence class over time. A pdf showing all the cumulative plots is available for <a href="{plan}-apo-cumulative.pdf">APO</a> and <a href="{plan}-lco-cumulative.pdf">LCO</a></p>
 
 <table><tbody>
@@ -47,9 +70,19 @@ def writeWebPage(base, plan, version=None):
         v_base = os.path.join(base, plan)
         v_base += "/"
     
-    html = header + "\n" + bar_plots + "\n" + fits_out + "\n" + table_heads + "\n"
+    html = header + "\n" + bar_plots + "\n" + fits_out + "\n" + target_table + "\n"
     html = html.format(plan=plan)
-        
+
+    targ_sum_file = v_base + plan + "-target_summary.txt"
+
+    targ_sum = np.genfromtxt(targ_sum_file, names=True, delimiter=",", dtype=None, encoding=None)
+
+    for t in targ_sum:
+        html += targ_table_row.format(cad=t["cadence"], req=t["required"],
+                                total=t["total"], apo=t["apo"], lco=t["lco"])
+    
+    html += "\n" + table_heads + "\n"
+
     files = os.listdir(v_base)
     cum_pngs = [f for f in files if "cumulative.png" in f]
     lco = [f for f in cum_pngs if "lco" in f and "none" not in f]
@@ -298,6 +331,104 @@ def cumulativePlot(base, plan, version=None, loc="apo"):
         plt.savefig(os.path.join(base, version)+"/{}-{}-{}-cumulative.png".format(plan, loc, k))
         plt.close()
 
+
+def passesCadence(targ_mjds, cadence=None):
+    for m in targ_mjds:
+        if m > 5e4:
+            # dumb for now, get back to this
+            return True
+
+def plotTargMetric(v_base, plan, version=None, reqs_file=None):
+    if version is not None:
+        v_base = os.path.join(base, version)
+        v_base += "/"
+    else:
+        v_base = os.path.join(base, plan)
+        v_base += "/"
+
+    apo_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc="apo"))
+    lco_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc="lco"))
+    lco_targs_mjds = {i: [] for i in np.unique(lco_targs["pk"])}
+    apo_targs_mjds = {i: [] for i in np.unique(apo_targs["pk"])}
+    targ_to_cad = dict()
+    
+    for t in lco_targs:
+        lco_targs_mjds[t["pk"]].append(t["obs_mjd"])
+        targ_to_cad[t["pk"]] = t["cadence"]
+    
+    for t in apo_targs:
+        apo_targs_mjds[t["pk"]].append(t["obs_mjd"])
+        targ_to_cad[t["pk"]] = t["cadence"]
+    
+    # #####################
+    # #####################
+    
+    all_cads = np.sort(np.unique([v for k, v in targ_to_cad.items()]))
+    lco_cads = {c: [] for c in all_cads}
+    apo_cads = {c: [] for c in all_cads}
+
+    for t, v in lco_targs_mjds.items():
+        if passesCadence(v):
+            lco_cads[targ_to_cad[t]].append(t)
+
+    for t, v in apo_targs_mjds.items():
+        if passesCadence(v):
+            apo_cads[targ_to_cad[t]].append(t)
+    
+    # #####################
+    # #####################
+
+    plt.figure(figsize=(16, 10))
+    
+    ax1 = plt.subplot(111)
+    
+    apo_counts = [len(v) for k, v in apo_cads.items()]
+    lco_counts = [len(v) for k, v in lco_cads.items()]
+    names = [k.strip() for k in apo_cads.keys()] # same as lco_cad.keys()
+    x = range(len(names))
+
+    ax1.bar(x, apo_counts, 0.4, color="b", label="apo")
+    ax1.bar(x, lco_counts, 0.4, bottom=apo_counts, color="r", label="lco")
+    ax1.set_xticks(x, minor=False)
+    ax1.set_xticklabels(names, rotation='vertical')
+    ax1.set_ylabel("# targs")
+    ax1.set_yscale("log")
+    
+    ax3 = ax1.twiny()
+    
+    labels = ax1.get_xticks()
+    ax3.set_xlim(ax1.get_xlim())
+    ax3.set_xticks(labels)
+    ax3.set_xticklabels([x + y for x, y in zip(apo_counts, lco_counts)], rotation='vertical')
+
+    ax1.legend()
+    
+    if reqs_file is None:
+        reqs_file = '/'.join(os.path.realpath(__file__).split('/')[0:-2]) + "/etc/cadence_reqs.yml"
+
+    req_by_cad = yaml.load(open(reqs_file))
+    
+    sum_text = "{cad:30s}, {req:9s}, {total:8s}, {apo:8s}, {lco:8s}\n".format(
+                cad="cadence", req="required", total="total", apo="apo", lco="lco")
+    
+    for k in apo_cads.keys():
+        apo = len(apo_cads[k])
+        lco = len(lco_cads[k])
+        if k.strip() in req_by_cad:
+            req = req_by_cad[k.strip()]
+        else:
+            req = ""
+        sum_text += "{cad:30s}, {req:9s}, {total:8d}, {apo:8d}, {lco:8d}\n".format(
+                     cad=k.strip(), req=str(req), total=apo+lco, apo=apo, lco=lco)
+    
+    res_base = v_base + plan
+
+    plt.savefig(res_base + "-target_summary.pdf")
+    plt.savefig(res_base + "-target_summary.png")
+    with open(res_base + "-target_summary.txt", "w") as sum_file:
+        print(sum_text, file=sum_file)
+
+
 if __name__ == "__main__":
     usage = "sdss5_simulate"
     description = "Simulate the SDSS-V schedule"
@@ -327,6 +458,8 @@ if __name__ == "__main__":
 
     doHist(base, rs_base, plan, version=version, loc="lco")
     doHist(base, rs_base, plan, version=version, loc="apo")
+
+    plotTargMetric(base, plan, version=version, reqs_file=None)
 
     with open(os.path.join(base, plan) + "/summary.html", "w") as html_file:
         print(writeWebPage(base, plan), file=html_file)
