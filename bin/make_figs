@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import fitsio
 import yaml
 
-from observesim.output import cumulativePlot, doHist, plotTargMetric, writeWebPage
+from observesim.output import cumulativePlot, doHist, plotTargMetric, writeWebPage, countFields
 
 
 if __name__ == "__main__":
@@ -48,3 +48,5 @@ if __name__ == "__main__":
 
     with open(os.path.join(base, plan) + "/summary.html", "w") as html_file:
         print(writeWebPage(base, plan), file=html_file)
+
+    # print("finished!")
