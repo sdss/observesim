@@ -1,0 +1,50 @@
+#! /usr/bin/env python
+
+import time
+import os
+import argparse
+import numpy as np
+import matplotlib.pyplot as plt
+import fitsio
+import yaml
+
+from observesim.output import cumulativePlot, doHist, plotTargMetric, writeWebPage
+
+
+if __name__ == "__main__":
+    usage = "sdss5_simulate"
+    description = "Simulate the SDSS-V schedule"
+    parser = argparse.ArgumentParser(description=description, usage=usage)
+    parser.add_argument("-b", "--base", dest="base", type=str,
+                        required=True, help="output FITS base name")
+    parser.add_argument("-r", "--rsbase", dest="rs_base", type=str,
+                        required=False, help="location of rs files if not specified in env",
+                        default=None)
+    parser.add_argument("-p", "--plan", dest="plan", type=str,
+                        required=False, help="design plan",
+                        default='plan-0')
+    parser.add_argument("-v", "--version", dest="version", type=str,
+                        required=False, help="use versioned directory for output",
+                        default=None)
+    args = parser.parse_args()
+    base = args.base
+    plan = args.plan
+    version = args.version
+    rs_base = args.rs_base
+
+    if rs_base is None:
+        rs_base = os.getenv('OBSERVING_PLAN_DIR') + "/"
+
+    countFields(base, rs_base, plan, version=version, loc="apo", N=0)
+    countFields(base, rs_base, plan, version=version, loc="lco", N=0)
+
+    cumulativePlot(base, plan, version=version, loc="lco")
+    cumulativePlot(base, plan, version=version, loc="apo")
+
+    doHist(base, rs_base, plan, version=version, loc="lco")
+    doHist(base, rs_base, plan, version=version, loc="apo")
+
+    plotTargMetric(base, plan, version=version, reqs_file=None)
+
+    with open(os.path.join(base, plan) + "/summary.html", "w") as html_file:
+        print(writeWebPage(base, plan), file=html_file)
