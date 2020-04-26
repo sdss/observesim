@@ -27,18 +27,14 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 
     assign = fitsio.read(rs_base + "{plan}/rsAssignments-{plan}-{loc}.fits".format(plan=plan, loc=loc))
     assign = assign[np.where(assign["pk"] != -1)]
-<<<<<<< Updated upstream
 
-=======
-    
     completeness = fitsio.read(rs_base + "gamma-0/" + "rsCompleteness-gamma-0-apo.fits")
     completeness = completeness[np.where(completeness["pk"] != -1)]
-    
+
     comp_dict = dict()
     for c in completeness:
         comp_dict[c["pk"]] = (c["targetid"], c["program"], c["got"], c["cadence"])
-    
->>>>>>> Stashed changes
+
     allocation = fitsio.read(rs_base + "{plan}/rsAllocation-{plan}-{loc}.fits".format(plan=plan, loc=loc))
 
     sim_data = fitsio.read(v_base + "{plan}-{loc}-fields-{n}.fits".format(plan=plan, loc=loc, n=N))
@@ -51,26 +47,13 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     all_fields = list()
 
     start_time = time.time()
-<<<<<<< Updated upstream
 
     for f in sim_data:
-=======
-    
-    for f in sim_data[:10]:
->>>>>>> Stashed changes
         obs_idx = f["observations"][:int(f["nobservations"])]
         mjds = [obs_data[i]["mjd"] for i in obs_idx]
         cad = f["cadence"]
         real_fid = allocation[f["fieldid"]]["fieldid"]
 
-#         if real_fid % 100 == 0:
-<<<<<<< Updated upstream
-#             print(real_fid, (time.time() - start_time)/60.)
-
-=======
-        print(real_fid, (time.time() - start_time)/60.)
-        
->>>>>>> Stashed changes
         ids, cadences, targ_mjds = read_field(real_fid, mjds, assign)
         all_targs.extend(ids)
         all_cads.extend(cadences)
@@ -80,10 +63,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     assert len(all_targs) == len(all_cads), "targ != cad!!"
     assert len(all_targs) == len(all_mjds), "targ != mjd!!"
     assert len(all_targs) == len(all_fields), "targ != field!!"
-<<<<<<< Updated upstream
 
-=======
-    
     targ_ids = list()
     programs = list()
     gots = list()
@@ -96,9 +76,6 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
         if cadence != c:
             print("field cad: {}, targ cad: {}".format(c, cadence))
             print("pk: {}, targ id: {}".format(k, targetid))
-        
-    
->>>>>>> Stashed changes
     dtype = [('pk', np.int32),
              ('target_id', np.int32),
              ('cadence', np.dtype('a40')),
@@ -112,14 +89,10 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     obs_targs["cadence"] = all_cads
     obs_targs["field_id"] = all_fields
     obs_targs["obs_mjd"] = all_mjds
-<<<<<<< Updated upstream
-
-=======
     obs_targs["got"] = gots
     obs_targs["program"] = programs
     obs_targs["target_id"] = targ_ids
-    
->>>>>>> Stashed changes
+
     if save:
         fitsio.write(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc), obs_targs,
                  clobber=True)
@@ -196,7 +169,7 @@ def writeWebPage(base, plan, version=None):
     targ_sum = np.genfromtxt(targ_sum_file, names=True, delimiter=",", dtype=None, encoding=None)
 
     for t in targ_sum:
-        html += targ_table_row.format(cad=t["cadence"], req=t["required"],
+        html += targ_table_row.format(cad=t["program"], req=t["required"],
                                 total=t["total"], apo=t["apo"], lco=t["lco"])
 
     html += "\n" + table_heads + "\n"
@@ -473,18 +446,18 @@ def plotTargMetric(base, plan, version=None, reqs_file=None):
     apo_targs_mjds = {i: [] for i in np.unique(apo_targs["pk"])}
 
     targ_to_prog = dict()
-    
+
     for t in lco_targs:
         lco_targs_mjds[t["pk"]].append(t["obs_mjd"])
         targ_to_prog[t["pk"]] = t["program"].decode()
-    
+
     for t in apo_targs:
         apo_targs_mjds[t["pk"]].append(t["obs_mjd"])
         targ_to_prog[t["pk"]] = t["program"].decode()
-    
+
     # #####################
     # #####################
-    
+
     all_progs = np.sort(np.unique([v for k, v in targ_to_prog.items()]))
     lco_progs = {c: [] for c in all_progs}
     apo_progs = {c: [] for c in all_progs}
@@ -503,7 +476,7 @@ def plotTargMetric(base, plan, version=None, reqs_file=None):
     plt.figure(figsize=(16, 10))
 
     ax1 = plt.subplot(111)
-    
+
     apo_counts = [len(v) for k, v in apo_progs.items()]
     lco_counts = [len(v) for k, v in lco_progs.items()]
     names = [k.strip() for k in apo_progs.keys()] # same as lco_prog.keys()
@@ -533,7 +506,7 @@ def plotTargMetric(base, plan, version=None, reqs_file=None):
 
     sum_text = "{cad:30s}, {req:9s}, {total:8s}, {apo:8s}, {lco:8s}\n".format(
                 cad="program", req="required", total="total", apo="apo", lco="lco")
-    
+
     for k in apo_progs.keys():
         apo = len(apo_progs[k])
         lco = len(lco_progs[k])
