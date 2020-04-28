@@ -132,12 +132,17 @@ scale.</p>
 is shown. A csv file containing this information is also <a href="{plan}-target_summary.txt">available</a>.</p>
 
 <table><tbody>
-<tr><td><h4>Cadence</h4></td> <td><h4>required</h4></td>
-<td><h4>total</h4></td> <td><h4>APO</h4></td>
-<td><h4>LCO</h4></td></tr>
+<tr> <th colspan=2></th> <th colspan=4>robostrategy</th>
+<th colspan=3>observesim</th> </tr>
+
+<tr> <th>program</th> <th>required</th> <th>input</th>
+<th>assigned</th> <th>assign_apo</th> <th>assign_lco</th>
+<th>total</th> <th>apo</th> <th>lco</th> </tr>
 """
 
-targ_table_row = "<tr><td>{cad}</td> <td>{req}</td> <td>{total}</td> <td>{apo}</td> <td>{lco}</td></tr>"
+targ_table_row = """<tr><td>{prog}</td> <td>{req}</td> <td>{input}</td>
+<td>{assign}</td> <td>{assign_apo}</td> <td>{assign_lco}</td>
+<td>{total}</td> <td>{apo}</td> <td>{lco}</td> </tr>"""
 
 table_heads = """</tbody></table>
 <h2>Cumulative Exposures</h2>
@@ -169,8 +174,10 @@ def writeWebPage(base, plan, version=None):
     targ_sum = np.genfromtxt(targ_sum_file, names=True, delimiter=",", dtype=None, encoding=None)
 
     for t in targ_sum:
-        html += targ_table_row.format(cad=t["program"], req=t["required"],
-                                total=t["total"], apo=t["apo"], lco=t["lco"])
+        html += targ_table_row.format(prog=t["program"], req=t["required"],
+                                total=t["total"], apo=t["apo"], lco=t["lco"],
+                                assign=t["assigned"], assign_apo=t["assign_apo"],
+                                assign_lco=t["assign_lco"], input=t["input"])
 
     html += "\n" + table_heads + "\n"
 
@@ -241,6 +248,7 @@ def tabulate(counts, planned, cadence):
             plan_count[c] = [p]
 
     return completion, visits, plan_count
+
 
 def convertCadence(cad):
     if not "-" in cad:
@@ -357,7 +365,6 @@ def getEpochsFromFile(base, plan, version=None, loc="apo", N=0):
             cad_mjds[cad] = mjds
 
     cad_mjds = {k: np.array(v) for k, v in cad_mjds.items()}
-#         print(f["cadence"], np.min(mjds))
     return cad_mjds
 
 
@@ -432,7 +439,21 @@ def passesCadence(targ_mjds, cadence=None):
             # dumb for now, get back to this
             return True
 
-def plotTargMetric(base, plan, version=None, reqs_file=None):
+
+def countPlanned(program, programs, gots):
+    """since utah has an old version of fitsio, strings are a pain.
+    assuming things are the same length and maintain their order,
+    this works. those assumptions should be good because python.
+    """
+    assert len(programs) == len(gots)
+    where_prog = np.where(programs == program)
+    prog_targs = gots[where_prog]
+    got = np.where(prog_targs == 1)
+
+    return len(prog_targs), len(got[0])
+
+
+def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
     if version is not None:
         v_base = os.path.join(base, version)
         v_base += "/"
@@ -482,7 +503,6 @@ def plotTargMetric(base, plan, version=None, reqs_file=None):
     names = [k.strip() for k in apo_progs.keys()] # same as lco_prog.keys()
     x = range(len(names))
 
-
     ax1.bar(x, lco_counts, color="c", label="lco", log=True)
     ax1.bar(x, apo_counts, bottom=lco_counts, color="r", label="apo", log=True)
     ax1.set_xticks(x, minor=False)
@@ -504,18 +524,37 @@ def plotTargMetric(base, plan, version=None, reqs_file=None):
 
     req_by_cad = yaml.load(open(reqs_file))
 
-    sum_text = "{cad:30s}, {req:9s}, {total:8s}, {apo:8s}, {lco:8s}\n".format(
-                cad="program", req="required", total="total", apo="apo", lco="lco")
+    apo_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
+                           columns=["pk", "program", "got"])
+    apo_comp_prog = np.array([p.decode().strip() for p in apo_comp["program"]])
+
+    lco_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
+                           columns=["pk", "program", "got"])
+    lco_comp_prog = np.array([p.decode().strip() for p in lco_comp["program"]])
+
+    sum_text = ("{cad:30s}, {req:9s}, {input:8s}, {assign:9s}, {total:8s}, "
+                "{apo:8s}, {lco:8s}, {assign_apo:10s}, {assign_lco:10s}\n").format(
+                cad="program", req="required", input="input", total="total",
+                apo="apo", lco="lco", assign_apo="assign_apo",
+                assign_lco="assign_lco", assign="assigned")
 
     for k in apo_progs.keys():
         apo = len(apo_progs[k])
+        apo_plan, apo_assign = countPlanned(k.strip(), apo_comp_prog, apo_comp["got"])
+
         lco = len(lco_progs[k])
+        lco_plan, lco_assign = countPlanned(k.strip(), lco_comp_prog, lco_comp["got"])
+
         if k.strip() in req_by_cad:
             req = req_by_cad[k.strip()]
         else:
             req = ""
-        sum_text += "{cad:30s}, {req:9s}, {total:8d}, {apo:8d}, {lco:8d}\n".format(
-                     cad=k.strip(), req=str(req), total=apo+lco, apo=apo, lco=lco)
+
+        sum_text += ("{cad:30s}, {req:9s}, {input:8d}, {assign:9d}, {total:8d}, "
+                     "{apo:8d}, {lco:8d}, {assign_apo:10d}, {assign_lco:10d}\n").format(
+                     cad=k.strip(), req=str(req), input=apo_plan+lco_plan,
+                     assign=apo_assign+lco_assign, total=apo+lco, apo=apo,
+                     lco=lco, assign_apo=apo_assign, assign_lco=lco_assign)
 
     res_base = v_base + plan
 

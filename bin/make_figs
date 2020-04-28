@@ -11,9 +11,20 @@ import yaml
 from observesim.output import cumulativePlot, doHist, plotTargMetric, writeWebPage, countFields
 
 
+def str2bool(v):
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 if __name__ == "__main__":
-    usage = "sdss5_simulate"
-    description = "Simulate the SDSS-V schedule"
+    usage = "make_figs"
+    description = "Post processing for observesim, make figs and webpage"
     parser = argparse.ArgumentParser(description=description, usage=usage)
     parser.add_argument("-b", "--base", dest="base", type=str,
                         required=True, help="output FITS base name")
@@ -26,26 +37,36 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--version", dest="version", type=str,
                         required=False, help="use versioned directory for output",
                         default=None)
+    parser.add_argument("-c", "--count", dest="count", type=str2bool,
+                        required=False, help="redo post-processing file creation, adds 15+ min",
+                        default=True)
     args = parser.parse_args()
     base = args.base
     plan = args.plan
     version = args.version
     rs_base = args.rs_base
+    recount = args.count
 
     if rs_base is None:
         rs_base = os.getenv('OBSERVING_PLAN_DIR') + "/"
 
-    countFields(base, rs_base, plan, version=version, loc="apo", N=0)
-    countFields(base, rs_base, plan, version=version, loc="lco", N=0)
+    if recount:
+        print("post processing for {}".format(plan))
+        countFields(base, rs_base, plan, version=version, loc="apo", N=0)
+        countFields(base, rs_base, plan, version=version, loc="lco", N=0)
 
+    print("drawing cumulativePlot for {}".format(plan))
     cumulativePlot(base, plan, version=version, loc="lco")
     cumulativePlot(base, plan, version=version, loc="apo")
 
+    print("drawing old figs for {}".format(plan))
     doHist(base, rs_base, plan, version=version, loc="lco")
     doHist(base, rs_base, plan, version=version, loc="apo")
 
-    plotTargMetric(base, plan, version=version, reqs_file=None)
+    print("creating target metrics for {}".format(plan))
+    plotTargMetric(base, rs_base, plan, version=version, reqs_file=None)
 
+    print("writing webpage for {}".format(plan))
     with open(os.path.join(base, plan) + "/summary.html", "w") as html_file:
         print(writeWebPage(base, plan), file=html_file)
 
