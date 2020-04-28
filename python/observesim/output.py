@@ -93,9 +93,13 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     obs_targs["program"] = programs
     obs_targs["target_id"] = targ_ids
 
+    # catch those -1 obs mjds!!! Oops
+    where_not_observed = np.where(obs_targs["obs_mjd"] > 5e4)
+    cleaned_targs = obs_targs[where_not_observed]
+
     if save:
-        fitsio.write(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc), obs_targs,
-                 clobber=True)
+        fitsio.write(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc),
+                     cleaned_targs, clobber=True)
 
     return obs_targs
 
@@ -344,7 +348,7 @@ def doHist(res_base, rs_base, plan, version=None, loc="apo", level=0.95):
     plt.savefig(os.path.join(res_base, version)+"/{}-{}-cadence_bar.png".format(plan, loc))
 
 
-def getEpochsFromFile(base, plan, version=None, loc="apo", N=0):
+def combineProgramMjds(base, plan, version=None, loc="apo", N=0):
     if version is not None:
         v_base = os.path.join(base, version)
         v_base += "/"
@@ -352,38 +356,35 @@ def getEpochsFromFile(base, plan, version=None, loc="apo", N=0):
         v_base = os.path.join(base, plan)
         v_base += "/"
 
-    sim_data = fitsio.read(v_base + "{plan}-{loc}-fields-{n}.fits".format(plan=plan, loc=loc, n=N))
-    obs_data = fitsio.read(v_base + "{plan}-{loc}-observations-{n}.fits".format(plan=plan, loc=loc, n=N))
-    cad_mjds = dict()
-    for f in sim_data:
-        obs_idx = f["observations"][:int(f["nobservations"])]
-        mjds = [obs_data[i]["mjd"] for i in obs_idx]
-        cad = f["cadence"].decode()
-        if cad in cad_mjds:
-            cad_mjds[cad].extend(mjds)
-        else:
-            cad_mjds[cad] = mjds
+    obs_data = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc),
+                          columns=["obs_mjd", "program"])
 
-    cad_mjds = {k: np.array(v) for k, v in cad_mjds.items()}
-    return cad_mjds
+    progs = np.unique(obs_data["program"])
+
+    prog_mjds = dict()
+    for p in progs:
+        w_targs = np.where(obs_data["program"] == p)
+        prog_mjds[p.decode()] = obs_data[w_targs]["obs_mjd"]
+
+    return prog_mjds
 
 
 def cumulativePlot(base, plan, version=None, loc="apo"):
-    cad_mjds = getEpochsFromFile(base, plan, version=version, loc=loc)
-    new_cad = [convertCadence(k) for k in cad_mjds.keys()]
+    prog_mjds = combineProgramMjds(base, plan, version=version, loc=loc)
+    new_prog = [convertCadence(k) for k in prog_mjds.keys()]
     all_mjds = list()
-    for k, i in cad_mjds.items():
+    for k, i in prog_mjds.items():
         all_mjds.extend(list(i))
     min_mjd, max_mjd = int(np.min(all_mjds)), int(np.max(all_mjds))
 
-    sort_keys = np.sort(np.unique(new_cad))
+    sort_keys = np.sort(np.unique(new_prog))
 
     mjds = np.arange(min_mjd, max_mjd, 1)
-    plot_cads = {k: [] for k in sort_keys}
+    plot_progs = {k: [] for k in sort_keys}
 
     for m in mjds:
         today = dict()
-        for k, v in cad_mjds.items():
+        for k, v in prog_mjds.items():
             count = len(np.where(v < m)[0])
             if convertCadence(k) in today:
                 today[convertCadence(k)].append(count)
@@ -391,20 +392,20 @@ def cumulativePlot(base, plan, version=None, loc="apo"):
                 today[convertCadence(k)] = [count]
 
         for k, v in today.items():
-            plot_cads[k].append(np.sum(v))
+            plot_progs[k].append(np.sum(v))
 
-    rows = int(np.ceil(len(np.unique(new_cad))/2))
+    rows = int(np.ceil(len(np.unique(new_prog))/2))
     fig, axes = plt.subplots(rows, 2, sharex=True)
     fig.set_size_inches(12, rows*1.5)
 
-    cad_to_indx = {k: i for i, k in enumerate(sort_keys)}
+    prog_to_indx = {k: i for i, k in enumerate(sort_keys)}
 
     flat_axes = axes.flatten()
 
     plt.title("{}-{}".format(plan, loc))
 
-    for k, v in plot_cads.items():
-        ax = flat_axes[cad_to_indx[k]]
+    for k, v in plot_progs.items():
+        ax = flat_axes[prog_to_indx[k]]
         ax.plot(mjds, v)
         ax.set_title(k)
 
@@ -420,7 +421,7 @@ def cumulativePlot(base, plan, version=None, loc="apo"):
 
     plt.close()
 
-    for k, v in plot_cads.items():
+    for k, v in plot_progs.items():
         plt.figure(figsize=(8,5))
         ax = plt.subplot(111)
         ax.plot(mjds, v)
