@@ -28,13 +28,6 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     assign = fitsio.read(rs_base + "{plan}/rsAssignments-{plan}-{loc}.fits".format(plan=plan, loc=loc))
     assign = assign[np.where(assign["pk"] != -1)]
 
-    completeness = fitsio.read(rs_base + "gamma-0/" + "rsCompleteness-gamma-0-apo.fits")
-    completeness = completeness[np.where(completeness["pk"] != -1)]
-
-    comp_dict = dict()
-    for c in completeness:
-        comp_dict[c["pk"]] = (c["targetid"], c["program"], c["got"], c["cadence"])
-
     allocation = fitsio.read(rs_base + "{plan}/rsAllocation-{plan}-{loc}.fits".format(plan=plan, loc=loc))
 
     sim_data = fitsio.read(v_base + "{plan}-{loc}-fields-{n}.fits".format(plan=plan, loc=loc, n=N))
@@ -68,6 +61,15 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     programs = list()
     gots = list()
 
+    completeness = fitsio.read(rs_base + "{plan}/rsCompleteness-{plan}-{loc}.fits".format(
+                                          loc=loc, plan=plan))
+    completeness = completeness[np.where(completeness["pk"] != -1)]
+
+    comp_dict = dict()
+    for c in completeness:
+        comp_dict[c["pk"]] = (c["targetid"], c["program"], c["got"], c["cadence"])
+
+    blowup = False
     for k, c in zip(all_targs, all_cads):
         targetid, program, got, cadence = comp_dict[k]
         targ_ids.append(targetid)
@@ -175,7 +177,8 @@ def writeWebPage(base, plan, version=None):
 
     targ_sum_file = v_base + plan + "-target_summary.txt"
 
-    targ_sum = np.genfromtxt(targ_sum_file, names=True, delimiter=",", dtype=None, encoding=None)
+    targ_sum = np.genfromtxt(targ_sum_file, names=True, delimiter=",",
+                             dtype=None, encoding=None)
 
     for t in targ_sum:
         html += targ_table_row.format(prog=t["program"], req=t["required"],
@@ -187,23 +190,21 @@ def writeWebPage(base, plan, version=None):
 
     files = os.listdir(v_base)
     cum_pngs = [f for f in files if "cumulative.png" in f]
-    lco = [f for f in cum_pngs if "lco" in f and "none" not in f]
-    apo = [f for f in cum_pngs if "apo" in f and "none" not in f]
-    lco.sort()
-    apo.sort()
 
-    len_l = len(lco)
-    len_a = len(apo)
+    progs_plotted = list()
+    for c in cum_pngs:
+        parts = c.split("-")
+        p = parts[-2]
+        if p not in progs_plotted:
+            progs_plotted.append(p)
 
-    for i in range(max(len_l, len_a)):
-        if i <= len_l - 1:
-            l_file = lco[i]
-        else:
-            l_file = ""
-        if i <= len_a - 1:
-            a_file = apo[i]
-        else:
-            a_file = ""
+    progs_plotted.sort()
+
+    for p in progs_plotted:
+        a_file = "{}-apo-{}-cumulative.png".format(plan, p)
+
+        l_file = "{}-lco-{}-cumulative.png".format(plan, p)
+
         html += table_row.format(apo_png=a_file, lco_png=l_file) + "\n"
 
     return html + tail
