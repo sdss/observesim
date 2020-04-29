@@ -10,10 +10,16 @@ def read_field(field_id, exp_to_mjd, assign):
     # fetch info, match mjd to exp
     field_targs = assign[np.where(assign["fieldid"] == field_id)]
 
-    if len(np.unique(field_targs["exposure"])) > len(exp_to_mjd):
-        exp_to_mjd.extend([-1 for i in range(len(np.unique(field_targs["exposure"])) - len(exp_to_mjd))])
+    if len(field_targs["exposure"]) == 0:
+        max_exp = 0
+    else:
+        max_exp = np.max(field_targs["exposure"])
+
+    if max_exp > len(exp_to_mjd) - 1:
+        exp_to_mjd.extend([-1 for i in range(max_exp - len(exp_to_mjd) + 1)])
 
     mjds = [exp_to_mjd[i] for i in field_targs["exposure"]]
+
     return field_targs["pk"], field_targs["cadence"], mjds
 
 
@@ -41,6 +47,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 
     start_time = time.time()
 
+    print("matching fields for {} {}".format(plan, loc))
     for f in sim_data:
         obs_idx = f["observations"][:int(f["nobservations"])]
         mjds = [obs_data[i]["mjd"] for i in obs_idx]
