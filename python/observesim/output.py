@@ -4,7 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import fitsio
 import yaml
-
+import healpy as hp
+import astropy.io.fits as pyfits
 
 def read_field(field_id, exp_to_mjd, assign):
     # fetch info, match mjd to exp
@@ -67,6 +68,8 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     targ_ids = list()
     programs = list()
     gots = list()
+    ras = list()
+    decs = list()
 
     completeness = fitsio.read(rs_base + "{plan}/rsCompleteness-{plan}-{loc}.fits".format(
                                           loc=loc, plan=plan))
@@ -74,14 +77,15 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 
     comp_dict = dict()
     for c in completeness:
-        comp_dict[c["pk"]] = (c["targetid"], c["program"], c["got"], c["cadence"])
+        comp_dict[c["pk"]] = (c["targetid"], c["program"], c["got"], c["cadence"], c["ra"], c["dec"])
 
-    blowup = False
     for k, c in zip(all_targs, all_cads):
-        targetid, program, got, cadence = comp_dict[k]
+        targetid, program, got, cadence, ra, dec = comp_dict[k]
         targ_ids.append(targetid)
         programs.append(program)
         gots.append(got)
+        ras.append(ra)
+        decs.append(dec)
         if cadence != c:
             print("field cad: {}, targ cad: {}".format(c, cadence))
             print("pk: {}, targ id: {}".format(k, targetid))
@@ -91,7 +95,9 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
              ('program', np.dtype('a40')),
              ('field_id', np.int32),
              ('got', np.int32),
-             ('obs_mjd', np.float64)]
+             ('obs_mjd', np.float64),
+             ('ra', np.float64),
+             ('dec', np.float64)]
     obs_targs = np.zeros(len(all_targs), dtype=dtype)
 
     obs_targs["pk"] = all_targs
@@ -101,6 +107,8 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     obs_targs["got"] = gots
     obs_targs["program"] = programs
     obs_targs["target_id"] = targ_ids
+    obs_targs["ra"] = ras
+    obs_targs["dec"] = decs
 
     # catch those -1 obs mjds!!! Oops
     where_not_observed = np.where(obs_targs["obs_mjd"] > 5e4)
@@ -157,8 +165,18 @@ targ_table_row = """<tr><td>{prog}</td> <td>{req}</td> <td>{input}</td>
 <td>{assign}</td> <td>{assign_apo}</td> <td>{assign_lco}</td>
 <td>{total}</td> <td>{apo}</td> <td>{lco}</td> </tr>"""
 
-table_heads = """</tbody></table>
-<h2>Cumulative Exposures</h2>
+
+agn_metrics = """</tbody></table>
+<p>Additional coverage metrics are computed for bhm_spiders_agn </p>
+
+<table><tbody>
+<tr> <th> loc </th> <th> %plan (deg<sup>2</sup>) </th> <th> %obs (deg<sup>2</sup>) </th>
+<tr> <td> apo </td> <td> {apo_plan:.2f} </td> <td> {apo_obs:.2f} </td> </tr>
+<tr> <td> lco </td> <td> {lco_plan:.2f} </td> <td> {lco_obs:.2f} </td> </tr>
+</tbody></table>
+"""
+
+table_heads = """<h2>Cumulative Exposures</h2>
 <p> The plots below show the cumulative exposures for each field cadence class over time. A pdf showing all the cumulative plots is available for <a href="{plan}-apo-cumulative.pdf">APO</a> and <a href="{plan}-lco-cumulative.pdf">LCO</a></p>
 
 <table><tbody>
@@ -171,7 +189,7 @@ tail = """</tbody></table>
 </body></html>"""
 
 
-def writeWebPage(base, plan, version=None):
+def writeWebPage(base, rs_base, plan, version=None):
     if version is not None:
         v_base = os.path.join(base, version)
         v_base += "/"
@@ -192,6 +210,14 @@ def writeWebPage(base, plan, version=None):
                                 total=t["total"], apo=t["apo"], lco=t["lco"],
                                 assign=t["assigned"], assign_apo=t["assign_apo"],
                                 assign_lco=t["assign_lco"], input=t["input"])
+
+    agn_args = dict()
+    agn_args["apo_plan"], agn_args["apo_obs"] = spiders_area_for_program(base, rs_base, plan,
+                                                                     version=version, loc="apo")
+    agn_args["lco_plan"], agn_args["lco_obs"] = spiders_area_for_program(base, rs_base, plan,
+                                                                     version=version, loc="lco")
+
+    html += agn_metrics.format(**agn_args)
 
     html += "\n" + table_heads + "\n"
 
@@ -571,3 +597,79 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
     plt.savefig(res_base + "-target_summary.png")
     with open(res_base + "-target_summary.txt", "w") as sum_file:
         print(sum_text, file=sum_file)
+
+
+def compute_area_above_threshold(targets, obs_targets, threshold, nside):
+     '''
+     Computes the sky area above a given completeness threshold
+     Counts sky pixels on a HEALPix gris with NSIDE=nside
+
+     inputs:
+       targets - numpy recarray-like object with columns 'ra' and 'dec',
+                 corresponding to planned targets
+
+       obs_targets - numpy recarray-like object with columns 'ra' and 'dec',
+                     corresponding to actually observed targets
+
+       threshold - floatingpoint number in range [0,1]
+
+       nside - HEALPix parameter controlling pixel size
+
+     '''
+
+    assert threshold >= 0.0 and threshold <= 1.0
+    assert len(targets) >= 1
+    assert (nside >= 1) and (nside < 65536)
+
+    npix = hp.nside2npix(nside)
+    pixarea=hp.nside2pixarea(nside, degrees=True)
+
+    hpx = hp.ang2pix(nside, targets["ra"], targets["dec"], lonlat=True)
+    all_map = np.bincount(hpx, minlength=npix)
+    got_map = np.bincount(hpx, weights=np.where(targets["got"]>0,1,0), minlength=npix)
+
+    obs_hpx = hp.ang2pix(nside, obs_targets["ra"], obs_targets["dec"], lonlat=True)
+    obs_map = np.bincount(obs_hpx, minlength=npix)
+
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        frac_map = np.divide(got_map, all_map)
+        map_completed = np.where(frac_map >= threshold, 1, 0)
+
+        obs_frac_map = np.divide(obs_map, all_map)
+        obs_completed = np.where(obs_map >= threshold, 1, 0)
+
+
+    planned_area_completed = pixarea * np.sum(map_completed)
+    obs_area_completed = pixarea * np.sum(obs_completed)
+
+    return planned_area_completed, obs_area_completed
+
+
+def spiders_area_for_program(base, rs_base, plan, version=None, loc="apo"):
+    if version is not None:
+        v_base = os.path.join(base, version)
+        v_base += "/"
+    else:
+        v_base = os.path.join(base, plan)
+        v_base += "/"
+
+    obs_file = (v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc)
+    comp_file = rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="lco")
+
+    hdul = pyfits.open(comp_file)
+    all_targets = hdul[1].data
+
+    targets = np.extract(all_targets['program'] == 'bhm_spiders_agn', all_targets)
+
+    hdul = pyfits.open(obs_file)
+    obs_targets = hdul[1].data
+
+    obs_targets = np.extract(obs_targets['program'] == 'bhm_spiders_agn', obs_targets)
+
+    planned, obs = compute_area_above_threshold(targets, obs_targets, threshold=0.8, nside=64)
+
+    print(f"{plan} planned: Ntargets={len(targets)}, Area={planned:.2f} deg^2")
+    print(f"{plan} obs: Ntargets={len(obs_targets)}, Area={obs:.2f} deg^2")
+
+    return planned, obs
