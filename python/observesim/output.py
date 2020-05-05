@@ -639,6 +639,7 @@ def compute_area_above_threshold(targets, obs_targets, threshold, nside):
         map_completed = np.where(frac_map >= threshold, 1, 0)
 
         obs_frac_map = np.divide(obs_map, all_map)
+        obs_completed = np.where(obs_frac_map >= threshold, 1, 0)
 
     planned_area_completed = pixarea * np.sum(map_completed)
     obs_area_completed = pixarea * np.sum(obs_completed)
@@ -662,17 +663,28 @@ def spiders_area_for_program(base, rs_base, plan, version=None, loc="apo"):
 
     loc_targs = np.extract(all_targets["covered"] > 0, all_targets)
 
-    targets = np.extract(loc_targs['program'] == 'bhm_spiders_agn', loc_targs)
+    progs = np.unique(loc_targs["program"])
+
+    # since mike is naming these with version numbers now
+    # need to find the right version
+    spiders_names = [p for p in progs if "bhm_spiders_agn" in p]
+    assert len(spiders_names) == 1, "didn't find an appropriate spiders_agn program!"
+    prog_name = spiders_names[0]
+
+    targets = np.extract(loc_targs['program'] == prog_name, loc_targs)
 
     hdul = pyfits.open(obs_file)
     obs_targets = hdul[1].data
 
-    obs_targets = np.extract(obs_targets['program'] == 'bhm_spiders_agn', obs_targets)
+    obs_targets = np.extract(obs_targets['program'] == prog_name, obs_targets)
 
     pks, idxs = np.unique(obs_targets["pk"], return_index=True)
 
     # since obs_targets has an entry for each observation!!
     obs_targets = obs_targets[idxs]
+
+    # we'll just leave this debug hint...
+    # print(f"{loc}, {len(obs_targets)}, {len(targets)}")
 
     planned, obs = compute_area_above_threshold(targets, obs_targets, threshold=0.8, nside=64)
 
