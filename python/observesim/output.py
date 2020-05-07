@@ -7,6 +7,9 @@ import yaml
 import healpy as hp
 import astropy.io.fits as pyfits
 
+__all__ = ["cumulativePlot", "doHist", "plotTargMetric", "writeWebPage",
+            "countFields", "spiders_area_for_program_time"]
+
 def read_field(field_id, exp_to_mjd, assign):
     # fetch info, match mjd to exp
     field_targs = assign[np.where(assign["fieldid"] == field_id)]
@@ -175,13 +178,17 @@ agn_metrics = """</tbody></table>
 <tr> <td> apo </td> <td> {apo_plan:.2f} </td> <td> {apo_obs:.2f} </td> </tr>
 <tr> <td> lco </td> <td> {lco_plan:.2f} </td> <td> {lco_obs:.2f} </td> </tr>
 </tbody></table>
+
+<a href="{plan}-apo-spiders_v_time.pdf"><img src="{plan}-apo-spiders_v_time.png" width="600px/"> </a>
+<a href="{plan}-lco-spiders_v_time.pdf"><img src="{plan}-lco-spiders_v_time.png" width="600px/"> </a>
 """
 
 table_heads = """<h2>Cumulative Exposures</h2>
 <p> The plots below show the cumulative exposures for each field cadence class over time. A pdf showing all the cumulative plots is available for <a href="{plan}-apo-cumulative.pdf">APO</a> and <a href="{plan}-lco-cumulative.pdf">LCO</a></p>
 
 <table><tbody>
-<tr><td><h4>APO</h4></td> <td><h4>LCO </h4></td></tr>"""
+<tr><td><h4>APO</h4></td> <td><h4>LCO </h4></td></tr>
+"""
 
 table_row ="""<tr><td><a href="{apo_png}"><img src="{apo_png}" width="450/"></a></td>
 <td><a href="{lco_png}"><img src="{lco_png}" width="450/"></a></td></tr>"""
@@ -220,6 +227,8 @@ def writeWebPage(base, rs_base, plan, version=None):
 
     agn_args["total_plan"] = agn_args["apo_plan"] + agn_args["lco_plan"]
     agn_args["total_obs"] = agn_args["apo_obs"] + agn_args["lco_obs"]
+    agn_args["plan"] = plan
+
     html += agn_metrics.format(**agn_args)
 
     html += "\n" + table_heads + "\n"
@@ -632,7 +641,7 @@ def compute_area_above_threshold(targets, obs_targets, threshold, nside):
     got_map = np.bincount(hpx, weights=np.where(targets["got"]>0,1,0), minlength=npix)
 
     obs_hpx = hp.ang2pix(nside, obs_targets["ra"], obs_targets["dec"], lonlat=True)
-    obs_map = np.bincount(obs_hpx, weights=np.where(obs_targets["got"]>0,1,0), minlength=npix)
+    obs_map = np.bincount(obs_hpx, minlength=npix)
 
     with np.errstate(divide='ignore', invalid='ignore'):
         frac_map = np.divide(got_map, all_map)
@@ -647,7 +656,7 @@ def compute_area_above_threshold(targets, obs_targets, threshold, nside):
     return planned_area_completed, obs_area_completed
 
 
-def spiders_area_for_program(base, rs_base, plan, version=None, loc="apo"):
+def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
     if version is not None:
         v_base = os.path.join(base, version)
         v_base += "/"
@@ -678,6 +687,9 @@ def spiders_area_for_program(base, rs_base, plan, version=None, loc="apo"):
 
     obs_targets = np.extract(obs_targets['program'] == prog_name, obs_targets)
 
+    # for time domain, ensure we get the earliest version
+    obs_targets = np.sort(obs_targets, order="obs_mjd")
+
     pks, idxs = np.unique(obs_targets["pk"], return_index=True)
 
     # since obs_targets has an entry for each observation!!
@@ -686,9 +698,73 @@ def spiders_area_for_program(base, rs_base, plan, version=None, loc="apo"):
     # we'll just leave this debug hint...
     # print(f"{loc}, {len(obs_targets)}, {len(targets)}")
 
+    return targets, obs_targets
+
+
+def spiders_area_for_program(base, rs_base, plan, version=None, loc="apo"):
+    targets, obs_targets = grab_summary_files(base, rs_base, plan, version=None, loc=loc)
+
     planned, obs = compute_area_above_threshold(targets, obs_targets, threshold=0.8, nside=64)
 
     # print(f"{plan} planned: Ntargets={len(targets)}, Area={planned:.2f} deg^2")
     # print(f"{plan} obs: Ntargets={len(obs_targets)}, Area={obs:.2f} deg^2")
 
     return planned, obs
+
+
+def spiders_area_for_program_time(base, rs_base, plan, version=None, loc="apo"):
+    targets, obs_targets = grab_summary_files(base, rs_base, plan, version=None, loc=loc)
+
+    start_mjd = int(np.min(obs_targets["obs_mjd"]))
+    end_mjd = int(np.max(obs_targets["obs_mjd"])) + 1
+
+    # force it to be multiples of 10 so I can print progress
+    mjds = np.arange(start_mjd//10*10, end_mjd//10*10, 10)
+    area_comp = list()
+
+    threshold = 0.8
+    nside = 64
+    assert threshold >= 0.0 and threshold <= 1.0
+    assert len(targets) >= 1
+    assert (nside >= 1) and (nside < 65536)
+
+    npix = hp.nside2npix(nside)
+    pixarea=hp.nside2pixarea(nside, degrees=True)
+
+    hpx = hp.ang2pix(nside, targets["ra"], targets["dec"], lonlat=True)
+    all_map = np.bincount(hpx, minlength=npix)
+
+    start = time.time()
+    for m in mjds:
+        mjd_targs = np.extract(obs_targets['obs_mjd'] < m, obs_targets)
+        obs_hpx = hp.ang2pix(nside, mjd_targs["ra"], mjd_targs["dec"], lonlat=True)
+        obs_map = np.bincount(obs_hpx, minlength=npix)
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            obs_frac_map = np.divide(obs_map, all_map)
+            obs_completed = np.where(obs_frac_map >= threshold, 1, 0)
+
+        obs_area_completed = pixarea * np.sum(obs_completed)
+
+        area_comp.append(obs_area_completed)
+
+    plt.figure(figsize=(16, 10))
+    ax = plt.subplot(111)
+
+    ax.plot(mjds, area_comp)
+    ax.set_xlabel("MJD")
+    ax.set_ylabel(r"area (deg$^2$)")
+    ax.set_title(f"SPIDERS sky coverage vs time, {loc}")
+
+    if version is not None:
+        v_base = os.path.join(base, version)
+        v_base += "/"
+    else:
+        v_base = os.path.join(base, plan)
+        v_base += "/"
+
+    res_base = v_base + plan
+
+    plt.savefig(res_base + f"-{loc}-spiders_v_time.png")
+    plt.savefig(res_base + f"-{loc}-spiders_v_time.pdf")
+    plt.close()

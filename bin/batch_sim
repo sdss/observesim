@@ -29,7 +29,7 @@ def runSim(args):
     # ###################
     idx, base, plan, observatory, schedule = args
 
-    time.sleep(idx)  # hopefully that avoids read conflicts? xD 
+    time.sleep(idx)  # hopefully that avoids read conflicts? xD
     print("running sim ", idx)
 
     sim = simulation.Simulation(plan, observatory, idx=idx, schedule=schedule)
@@ -82,7 +82,8 @@ usage = "sdss5_simulate"
 description = "Simulate the SDSS-V schedule"
 parser = argparse.ArgumentParser(description=description, usage=usage)
 parser.add_argument("-b", "--base", dest="base", type=str,
-                    required=True, help="output FITS base name")
+                    required=False, help="output FITS base name",
+                    default=None)
 parser.add_argument("-p", "--plan", dest="plan", type=str,
                     required=False, help="design plan",
                     default='plan-0')
@@ -91,7 +92,7 @@ parser.add_argument("-t", "--telescope", dest="telescope", type=str,
                     default='apo')
 parser.add_argument("-n", "--number", dest="number", type=int,
                     required=False, help="number of runs",
-                    default=10)
+                    default=1)
 parser.add_argument("-m", "--multi", dest="multi", type=int,
                     required=False, help="number of processes to use",
                     default=-1)
@@ -109,6 +110,11 @@ number = args.number
 multi = args.multi
 version = args.version
 schedule = args.schedule
+
+if base is None:
+    base = os.getenv("OBSERVESIM_OUTPUT_BASE")
+
+assert base is not None, "must specify result base"
 
 if version is not None:
     base = os.path.join(base, version)
