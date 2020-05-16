@@ -170,7 +170,8 @@ agn_metrics = """</tbody></table>
 <p>Additional coverage metrics are computed for bhm_spiders_agn </p>
 
 <table><tbody>
-<tr> <th> loc </th> <th> %plan (deg<sup>2</sup>) </th> <th> %obs (deg<sup>2</sup>) </th>
+<tr> <th> loc </th> <th> area planned (deg<sup>2</sup>) </th> <th> area obs (deg<sup>2</sup>) </th>
+<tr> <td> total </td> <td> {total_plan:.2f} </td> <td> {total_obs:.2f} </td> </tr>
 <tr> <td> apo </td> <td> {apo_plan:.2f} </td> <td> {apo_obs:.2f} </td> </tr>
 <tr> <td> lco </td> <td> {lco_plan:.2f} </td> <td> {lco_obs:.2f} </td> </tr>
 </tbody></table>
@@ -217,6 +218,8 @@ def writeWebPage(base, rs_base, plan, version=None):
     agn_args["lco_plan"], agn_args["lco_obs"] = spiders_area_for_program(base, rs_base, plan,
                                                                      version=version, loc="lco")
 
+    agn_args["total_plan"] = agn_args["apo_plan"] + agn_args["lco_plan"]
+    agn_args["total_obs"] = agn_args["apo_obs"] + agn_args["lco_obs"]
     html += agn_metrics.format(**agn_args)
 
     html += "\n" + table_heads + "\n"
@@ -600,12 +603,12 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
 
 
 def compute_area_above_threshold(targets, obs_targets, threshold, nside):
-     '''
+    '''
      Computes the sky area above a given completeness threshold
      Counts sky pixels on a HEALPix gris with NSIDE=nside
 
      inputs:
-       targets - numpy recarray-like object with columns 'ra' and 'dec',
+       targets - numpy recarray-like object with columns 'ra', 'dec', 'got'
                  corresponding to planned targets
 
        obs_targets - numpy recarray-like object with columns 'ra' and 'dec',
@@ -615,7 +618,7 @@ def compute_area_above_threshold(targets, obs_targets, threshold, nside):
 
        nside - HEALPix parameter controlling pixel size
 
-     '''
+    '''
 
     assert threshold >= 0.0 and threshold <= 1.0
     assert len(targets) >= 1
@@ -629,16 +632,14 @@ def compute_area_above_threshold(targets, obs_targets, threshold, nside):
     got_map = np.bincount(hpx, weights=np.where(targets["got"]>0,1,0), minlength=npix)
 
     obs_hpx = hp.ang2pix(nside, obs_targets["ra"], obs_targets["dec"], lonlat=True)
-    obs_map = np.bincount(obs_hpx, minlength=npix)
-
+    obs_map = np.bincount(obs_hpx, weights=np.where(obs_targets["got"]>0,1,0), minlength=npix)
 
     with np.errstate(divide='ignore', invalid='ignore'):
         frac_map = np.divide(got_map, all_map)
         map_completed = np.where(frac_map >= threshold, 1, 0)
 
         obs_frac_map = np.divide(obs_map, all_map)
-        obs_completed = np.where(obs_map >= threshold, 1, 0)
-
+        obs_completed = np.where(obs_frac_map >= threshold, 1, 0)
 
     planned_area_completed = pixarea * np.sum(map_completed)
     obs_area_completed = pixarea * np.sum(obs_completed)
@@ -654,22 +655,40 @@ def spiders_area_for_program(base, rs_base, plan, version=None, loc="apo"):
         v_base = os.path.join(base, plan)
         v_base += "/"
 
-    obs_file = (v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc)
-    comp_file = rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="lco")
+    obs_file = v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc)
+    comp_file = rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc)
 
     hdul = pyfits.open(comp_file)
     all_targets = hdul[1].data
 
-    targets = np.extract(all_targets['program'] == 'bhm_spiders_agn', all_targets)
+    loc_targs = np.extract(all_targets["covered"] > 0, all_targets)
+
+    progs = np.unique(loc_targs["program"])
+
+    # since mike is naming these with version numbers now
+    # need to find the right version
+    spiders_names = [p for p in progs if "bhm_spiders_agn" in p]
+    assert len(spiders_names) == 1, "didn't find an appropriate spiders_agn program!"
+    prog_name = spiders_names[0]
+
+    targets = np.extract(loc_targs['program'] == prog_name, loc_targs)
 
     hdul = pyfits.open(obs_file)
     obs_targets = hdul[1].data
 
-    obs_targets = np.extract(obs_targets['program'] == 'bhm_spiders_agn', obs_targets)
+    obs_targets = np.extract(obs_targets['program'] == prog_name, obs_targets)
+
+    pks, idxs = np.unique(obs_targets["pk"], return_index=True)
+
+    # since obs_targets has an entry for each observation!!
+    obs_targets = obs_targets[idxs]
+
+    # we'll just leave this debug hint...
+    # print(f"{loc}, {len(obs_targets)}, {len(targets)}")
 
     planned, obs = compute_area_above_threshold(targets, obs_targets, threshold=0.8, nside=64)
 
-    print(f"{plan} planned: Ntargets={len(targets)}, Area={planned:.2f} deg^2")
-    print(f"{plan} obs: Ntargets={len(obs_targets)}, Area={obs:.2f} deg^2")
+    # print(f"{plan} planned: Ntargets={len(targets)}, Area={planned:.2f} deg^2")
+    # print(f"{plan} obs: Ntargets={len(obs_targets)}, Area={obs:.2f} deg^2")
 
     return planned, obs

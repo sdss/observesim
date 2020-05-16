@@ -75,6 +75,6 @@ if __name__ == "__main__":
 
     print("writing webpage for {}".format(plan))
     with open(os.path.join(base, plan) + "/summary.html", "w") as html_file:
-        print(writeWebPage(base, plan, rs_base), file=html_file)
+        print(writeWebPage(base, rs_base, plan), file=html_file)
 
     # print("finished!")
