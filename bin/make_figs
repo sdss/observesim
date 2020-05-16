@@ -9,6 +9,7 @@ import fitsio
 import yaml
 
 from observesim.output import cumulativePlot, doHist, plotTargMetric, writeWebPage, countFields
+from observesim.animateSurvey import CountFramesAllSky
 
 
 def str2bool(v):
@@ -65,6 +66,12 @@ if __name__ == "__main__":
 
     print("creating target metrics for {}".format(plan))
     plotTargMetric(base, rs_base, plan, version=version, reqs_file=None)
+
+    movieFrameDir = CountFramesAllSky(base, plan, version=version)
+
+    # now makes mp4 file from frames in FramesForMP4 dir
+    os.chdir(movieFrameDir)
+    subprocess.call('ffmpeg -r 10 -i frame%03d.png -vcodec mpeg4 -y sdss5_sim.mp4', shell=True)
 
     print("writing webpage for {}".format(plan))
     with open(os.path.join(base, plan) + "/summary.html", "w") as html_file:
