@@ -276,7 +276,7 @@ def getCounts(res_base, rs_base, plan, version=None, loc="apo"):
 
     counts = np.mean(np.array(counts), axis=0)
 
-    return counts, planned, [c.decode() for c in fields["cadence"]]
+    return counts, planned, [c for c in fields["cadence"]]
 
 
 def tabulate(counts, planned, cadence):
@@ -410,7 +410,7 @@ def combineProgramMjds(base, plan, version=None, loc="apo", N=0):
     prog_mjds = dict()
     for p in progs:
         w_targs = np.where(obs_data["program"] == p)
-        prog_mjds[p.decode()] = obs_data[w_targs]["obs_mjd"]
+        prog_mjds[p] = obs_data[w_targs]["obs_mjd"]
 
     return prog_mjds
 
@@ -517,11 +517,11 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
 
     for t in lco_targs:
         lco_targs_mjds[t["pk"]].append(t["obs_mjd"])
-        targ_to_prog[t["pk"]] = t["program"].decode()
+        targ_to_prog[t["pk"]] = t["program"]
 
     for t in apo_targs:
         apo_targs_mjds[t["pk"]].append(t["obs_mjd"])
-        targ_to_prog[t["pk"]] = t["program"].decode()
+        targ_to_prog[t["pk"]] = t["program"]
 
     # #####################
     # #####################
@@ -573,11 +573,11 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
 
     apo_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
                            columns=["pk", "program", "got"])
-    apo_comp_prog = np.array([p.decode().strip() for p in apo_comp["program"]])
+    apo_comp_prog = np.array([p.strip() for p in apo_comp["program"]])
 
     lco_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
                            columns=["pk", "program", "got"])
-    lco_comp_prog = np.array([p.decode().strip() for p in lco_comp["program"]])
+    lco_comp_prog = np.array([p.strip() for p in lco_comp["program"]])
 
     sum_text = ("{cad:30s}, {req:9s}, {input:8s}, {assign:9s}, {total:8s}, "
                 "{apo:8s}, {lco:8s}, {assign_apo:10s}, {assign_lco:10s}\n").format(
