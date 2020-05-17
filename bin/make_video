@@ -3,10 +3,7 @@
 import os
 import argparse
 
-from observesim.output import *
 from observesim.animateSurvey import CountFramesAllSky
-
-
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -54,32 +51,10 @@ if __name__ == "__main__":
     assert base is not None, "must specify result base"
     assert rs_base is not None, "must specify roboscheduler result base"
 
-    if recount:
-        print("post processing for {}".format(plan))
-        countFields(base, rs_base, plan, version=version, loc="apo", N=0)
-        countFields(base, rs_base, plan, version=version, loc="lco", N=0)
-
-    print("drawing cumulativePlot for {}".format(plan))
-    cumulativePlot(base, plan, version=version, loc="lco")
-    cumulativePlot(base, plan, version=version, loc="apo")
-    spiders_area_for_program_time(base, rs_base, plan, version=version, loc="lco")
-    spiders_area_for_program_time(base, rs_base, plan, version=version, loc="apo")
-
-    print("drawing old figs for {}".format(plan))
-    doHist(base, rs_base, plan, version=version, loc="lco")
-    doHist(base, rs_base, plan, version=version, loc="apo")
-
-    print("creating target metrics for {}".format(plan))
-    plotTargMetric(base, rs_base, plan, version=version, reqs_file=None)
-
     movieFrameDir = CountFramesAllSky(base, plan, version=version)
 
     # now makes mp4 file from frames in FramesForMP4 dir
     os.chdir(movieFrameDir)
     subprocess.call('ffmpeg -r 10 -i frame%03d.png -vcodec mpeg4 -y sdss5_sim.mp4', shell=True)
-
-    print("writing webpage for {}".format(plan))
-    with open(os.path.join(base, plan) + "/summary.html", "w") as html_file:
-        print(writeWebPage(base, rs_base, plan), file=html_file)
 
     print("finished!")
