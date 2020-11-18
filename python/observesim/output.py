@@ -6,7 +6,6 @@ import matplotlib.dates as mdates
 import fitsio
 import yaml
 import healpy as hp
-import astropy.io.fits as pyfits
 from PyAstronomy.pyasl.asl.astroTimeLegacy import daycnv
 
 __all__ = ["cumulativePlot", "doHist", "plotTargMetric", "writeWebPage",
@@ -77,12 +76,13 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     decs = list()
 
     completeness = fitsio.read(rs_base + "{plan}/rsCompleteness-{plan}-{loc}.fits".format(
-                                          loc=loc, plan=plan))
+                                          loc=loc, plan=plan),
+                               columns=["catalogid", "carton", "got", "cadence", "ra", "dec", "pk"])
     completeness = completeness[np.where(completeness["pk"] != -1)]
 
     comp_dict = dict()
     for c in completeness:
-        comp_dict[c["pk"]] = (c["catalogid"], c["program"], c["got"], c["cadence"], c["ra"], c["dec"])
+        comp_dict[c["pk"]] = (c["catalogid"], c["carton"], c["got"], c["cadence"], c["ra"], c["dec"])
 
     for k, c in zip(all_targs, all_cads):
         targetid, program, got, cadence, ra, dec = comp_dict[k]
@@ -91,13 +91,13 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
         gots.append(got)
         ras.append(ra)
         decs.append(dec)
-        if cadence != c:
-            print("field cad: {}, targ cad: {}".format(c, cadence))
-            print("pk: {}, targ id: {}".format(k, targetid))
+        # if cadence != c:
+        #     print("field cad: {}, targ cad: {}".format(c, cadence))
+        #     print("pk: {}, targ id: {}".format(k, targetid))
     dtype = [('pk', np.int32),
              ('target_id', np.int32),
              ('cadence', np.dtype('a40')),
-             ('program', np.dtype('a40')),
+             ('carton', np.dtype('a40')),
              ('field_id', np.int32),
              ('got', np.int32),
              ('obs_mjd', np.float64),
@@ -110,7 +110,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     obs_targs["field_id"] = all_fields
     obs_targs["obs_mjd"] = all_mjds
     obs_targs["got"] = gots
-    obs_targs["program"] = programs
+    obs_targs["carton"] = programs
     obs_targs["target_id"] = targ_ids
     obs_targs["ra"] = ras
     obs_targs["dec"] = decs
@@ -124,6 +124,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
                      cleaned_targs, clobber=True)
 
     return obs_targs
+
 
 header = """<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
 <style>
@@ -165,7 +166,7 @@ is shown. A csv file containing this information is also <a href="{plan}-target_
 <tr> <th colspan=2></th> <th colspan=4>robostrategy</th>
 <th colspan=3>observesim</th> </tr>
 
-<tr> <th>program</th> <th>required</th> <th>input</th>
+<tr> <th>carton</th> <th>required</th> <th>input</th>
 <th>assigned</th> <th>assign_apo</th> <th>assign_lco</th>
 <th>total</th> <th>apo</th> <th>lco</th> </tr>
 """
@@ -220,7 +221,7 @@ def writeWebPage(base, rs_base, plan, version=None):
                              dtype=None, encoding=None)
 
     for t in targ_sum:
-        html += targ_table_row.format(prog=t["program"], req=t["required"],
+        html += targ_table_row.format(prog=t["carton"], req=t["required"],
                                 total=t["total"], apo=t["apo"], lco=t["lco"],
                                 assign=t["assigned"], assign_apo=t["assign_apo"],
                                 assign_lco=t["assign_lco"], input=t["input"])
@@ -276,7 +277,8 @@ def getCounts(res_base, rs_base, plan, version=None, loc="apo"):
         sim_data = fitsio.read(v_base + f)
         counts.append(sim_data['nobservations'])
 
-    fields = fitsio.read(rs_base+"{plan}/rsAllocation-{plan}-{loc}.fits".format(plan=plan, loc=loc))
+    fields = fitsio.read(rs_base+"{plan}/rsAllocation-{plan}-{loc}.fits".format(plan=plan, loc=loc),
+                         columns=["needed", "cadence"])
 
     planned = fields['needed']
 
@@ -310,7 +312,12 @@ def convertCadence(cad):
     if not "-" in cad:
         return cad.strip()
     name, num = cad.split("-")
-    num = int(num)
+    try:
+        num = int(num)
+    except ValueError:
+        # this catches like 2 cadences
+        # bright/dark used after "-"
+        return cad.strip()
     if num < 6:
         return name + "-1:5"
     elif num < 11:
@@ -409,13 +416,13 @@ def combineProgramMjds(base, plan, version=None, loc="apo", N=0):
         v_base += "/"
 
     obs_data = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc),
-                          columns=["obs_mjd", "program"])
+                           columns=["obs_mjd", "carton"])
 
-    progs = np.unique(obs_data["program"])
+    progs = np.unique(obs_data["carton"])
 
     prog_mjds = dict()
     for p in progs:
-        w_targs = np.where(obs_data["program"] == p)
+        w_targs = np.where(obs_data["carton"] == p)
         prog_mjds[p] = obs_data[w_targs]["obs_mjd"]
 
     return prog_mjds
@@ -579,8 +586,10 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
         v_base = os.path.join(base, plan)
         v_base += "/"
 
-    apo_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc="apo"))
-    lco_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc="lco"))
+    apo_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
+                            columns=["obs_mjd", "carton", "pk"])
+    lco_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
+                            columns=["obs_mjd", "carton", "pk"])
     lco_targs_mjds = {i: [] for i in np.unique(lco_targs["pk"])}
     apo_targs_mjds = {i: [] for i in np.unique(apo_targs["pk"])}
 
@@ -588,11 +597,11 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
 
     for t in lco_targs:
         lco_targs_mjds[t["pk"]].append(t["obs_mjd"])
-        targ_to_prog[t["pk"]] = t["program"]
+        targ_to_prog[t["pk"]] = t["carton"]
 
     for t in apo_targs:
         apo_targs_mjds[t["pk"]].append(t["obs_mjd"])
-        targ_to_prog[t["pk"]] = t["program"]
+        targ_to_prog[t["pk"]] = t["carton"]
 
     # #####################
     # #####################
@@ -643,16 +652,16 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
     req_by_cad = yaml.load(open(reqs_file))
 
     apo_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
-                           columns=["pk", "program", "got"])
-    apo_comp_prog = np.array([p.strip() for p in apo_comp["program"]])
+                           columns=["pk", "carton", "got"])
+    apo_comp_prog = np.array([p.strip() for p in apo_comp["carton"]])
 
     lco_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
-                           columns=["pk", "program", "got"])
-    lco_comp_prog = np.array([p.strip() for p in lco_comp["program"]])
+                           columns=["pk", "carton", "got"])
+    lco_comp_prog = np.array([p.strip() for p in lco_comp["carton"]])
 
     sum_text = ("{cad:30s}, {req:9s}, {input:8s}, {assign:9s}, {total:8s}, "
                 "{apo:8s}, {lco:8s}, {assign_apo:10s}, {assign_lco:10s}\n").format(
-                cad="program", req="required", input="input", total="total",
+                cad="carton", req="required", input="input", total="total",
                 apo="apo", lco="lco", assign_apo="assign_apo",
                 assign_lco="assign_lco", assign="assigned")
 
@@ -705,7 +714,7 @@ def compute_area_above_threshold(targets, obs_targets, threshold, nside):
     assert (nside >= 1) and (nside < 65536)
 
     npix = hp.nside2npix(nside)
-    pixarea=hp.nside2pixarea(nside, degrees=True)
+    pixarea = hp.nside2pixarea(nside, degrees=True)
 
     hpx = hp.ang2pix(nside, targets["ra"], targets["dec"], lonlat=True)
     all_map = np.bincount(hpx, minlength=npix)
@@ -738,25 +747,25 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
     obs_file = v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc)
     comp_file = rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc)
 
-    hdul = pyfits.open(comp_file)
-    all_targets = hdul[1].data
+    all_targets = fitsio.read(comp_file,
+                              columns=["covered", "carton", "ra", "dec", "got"])
 
     loc_targs = np.extract(all_targets["covered"] > 0, all_targets)
 
-    progs = np.unique(loc_targs["program"])
+    progs = np.unique(loc_targs["carton"])
 
     # since mike is naming these with version numbers now
     # need to find the right version
     spiders_names = [p for p in progs if "bhm_spiders_agn" in p]
-    assert len(spiders_names) == 1, "didn't find an appropriate spiders_agn program!"
+    assert len(spiders_names) == 1, "didn't find an appropriate spiders_agn carton!"
     prog_name = spiders_names[0]
 
-    targets = np.extract(loc_targs['program'] == prog_name, loc_targs)
+    targets = np.extract(loc_targs['carton'] == prog_name, loc_targs)
 
-    hdul = pyfits.open(obs_file)
-    obs_targets = hdul[1].data
+    obs_targets = fitsio.read(obs_file,
+                              columns=["pk", "carton", "obs_mjd", "ra", "dec"])
 
-    obs_targets = np.extract(obs_targets['program'] == prog_name, obs_targets)
+    obs_targets = np.extract(obs_targets['carton'] == prog_name, obs_targets)
 
     # for time domain, ensure we get the earliest version
     obs_targets = np.sort(obs_targets, order="obs_mjd")
@@ -800,7 +809,7 @@ def spiders_area_for_program_time(base, rs_base, plan, version=None, loc="apo"):
     assert (nside >= 1) and (nside < 65536)
 
     npix = hp.nside2npix(nside)
-    pixarea=hp.nside2pixarea(nside, degrees=True)
+    pixarea = hp.nside2pixarea(nside, degrees=True)
 
     hpx = hp.ang2pix(nside, targets["ra"], targets["dec"], lonlat=True)
     all_map = np.bincount(hpx, minlength=npix)
