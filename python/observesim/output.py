@@ -2,10 +2,12 @@ import time
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import fitsio
 import yaml
 import healpy as hp
 import astropy.io.fits as pyfits
+from PyAstronomy.pyasl.asl.astroTimeLegacy import daycnv
 
 __all__ = ["cumulativePlot", "doHist", "plotTargMetric", "writeWebPage",
             "countFields", "spiders_area_for_program_time"]
@@ -80,7 +82,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 
     comp_dict = dict()
     for c in completeness:
-        comp_dict[c["pk"]] = (c["targetid"], c["program"], c["got"], c["cadence"], c["ra"], c["dec"])
+        comp_dict[c["pk"]] = (c["catalogid"], c["program"], c["got"], c["cadence"], c["ra"], c["dec"])
 
     for k, c in zip(all_targs, all_cads):
         targetid, program, got, cadence, ra, dec = comp_dict[k]
@@ -131,6 +133,10 @@ header = """<html><head><meta http-equiv="Content-Type" content="text/html; char
 
 <h1>Observesim: {plan}</h1>
 <p>This page summarizes the observesim results for the {plan} robostrategy runs <a href="https://data.sdss.org/sas/sdss5/sandbox/robostrategy/allocations/{plan}">found here</a></p>
+
+<p>A video animation of this simulation is available!! <a href="moviePngsAllSky/sdss5_sim.mp4">Right click and "Save As"</a></p
+
+
 
 <h2>Summary</h2>
 <p> The results for each observatory are summarized below. The average completion % for each field cadence class is shown, as well as the number of exposures falling into each class (note the log scale). </p>"""
@@ -467,17 +473,82 @@ def cumulativePlot(base, plan, version=None, loc="apo"):
 
     plt.close()
 
+    years = mdates.YearLocator()   # every year
+    months = mdates.MonthLocator()  # every month
+    years_fmt = mdates.DateFormatter('%Y')
+
+    programs_to_highlight = ["bhm_aqmes_rm", "bhm_spiders_agn", "bhm_aqmes_wide",
+                             "mwm_galactic", "mwm_100pc", "mwm_planet"]
+
+    year1 = list()
+    year2 = list()
+    year3 = list()
+    year4 = list()
+    year5 = list()
+    year5 = list()
+
+    used_progs = list()  # ugh why are the observatories not the same...
+
     for k, v in plot_progs.items():
         plt.figure(figsize=(8,5))
         ax = plt.subplot(111)
-        ax.plot(mjds, v)
+        cal_days = daycnv(mjds+2400000.5, mode="dt")
+        ax.plot(cal_days, v)
         ax.set_title(k)
         ax.set_ylabel("# visits", fontsize=16)
-        ax.set_xlabel("mjd", fontsize=16)
+        ax.set_xlabel("date", fontsize=16)
+
+        ax.xaxis.set_major_locator(years)
+        ax.xaxis.set_major_formatter(years_fmt)
+        ax.xaxis.set_minor_locator(months)
+
         if version is None:
             version = plan
         plt.savefig(os.path.join(base, version)+"/{}-{}-{}-cumulative.png".format(plan, loc, k))
         plt.close()
+
+        if k in programs_to_highlight:
+            used_progs.append(k)
+            bars = yearBars(mjds, v)
+            year1.append(bars[0])
+            year2.append(bars[1])
+            year3.append(bars[2])
+            year4.append(bars[3])
+            year5.append(bars[4])
+
+    # make bar plots of programs by year
+    plt.figure(figsize=(8,5))
+    ax1 = plt.subplot(111)
+    width = 0.1
+    x_cor = np.arange(0, len(used_progs))
+
+    ax1.bar(x_cor - 0.2, year1, width, color="c", label="year 1", log=True)
+    ax1.bar(x_cor - 0.1, year2, width, color="b", label="year 2", log=True)
+    ax1.bar(x_cor + 0.0, year3, width, color="m", label="year 3", log=True)
+    ax1.bar(x_cor + 0.1, year4, width, color="r", label="year 4", log=True)
+    ax1.bar(x_cor + 0.2, year5, width, color="y", label="year 5", log=True)
+
+    ax1.set_xticks(x_cor, minor=False)
+    ax1.set_xticklabels(used_progs, rotation='vertical')
+    ax1.set_ylabel("visits")
+    ax1.legend()
+
+    plt.tight_layout()
+
+    plt.savefig(os.path.join(base, version)+"/{}-{}-by_year.png".format(plan, loc))
+    plt.close()
+
+
+def yearBars(mjds, v):
+    jan_2021 = 59215
+    cuts = jan_2021 + np.arange(365, 365.25*6, 365.25)
+    perYear = list()
+
+    for c in cuts:
+        use = np.where(mjds <= c)
+        perYear.append(np.max(np.array(v)[use]))
+
+    return perYear
 
 
 def passesCadence(targ_mjds, cadence=None):

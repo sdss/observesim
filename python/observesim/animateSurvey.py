@@ -157,7 +157,7 @@ def CountFramesAllSky(base, plan, version=None):
         previous = p
         mjd_to_phase[int(d)] = np.floor(mapped)
 
-    min_mjd = max_mjd - 45
+    # min_mjd = max_mjd - 45
     for i, mjd in enumerate(np.arange(min_mjd, max_mjd, 2)):
         w, h = 16, 9
         if i%50 == 0:
