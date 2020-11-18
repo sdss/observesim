@@ -243,12 +243,15 @@ def writeWebPage(base, rs_base, plan, version=None):
     files = os.listdir(v_base)
     cum_pngs = [f for f in files if "cumulative.png" in f]
 
+    headchars = len(plan) + 5  # 5 for "-lco-" or "-apo"
+    tailschars = len("-cumulative.png")
+
     progs_plotted = list()
     for c in cum_pngs:
-        parts = c.split("-")
-        p = parts[-2]
-        if p not in progs_plotted:
-            progs_plotted.append(p)
+        prog = c[headchars:-tailschars]
+        print("PROG", prog)
+        if prog not in progs_plotted:
+            progs_plotted.append(prog)
 
     progs_plotted.sort()
 
