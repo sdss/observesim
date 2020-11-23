@@ -9,7 +9,8 @@ import healpy as hp
 from PyAstronomy.pyasl.asl.astroTimeLegacy import daycnv
 
 __all__ = ["cumulativePlot", "doHist", "plotTargMetric", "writeWebPage",
-            "countFields", "spiders_area_for_program_time"]
+           "countFields", "spiders_area_for_program_time"]
+
 
 def read_field(field_id, exp_to_mjd, assign):
     # fetch info, match mjd to exp
@@ -29,6 +30,9 @@ def read_field(field_id, exp_to_mjd, assign):
 
 
 def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True):
+    """Create obsTargets summary file, combining robostrategy planned visits
+       with observesim visits.
+    """
     if version is not None:
         v_base = os.path.join(res_base, version)
         v_base += "/"
@@ -129,15 +133,16 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 header = """<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
 <style>
     table, th, tr, td {{border: 1px solid black}}
+    .bg-green  {{background-color:green; color:black;}}
+    .bg-orange {{background-color:orange; color:black;}}
+    .bg-red    {{background-color:red; color:black;}}
 </style>
 </head><body>
 
 <h1>Observesim: {plan}</h1>
 <p>This page summarizes the observesim results for the {plan} robostrategy runs <a href="https://data.sdss.org/sas/sdss5/sandbox/robostrategy/allocations/{plan}">found here</a></p>
 
-<p>A video animation of this simulation is available!! <a href="moviePngsAllSky/sdss5_sim.mp4">Right click and "Save As"</a></p
-
-
+<p>A video animation of this simulation is available!! <a href="moviePngsAllSky/sdss5_sim.mp4">Right click and "Save As"</a></p>
 
 <h2>Summary</h2>
 <p> The results for each observatory are summarized below. The average completion % for each field cadence class is shown, as well as the number of exposures falling into each class (note the log scale). </p>"""
@@ -173,7 +178,7 @@ is shown. A csv file containing this information is also <a href="{plan}-target_
 
 targ_table_row = """<tr><td>{prog}</td> <td>{req}</td> <td>{input}</td>
 <td>{assign}</td> <td>{assign_apo}</td> <td>{assign_lco}</td>
-<td>{total}</td> <td>{apo}</td> <td>{lco}</td> </tr>"""
+<td>{total}</td> <td class="{apo_flag}">{apo}</td> <td class="{lco_flag}">{lco}</td> </tr>"""
 
 
 agn_metrics = """</tbody></table>
@@ -204,6 +209,19 @@ tail = """</tbody></table>
 </body></html>"""
 
 
+def comp_to_css(assign, obs):
+    if assign == 0:
+        return "bg-green"
+    else:
+        frac = obs/assign
+    if frac >= 0.9:
+        return "bg-green"
+    elif frac < 0.9 and frac >= 0.7:
+        return "bg-orange"
+    else:
+        return "bg-red"
+
+
 def writeWebPage(base, rs_base, plan, version=None):
     if version is not None:
         v_base = os.path.join(base, version)
@@ -222,9 +240,11 @@ def writeWebPage(base, rs_base, plan, version=None):
 
     for t in targ_sum:
         html += targ_table_row.format(prog=t["carton"], req=t["required"],
-                                total=t["total"], apo=t["apo"], lco=t["lco"],
-                                assign=t["assigned"], assign_apo=t["assign_apo"],
-                                assign_lco=t["assign_lco"], input=t["input"])
+                                      total=t["total"], apo=t["apo"], lco=t["lco"],
+                                      assign=t["assigned"], assign_apo=t["assign_apo"],
+                                      assign_lco=t["assign_lco"], input=t["input"],
+                                      apo_flag=comp_to_css(t["assign_apo"], t["apo"]),
+                                      lco_flag=comp_to_css(t["assign_lco"], t["lco"]))
 
     agn_args = dict()
     agn_args["apo_plan"], agn_args["apo_obs"] = spiders_area_for_program(base, rs_base, plan,
@@ -249,7 +269,6 @@ def writeWebPage(base, rs_base, plan, version=None):
     progs_plotted = list()
     for c in cum_pngs:
         prog = c[headchars:-tailschars]
-        print("PROG", prog)
         if prog not in progs_plotted:
             progs_plotted.append(prog)
 
@@ -295,8 +314,8 @@ def tabulate(counts, planned, cadence):
     visits = dict()
     plan_count = dict()
 
-    print(counts)
-    print(len(counts), len(planned), len(cadence))
+    # print(counts)
+    # print(len(counts), len(planned), len(cadence))
 
     for n, p, c in zip(counts, planned, cadence):
         if c in completion:
@@ -330,6 +349,8 @@ def convertCadence(cad):
 
 
 def doHist(res_base, rs_base, plan, version=None, loc="apo", level=0.95):
+    """Create old histograms by cadence
+    """
     args = getCounts(res_base, rs_base, plan, version=version, loc=loc)
     completion, vis_count, plan_count = tabulate(*args)
     print("found {} cadences".format(len(completion.keys())))
@@ -630,11 +651,13 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
 
     apo_counts = [len(v) for k, v in apo_progs.items()]
     lco_counts = [len(v) for k, v in lco_progs.items()]
-    names = [k.strip() for k in apo_progs.keys()] # same as lco_prog.keys()
-    x = range(len(names))
+    names = [k.strip() for k in apo_progs.keys()]  # same as lco_prog.keys()
+    x = np.arange(len(names))
 
-    ax1.bar(x, lco_counts, color="c", label="lco", log=True)
-    ax1.bar(x, apo_counts, bottom=lco_counts, color="r", label="apo", log=True)
+    width = 0.3
+
+    ax1.bar(x - width, lco_counts, width, color="c", label="lco", log=True)
+    ax1.bar(x, apo_counts, width, color="r", label="apo", log=True)
     ax1.set_xticks(x, minor=False)
     ax1.set_xticklabels(names, rotation='vertical')
     ax1.set_ylabel("# targs")
