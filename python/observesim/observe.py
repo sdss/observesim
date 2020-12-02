@@ -73,7 +73,7 @@ class Observe(object):
         result : dict
             has keys 'sn2', 'mjd', 'duration'
     """
-        
+
         if self.cadences is None or self.cadencelist is None:
             duration = self.defaultExp
             sn2 = self.defaultSN2
