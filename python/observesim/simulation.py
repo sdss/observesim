@@ -293,7 +293,8 @@ class Simulation(object):
                     # assert False, "ugh"
 
             result = self.observe.result(mjd=self.curr_mjd, fieldid=fieldidx,
-                                         airmass=airmass)
+                                         airmass=airmass,
+                                         epochidx=self.scheduler.fields.icadence[fieldidx])
             duration = result["duration"]
             if duration < 0 or np.isnan(duration):
                 print("HOOOWWWOWOWOWOWW")

@@ -29,10 +29,10 @@ class Observe(object):
         defaultExp : float
             default exposure length in days
 
-        cadencelist : 
+        cadencelist :
             the cadencelist object from scheduler
 
-        cadences : 
+        cadences :
             the cadences from scheduler (of length fields, matching that index)
         """
 
@@ -49,7 +49,8 @@ class Observe(object):
         self.defaultSN2 = 3000.
         pass
 
-    def result(self, fieldid=None, mjd=None, airmass=1, **kwargs):
+    def result(self, fieldid=None, mjd=None, airmass=1,
+               epochidx=None, **kwargs):
         """Return simulated result of an observation
 
         Parameters:
@@ -78,7 +79,7 @@ class Observe(object):
             duration = self.defaultExp
             sn2 = self.defaultSN2
         else:
-            boss = self.cadencelist[self.cadences[fieldid]].requires_boss
+            boss = self.cadencelist[self.cadences[fieldid]].skybrightness[epochidx] <= 0.35
             if boss:
                 weight = 1
             else:

@@ -8,10 +8,9 @@ from observesim.output import *
 from observesim.animateSurvey import CountFramesAllSky
 
 
-
 def str2bool(v):
     if isinstance(v, bool):
-       return v
+        return v
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
     elif v.lower() in ('no', 'false', 'f', 'n', '0'):
@@ -80,7 +79,7 @@ if __name__ == "__main__":
     subprocess.call('ffmpeg -r 10 -i frame%03d.png -vcodec mpeg4 -y sdss5_sim.mp4', shell=True)
 
     print("writing webpage for {}".format(plan))
-    with open(os.path.join(base, plan) + "/summary.html", "w") as html_file:
-        print(writeWebPage(base, rs_base, plan), file=html_file)
+
+    writeWebPage(base, rs_base, plan, version=version)
 
     print("finished!")

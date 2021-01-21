@@ -281,7 +281,8 @@ def writeWebPage(base, rs_base, plan, version=None):
 
         html += table_row.format(apo_png=a_file, lco_png=l_file) + "\n"
 
-    return html + tail
+    with open(v_base + "/summary.html", "w") as html_file:
+        print(html + tail, file=html_file)
 
 
 def getCounts(res_base, rs_base, plan, version=None, loc="apo"):
