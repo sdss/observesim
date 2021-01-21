@@ -202,7 +202,7 @@ class Simulation(object):
         if mjd is None:
             mjd = self.curr_mjd
         skybrightness = self.scheduler.skybrightness(mjd)
-        return skybrightness > 0.3
+        return skybrightness > 0.35
 
     def nextField(self):
         # dark time or brighttime? to guess at how long we need for obs
