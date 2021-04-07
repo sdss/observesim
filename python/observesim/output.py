@@ -26,7 +26,7 @@ def read_field(field_id, exp_to_mjd, assign):
 
     mjds = [exp_to_mjd[i] for i in field_targs["exposure"]]
 
-    return field_targs["pk"], field_targs["cadence"], mjds
+    return field_targs["catalogid"], field_targs["cadence"], mjds
 
 
 def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True):
@@ -41,7 +41,10 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
         v_base += "/"
 
     assign = fitsio.read(rs_base + "{plan}/rsAssignments-{plan}-{loc}.fits".format(plan=plan, loc=loc))
-    assign = assign[np.where(assign["pk"] != -1)]
+    print("ASSIGN LEN ", len(assign))
+    print("unique", len(np.unique(assign["catalogid"])))
+    assign = assign[np.where(np.logical_and(assign["catalogid"] != -1, assign["catalogid"] != 0))]
+    print("ASSIGN LEN ", len(assign))
 
     allocation = fitsio.read(rs_base + "{plan}/rsAllocation-{plan}-{loc}.fits".format(plan=plan, loc=loc))
 
@@ -81,12 +84,12 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 
     completeness = fitsio.read(rs_base + "{plan}/rsCompleteness-{plan}-{loc}.fits".format(
                                           loc=loc, plan=plan),
-                               columns=["catalogid", "carton", "got", "cadence", "ra", "dec", "pk"])
-    completeness = completeness[np.where(completeness["pk"] != -1)]
+                               columns=["catalogid", "carton", "assigned", "cadence", "ra", "dec", "catalogid"])
+    completeness = completeness[np.where(completeness["catalogid"] != -1)]
 
     comp_dict = dict()
     for c in completeness:
-        comp_dict[c["pk"]] = (c["catalogid"], c["carton"], c["got"], c["cadence"], c["ra"], c["dec"])
+        comp_dict[c["catalogid"]] = (c["catalogid"], c["carton"], c["assigned"], c["cadence"], c["ra"], c["dec"])
 
     for k, c in zip(all_targs, all_cads):
         targetid, program, got, cadence, ra, dec = comp_dict[k]
@@ -103,7 +106,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
              ('cadence', np.dtype('a40')),
              ('carton', np.dtype('a40')),
              ('field_id', np.int32),
-             ('got', np.int32),
+             ('assigned', np.int32),
              ('obs_mjd', np.float64),
              ('ra', np.float64),
              ('dec', np.float64)]
@@ -113,7 +116,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     obs_targs["cadence"] = all_cads
     obs_targs["field_id"] = all_fields
     obs_targs["obs_mjd"] = all_mjds
-    obs_targs["got"] = gots
+    obs_targs["assigned"] = gots
     obs_targs["carton"] = programs
     obs_targs["target_id"] = targ_ids
     obs_targs["ra"] = ras
@@ -679,11 +682,11 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
     req_by_cad = yaml.load(open(reqs_file))
 
     apo_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
-                           columns=["pk", "carton", "got"])
+                           columns=["pk", "carton", "assigned"])
     apo_comp_prog = np.array([p.strip() for p in apo_comp["carton"]])
 
     lco_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
-                           columns=["pk", "carton", "got"])
+                           columns=["pk", "carton", "assigned"])
     lco_comp_prog = np.array([p.strip() for p in lco_comp["carton"]])
 
     sum_text = ("{cad:30s}, {req:9s}, {input:8s}, {assign:9s}, {total:8s}, "
@@ -694,10 +697,10 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
 
     for k in apo_progs.keys():
         apo = len(apo_progs[k])
-        apo_plan, apo_assign = countPlanned(k.strip(), apo_comp_prog, apo_comp["got"])
+        apo_plan, apo_assign = countPlanned(k.strip(), apo_comp_prog, apo_comp["assigned"])
 
         lco = len(lco_progs[k])
-        lco_plan, lco_assign = countPlanned(k.strip(), lco_comp_prog, lco_comp["got"])
+        lco_plan, lco_assign = countPlanned(k.strip(), lco_comp_prog, lco_comp["assigned"])
 
         if k.strip() in req_by_cad:
             req = req_by_cad[k.strip()]
@@ -745,7 +748,7 @@ def compute_area_above_threshold(targets, obs_targets, threshold, nside):
 
     hpx = hp.ang2pix(nside, targets["ra"], targets["dec"], lonlat=True)
     all_map = np.bincount(hpx, minlength=npix)
-    got_map = np.bincount(hpx, weights=np.where(targets["got"]>0,1,0), minlength=npix)
+    got_map = np.bincount(hpx, weights=np.where(targets["assigned"] > 0, 1, 0), minlength=npix)
 
     obs_hpx = hp.ang2pix(nside, obs_targets["ra"], obs_targets["dec"], lonlat=True)
     obs_map = np.bincount(obs_hpx, minlength=npix)
@@ -775,7 +778,7 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
     comp_file = rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc)
 
     all_targets = fitsio.read(comp_file,
-                              columns=["covered", "carton", "ra", "dec", "got"])
+                              columns=["covered", "carton", "ra", "dec", "assigned"])
 
     loc_targs = np.extract(all_targets["covered"] > 0, all_targets)
 
