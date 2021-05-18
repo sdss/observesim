@@ -16,15 +16,11 @@ import roboscheduler.scheduler
 import observesim.observe
 
 
-def sortFields(fieldids, nexps, priorities, exp, maxTime=0):
-    dtype = [('field', int), ('nexp', int), ('priority', float), ("exp", float)]
-    values = [(f, n, p, a) for f, n, p, a in zip(fieldids, nexps, priorities, exp)]
-    arrified = np.array(values, dtype=dtype)
-    sortedFields = np.sort(arrified, order='priority')
+def sortFields(fieldids, nexps, exp, maxTime=0):
 
-    for f in sortedFields:
-        if f["exp"] * f["nexp"] < maxTime:
-            return f["field"], f["nexp"]
+    for f, n, e in zip(fieldids, nexps, exp):
+        if e * n < maxTime:
+            return f, n
 
     return -1, -1
 
@@ -103,7 +99,7 @@ class Simulation(object):
         self.scheduler.initdb(designbase=plan)
         self.field_ra = self.scheduler.fields.racen
         self.field_dec = self.scheduler.fields.deccen
-        self.fieldid = self.scheduler.fields.fieldid
+        self.fieldid = self.scheduler.fields.field_id
 
         cadencelist = self.scheduler.fields.cadencelist.cadences
         cadences = self.scheduler.fields.cadence
@@ -235,9 +231,10 @@ class Simulation(object):
                 not site_check:
                 # print("first field: ")
                 # print(fieldid, site_check, new_alt, new_az)
-                field_idxs, nexps, priorities = self.scheduler.nextfield(mjd=self.curr_mjd,
-                                                                         maxExp=maxExp,
-                                                                         returnAll=True)
+                field_idxs, nexps = self.scheduler.nextfield(mjd=self.curr_mjd,
+                                                             maxExp=maxExp,
+                                                             returnAll=True)
+
                 obs_fields = self.siteObs(field_idxs, [self.curr_mjd + n*(new_duration) for n in range(nexposures)])
                 field_idxs = field_idxs[obs_fields]
                 nexps = nexps[obs_fields]
@@ -252,8 +249,7 @@ class Simulation(object):
                                                        dec=self.field_dec[field_idxs])
                 adj_exp = self.nom_duration * np.power((1/np.cos(np.pi *
                                                        (90 - alts) / 180.)), airmass_weight)
-                fieldidx, nexposures = sortFields(field_idxs, nexps, priorities, adj_exp,
-                                                  maxTime=maxTime)
+                fieldidx, nexposures = sortFields(field_idxs, nexps, adj_exp, maxTime=maxTime)
                 if fieldidx == -1:
                     # print("baawaaaaaahhhahahaa :( ")
                     # self.curr_mjd = self.curr_mjd + self.nom_duration/20
@@ -269,15 +265,14 @@ class Simulation(object):
         #     exp_tonight += duration
 
     def observeField(self, fieldid, nexposures):
+        fieldidx = int(np.where(self.fieldid == fieldid)[0])
 
         # slewtime = np.float32(2. / 60. / 24.) # times some function of angular distance?
-        slewtime = self.moveTelescope(self.curr_mjd, fieldid)
+        slewtime = self.moveTelescope(self.curr_mjd, fieldidx)
         # print("moved to {} in {} s".format(fieldid, slewtime))
 
         # slewtime is in seconds...
         self.curr_mjd = self.curr_mjd + self.cals + np.float32(slewtime / 60. / 60. / 24.)
-
-        fieldidx = int(np.where(self.fieldid == fieldid)[0])
 
         for i in range(nexposures):
             # add each exposure
