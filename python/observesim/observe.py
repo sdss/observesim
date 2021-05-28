@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import fitsio
 
@@ -32,8 +34,8 @@ class SN2(object):
                 using a random variable.
 
         """
-        assert fid_cdf is None, "must init with fiducial CDF!"
-        assert fid_grid is None, "must init with fiducial grid!"
+        assert fid_cdf is not None, "must init with fiducial CDF!"
+        assert fid_grid is not None, "must init with fiducial grid!"
 
         assert len(fid_cdf) == len(fid_grid), "fiducial CDF and grid must be the same length!"
 
@@ -84,7 +86,7 @@ class SN2(object):
         elif np.isscalar(mu):
             mu = np.array([mu])
 
-        return np.array([_sampleCDF(x) for x in mu])
+        return np.array([self._sampleCDF(x) for x in mu])
 
 
 class Observe(object):
@@ -128,7 +130,7 @@ class Observe(object):
             self.defaultExp = defaultExp
         # self.defaultSN2 = 3000.
 
-        fid_file = '/'.join(os.path.realpath(__file__).split('/')[0:-3]) + "/data/sn_fiducial.fits"
+        fid_file = '/'.join(os.path.realpath(__file__).split('/')[0:-3]) + "/data/sn_fiducials.fits"
 
         fid_data = fitsio.read(fid_file)
 
@@ -136,12 +138,12 @@ class Observe(object):
         self.rSN2 = SN2(fid_cdf=fid_data["r_fid"], fid_grid=fid_data["r_grid"])
         self.bSN2 = SN2(fid_cdf=fid_data["b_fid"], fid_grid=fid_data["b_grid"])
 
-    def _amSN(am):
+    def _amSN(self, am):
         norm_rand = np.random.randn() / 10 + 0.7
         r = self.rSN2(norm_rand) / am
         b = self.bSN2(norm_rand) / am
         apg = self.apgSN2(norm_rand) / am**0.05
-    return r, b, apg
+        return r, b, apg
 
     def result(self, fieldid=None, mjd=None, airmass=1,
                epochidx=None, **kwargs):
