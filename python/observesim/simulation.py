@@ -18,8 +18,8 @@ import observesim.observe
 
 def sortFields(fieldids, nexps, exp, maxTime=0):
 
-    for f, n, e in zip(fieldids, nexps, exp):
-        if e * n < maxTime:
+    for f, n in zip(fieldids, nexps):
+        if exp * n < maxTime:
             return f, n
 
     return -1, -1
@@ -130,7 +130,6 @@ class Simulation(object):
 
         return max([dec_time, ra_time])
 
-
     def moveSloanTelescope(self, mjd, fieldid):
         altaz = self.observatory.altaz(Time(mjd, format="mjd"), self.coord[fieldid])
         alt = altaz.alt.deg
@@ -151,28 +150,12 @@ class Simulation(object):
 
         return max([alt_time, az_time, rot_time])
 
-
     def siteObs(self, fieldid, mjd):
         """Check observability issues at site, e.g. zenith at APO
            or enclosure, etc
            for any number of mjds, e.g. for a whole observing window
         """
-        # try:
-        #     len(mjd)
-        # except TypeError:
-        #     mjd = [mjd]
-        # good = list()
-        # for m in mjd:
-        #     # print(m, fieldid)
-        #     # print(self.field_ra[fieldid], self.field_dec[fieldid])
-        #     altaz = self.observatory.altaz(Time(0m, format="mjd"), self.coord[fieldid])
-        #     alt = altaz.alt.deg
-        #     az = altaz.az.deg
-        #     good.append(self.obsCheck(alt, az))
 
-        # return np.all(good, axis=0)
-
-        # this way seems to be at least 30% faster?
         try:
             len(mjd)
         except TypeError:
@@ -210,108 +193,102 @@ class Simulation(object):
         maxExp = int((self.nextchange - self.curr_mjd)//(self.nom_duration * 1.3 ** airmass_weight))
         if maxExp == 0:
             # self.curr_mjd = self.curr_mjd + self.nom_duration
-            return -1, 1
+            return -1, 1, True
         fieldid, nexposures = self.scheduler.nextfield(mjd=self.curr_mjd,
                                                        maxExp=maxExp)
         if(fieldid is not None):
             fieldidx = np.where(self.fieldid == fieldid)[0]
-            new_alt, new_az = self.scheduler.radec2altaz(mjd=self.curr_mjd,
-                                            ra=self.field_ra[fieldidx],
-                                            dec=self.field_dec[fieldidx])
-            new_duration = self.nom_duration * (1/np.cos(np.pi *
-                                                (90-new_alt) / 180.)) ** airmass_weight
-            # final_alt, final_az = self.scheduler.radec2altaz(
-            #                         mjd=self.curr_mjd + new_duration * nexposures,
-            #                         ra=self.field_ra[fieldid],
-            #                         dec=self.field_dec[fieldid])
-
-            site_check = self.siteObs(fieldidx, [self.curr_mjd + n*(new_duration) for n in range(nexposures)])
-            maxTime = self.nextchange - self.curr_mjd
-            if maxTime < new_duration * nexposures or \
-                not site_check:
-                # print("first field: ")
-                # print(fieldid, site_check, new_alt, new_az)
+            site_check = self.siteObs(fieldidx, [self.curr_mjd + n*(self.nom_duration) for n in range(nexposures)])
+            # maxTime = self.nextchange - self.curr_mjd
+            maxTime = maxExp * self.nom_duration
+            if not site_check:
                 field_idxs, nexps = self.scheduler.nextfield(mjd=self.curr_mjd,
                                                              maxExp=maxExp,
                                                              returnAll=True)
 
-                obs_fields = self.siteObs(field_idxs, [self.curr_mjd + n*(new_duration) for n in range(nexposures)])
+                obs_fields = self.siteObs(field_idxs, [self.curr_mjd + n*(self.nom_duration) for n in range(nexposures)])
                 field_idxs = field_idxs[obs_fields]
                 nexps = nexps[obs_fields]
                 if len(field_idxs) == 0:
                     # print("all fields collide with something :( ")
                     # print(obs_fields)
                     self.hit_lims += 1./20
-                    # self.curr_mjd = self.curr_mjd + self.nom_duration/20
-                    return -1, 1./20
-                alts, azs = self.scheduler.radec2altaz(mjd=self.curr_mjd,
-                                                       ra=self.field_ra[field_idxs],
-                                                       dec=self.field_dec[field_idxs])
-                adj_exp = self.nom_duration * np.power((1/np.cos(np.pi *
-                                                       (90 - alts) / 180.)), airmass_weight)
-                fieldidx, nexposures = sortFields(field_idxs, nexps, adj_exp, maxTime=maxTime)
+                    return -1, 1./20, False
+
+                fieldidx, nexposures = sortFields(field_idxs, nexps, self.nom_duration, maxTime=maxTime)
                 if fieldidx == -1:
                     # print("baawaaaaaahhhahahaa :( ")
                     # self.curr_mjd = self.curr_mjd + self.nom_duration/20
-                    return -1, 1./20
+                    return -1, 1./20, False
             fieldid = int(self.fieldid[fieldidx])
-            return fieldid, nexposures
+            return fieldid, nexposures, False
         else:
-            return -1, 1
-        # else:
-        #     lsts.append(self.scheduler.lst(self.curr_mjd)[0])
-        #     observed.append(-1)
-        #     self.curr_mjd = self.curr_mjd + duration
-        #     exp_tonight += duration
+            return -1, 1, False
+
+    def bookKeeping(self, fieldidx, i=-1):
+        """figure out SN and keep track, etc
+        """
+        alt, az = self.scheduler.radec2altaz(mjd=self.curr_mjd,
+                                             ra=self.field_ra[fieldidx],
+                                             dec=self.field_dec[fieldidx])
+        airmass = 1/np.cos(np.pi * (90-alt) / 180.)
+        if alt < 20:
+            print(i, alt, az, self.curr_mjd, fieldidx, "TOO LOW!!")
+            if alt < 0:
+                print("booooooooo")
+                # assert False, "ugh"
+
+        result = self.observe.result(mjd=self.curr_mjd, fieldid=fieldidx,
+                                     airmass=airmass,
+                                     epochidx=self.scheduler.fields.icadence[fieldidx])
+        duration = result["duration"]
+        if duration < 0 or np.isnan(duration):
+            print("HOOOWWWOWOWOWOWW")
+            print(i, alt, az, self.curr_mjd, fieldid)
+
+        self.curr_mjd = self.curr_mjd + duration + self.bossReadout
+
+        self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
+        self.obsHist["ra"].append(self.field_ra[fieldidx])
+        self.obsHist["bright"].append(self.bright())
+        self.obsHist["fieldid"].append(self.fieldid[fieldidx])
+
+        self.scheduler.update(fieldid=self.fieldid[fieldidx], result=result)
+
+        if self.bright():
+            return [result["apgSN2"]]
+        else:
+            return [result["rSN2"], result["bSN2"]]
 
     def observeField(self, fieldid, nexposures):
         fieldidx = int(np.where(self.fieldid == fieldid)[0])
 
-        # slewtime = np.float32(2. / 60. / 24.) # times some function of angular distance?
         slewtime = self.moveTelescope(self.curr_mjd, fieldidx)
-        # print("moved to {} in {} s".format(fieldid, slewtime))
 
         # slewtime is in seconds...
         self.curr_mjd = self.curr_mjd + self.cals + np.float32(slewtime / 60. / 60. / 24.)
 
         for i in range(nexposures):
-            # add each exposure
-            alt, az = self.scheduler.radec2altaz(mjd=self.curr_mjd,
-                                                 ra=self.field_ra[fieldidx],
-                                                 dec=self.field_dec[fieldidx])
-            airmass = 1/np.cos(np.pi * (90-alt) / 180.)
-            # observed.append(self.scheduler.fields.racen[fieldid])
-            if alt < 20:
-                print(i, alt, az, self.curr_mjd, fieldid)
-                if alt < 0:
-                    print("booooooooo")
-                    # assert False, "ugh"
+            # each "exposure" is a design
 
-            result = self.observe.result(mjd=self.curr_mjd, fieldid=fieldidx,
-                                         airmass=airmass,
-                                         epochidx=self.scheduler.fields.icadence[fieldidx])
-            duration = result["duration"]
-            if duration < 0 or np.isnan(duration):
-                print("HOOOWWWOWOWOWOWW")
-                print(i, alt, az, self.curr_mjd, fieldid)
+            res = self.bookKeeping(fieldidx, i=i)
 
-            self.curr_mjd = self.curr_mjd + duration + self.bossReadout
-            # lsts.append(self.scheduler.lst(self.curr_mjd)[0])
+            if len(res) == 1:
+                # it's bright time, check apg req
+                if res[0] < 900:
+                    self.bookKeeping(fieldidx, i=i)
+            else:
+                # it's dark time, check BOSS req
+                if res[0] < 5 or res[1] < 2.5:
+                    self.bookKeeping(fieldidx, i=i)
 
-            self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
-            self.obsHist["ra"].append(self.field_ra[fieldidx])
-            self.obsHist["bright"].append(self.bright())
-            self.obsHist["fieldid"].append(fieldid)
+            self.scheduler.fields.completeDesign(fieldid, self.curr_mjd)
 
             if(self.curr_mjd > self.nextchange):
                 oops = (self.curr_mjd - self.nextchange) * 24 * 60
                 if oops > 5:
                     print("NOOOO! BAD!", oops)
-                    print(i, nexposures, alt)
-            # print("observed: ", i,  fieldid, result)
-            self.scheduler.update(fieldid=fieldid, result=result)
-
-            # exp_tonight += duration
+                    print(i, nexposures, self.telescope)
 
     def observeMJD(self, mjd):
         # uncomment to do a quick check
@@ -323,7 +300,9 @@ class Simulation(object):
         int_mjd = int(self.curr_mjd)
         if int_mjd % 100 == 0:
             print("!!!!", int_mjd)
-        # print(int_mjd)
+
+        guesses = np.arange(0, 1, 0.05)
+
         while(self.curr_mjd < mjd_morning_twilight and
               self.curr_mjd < self.scheduler.end_mjd()):
             # should we do this now?
@@ -335,14 +314,20 @@ class Simulation(object):
                 if(self.nextchange > self.curr_mjd):
                     self.curr_mjd = self.nextchange
                 continue
-            fieldid, nexposures = self.nextField()
-            # print(self.curr_mjd, fieldid, nexposures)
+            fieldid, nexposures, noTime = self.nextField()
             if fieldid == -1:
-                self.curr_mjd = self.curr_mjd + self.nom_duration * nexposures
+                if noTime:
+                    self.curr_mjd = self.curr_mjd + self.nom_duration
+                    continue
+                # raise Exception()
+                print("skipped ", self.curr_mjd)
+                self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
+                self.obsHist["ra"].append(np.nan)
+                self.obsHist["bright"].append(self.bright())
+                self.obsHist["fieldid"].append(-1)
+                self.curr_mjd = self.curr_mjd + self.nom_duration
                 continue
             self.observeField(fieldid, nexposures)
-
-        # weather_used[mjd] = {"length": night_len, "observed": exp_tonight}
 
     def lstToArray(self):
         dtype = [('lst', np.float64),

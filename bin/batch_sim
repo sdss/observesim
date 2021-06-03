@@ -39,7 +39,7 @@ def runSim(args):
         warnings.simplefilter("ignore", category=ErfaWarning)
         for mjd in sim.scheduler.mjds:
             # uncomment to do a quick check
-            # if mjd > 59200:
+            # if mjd > 59700:
             #     continue
             sim.observeMJD(mjd)
     print("skipped for physical obstructions", sim.hit_lims)
@@ -100,7 +100,7 @@ parser.add_argument("-v", "--version", dest="version", type=str,
                     default=None)
 parser.add_argument("-s", "--schedule", dest="schedule", type=str,
                     required=False, help="master schedule to use",
-                    default="normal")
+                    default="maximal_v2")
 args = parser.parse_args()
 base = args.base
 plan = args.plan

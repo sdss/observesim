@@ -64,7 +64,8 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
         obs_idx = f["observations"][:int(f["nobservations"])]
         mjds = [obs_data[i]["mjd"] for i in obs_idx]
         cad = f["cadence"]
-        real_fid = allocation[f["fieldid"]]["fieldid"]
+        # real_fid = allocation[f["fieldid"]]["fieldid"]
+        real_fid = f["fieldid"]
 
         ids, cadences, targ_mjds = read_field(real_fid, mjds, assign)
         all_targs.extend(ids)
@@ -512,8 +513,8 @@ def cumulativePlot(base, plan, version=None, loc="apo"):
     months = mdates.MonthLocator()  # every month
     years_fmt = mdates.DateFormatter('%Y')
 
-    programs_to_highlight = ["bhm_aqmes_rm", "bhm_spiders_agn", "bhm_aqmes_wide",
-                             "mwm_galactic", "mwm_100pc", "mwm_planet"]
+    programs_to_highlight = ["bhm_rm_core", "bhm_spiders_agn_supercosmos", "bhm_spiders_agn_lsdr8",
+                             "mwm_galactic_core", "mwm_snc_100pc_boss", "mwm_tess_planet"]
 
     year1 = list()
     year2 = list()
@@ -682,11 +683,11 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
     req_by_cad = yaml.load(open(reqs_file))
 
     apo_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
-                           columns=["pk", "carton", "assigned"])
+                           columns=["target_pk", "carton", "assigned"])
     apo_comp_prog = np.array([p.strip() for p in apo_comp["carton"]])
 
     lco_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
-                           columns=["pk", "carton", "assigned"])
+                           columns=["target_pk", "carton", "assigned"])
     lco_comp_prog = np.array([p.strip() for p in lco_comp["carton"]])
 
     sum_text = ("{cad:30s}, {req:9s}, {input:8s}, {assign:9s}, {total:8s}, "
@@ -787,7 +788,7 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
     # since mike is naming these with version numbers now
     # need to find the right version
     spiders_names = [p for p in progs if "bhm_spiders_agn" in p]
-    assert len(spiders_names) == 1, "didn't find an appropriate spiders_agn carton!"
+    assert len(spiders_names) != 0, "didn't find an appropriate spiders_agn carton!"
     prog_name = spiders_names[0]
 
     targets = np.extract(loc_targs['carton'] == prog_name, loc_targs)

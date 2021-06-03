@@ -143,7 +143,7 @@ class Observe(object):
         r = self.rSN2(norm_rand) / am
         b = self.bSN2(norm_rand) / am
         apg = self.apgSN2(norm_rand) / am**0.05
-        return r, b, apg
+        return r, b, apg * 2  # 2x apg exp for each boss exp
 
     def result(self, fieldid=None, mjd=None, airmass=1,
                epochidx=None, **kwargs):
