@@ -335,22 +335,38 @@ def tabulate(counts, planned, cadence):
     return completion, visits, plan_count
 
 
+# def convertCadence(cad):
+#     if not "-" in cad:
+#         return cad.strip()
+#     name, num = cad.split("-")
+#     try:
+#         num = int(num)
+#     except ValueError:
+#         # this catches like 2 cadences
+#         # bright/dark used after "-"
+#         return cad.strip()
+#     if num < 6:
+#         return name + "-1:5"
+#     elif num < 11:
+#         return name + "-6:10"
+#     else:
+#         return name + "-10+"
+
+
 def convertCadence(cad):
-    if not "-" in cad:
-        return cad.strip()
-    name, num = cad.split("-")
-    try:
-        num = int(num)
-    except ValueError:
-        # this catches like 2 cadences
-        # bright/dark used after "-"
-        return cad.strip()
-    if num < 6:
-        return name + "-1:5"
-    elif num < 11:
-        return name + "-6:10"
+    split = cad.split("_")
+    nums = split[-1]
+    name = "".join([str(n) + "_" for n in split[:-1]])
+    epochs, exps = nums.split("x")
+    epochs = int(epochs)
+
+    name += "{}x" + exps
+    if epochs < 6:
+        return name.format("1:5")
+    elif epochs < 11:
+        return name.format("6:10")
     else:
-        return name + "-10+"
+        return name.format("10+")
 
 
 def doHist(res_base, rs_base, plan, version=None, loc="apo", level=0.95):
@@ -459,7 +475,8 @@ def combineProgramMjds(base, plan, version=None, loc="apo", N=0):
 
 def cumulativePlot(base, plan, version=None, loc="apo"):
     prog_mjds = combineProgramMjds(base, plan, version=version, loc=loc)
-    new_prog = [convertCadence(k) for k in prog_mjds.keys()]
+    # new_prog = [convertCadence(k) for k in prog_mjds.keys()]
+    new_prog = [k for k in prog_mjds.keys()]
     all_mjds = list()
     for k, i in prog_mjds.items():
         all_mjds.extend(list(i))
@@ -474,10 +491,10 @@ def cumulativePlot(base, plan, version=None, loc="apo"):
         today = dict()
         for k, v in prog_mjds.items():
             count = len(np.where(v < m)[0])
-            if convertCadence(k) in today:
-                today[convertCadence(k)].append(count)
+            if k in today:
+                today[k].append(count)
             else:
-                today[convertCadence(k)] = [count]
+                today[k] = [count]
 
         for k, v in today.items():
             plot_progs[k].append(np.sum(v))
@@ -576,8 +593,8 @@ def cumulativePlot(base, plan, version=None, loc="apo"):
 
 
 def yearBars(mjds, v):
-    jan_2021 = 59215
-    cuts = jan_2021 + np.arange(365, 365.25*6, 365.25)
+    jan_2022 = 59580
+    cuts = jan_2022 + np.arange(365, 365.25*6, 365.25)
     perYear = list()
 
     for c in cuts:

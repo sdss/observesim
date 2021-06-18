@@ -116,8 +116,8 @@ class Simulation(object):
 
         self.hit_lims = 0
 
-    def moveDuPontTelescope(self, mjd, fieldid):
-        next_ra, next_dec = self.field_ra[fieldid], self.field_dec[fieldid]
+    def moveDuPontTelescope(self, mjd, fieldidx):
+        next_ra, next_dec = self.field_ra[fieldidx], self.field_dec[fieldidx]
 
         dec_slew = np.abs(next_ra-self.telescope["ra"])
         ra_slew = np.abs(next_dec-self.telescope["dec"])
@@ -125,16 +125,16 @@ class Simulation(object):
         dec_time = decTime(dec_slew)
         ra_time = raTime(ra_slew)
 
-        self.telescope["ra"] = self.field_ra[fieldid]
-        self.telescope["dec"] = self.field_dec[fieldid]
+        self.telescope["ra"] = self.field_ra[fieldidx]
+        self.telescope["dec"] = self.field_dec[fieldidx]
 
         return max([dec_time, ra_time])
 
-    def moveSloanTelescope(self, mjd, fieldid):
-        altaz = self.observatory.altaz(Time(mjd, format="mjd"), self.coord[fieldid])
+    def moveSloanTelescope(self, mjd, fieldidx):
+        altaz = self.observatory.altaz(Time(mjd, format="mjd"), self.coord[fieldidx])
         alt = altaz.alt.deg
         az = altaz.az.deg
-        angle = self.observatory.parallactic_angle(Time(mjd, format="mjd"), self.coord[fieldid]).deg
+        angle = self.observatory.parallactic_angle(Time(mjd, format="mjd"), self.coord[fieldidx]).deg
 
         alt_slew = np.abs(alt-self.telescope["alt"])
         az_slew = np.abs(az-self.telescope["az"])
@@ -238,7 +238,7 @@ class Simulation(object):
                 print("booooooooo")
                 # assert False, "ugh"
 
-        result = self.observe.result(mjd=self.curr_mjd, fieldid=fieldidx,
+        result = self.observe.result(mjd=self.curr_mjd, fieldid=self.fieldid[fieldidx],
                                      airmass=airmass,
                                      epochidx=self.scheduler.fields.icadence[fieldidx])
         duration = result["duration"]
@@ -248,17 +248,14 @@ class Simulation(object):
 
         self.curr_mjd = self.curr_mjd + duration + self.bossReadout
 
+        self.moveTelescope(self.curr_mjd, fieldidx)
+
         self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
         self.obsHist["ra"].append(self.field_ra[fieldidx])
         self.obsHist["bright"].append(self.bright())
         self.obsHist["fieldid"].append(self.fieldid[fieldidx])
 
-        self.scheduler.update(fieldid=self.fieldid[fieldidx], result=result)
-
-        if self.bright():
-            return [result["apgSN2"]]
-        else:
-            return [result["rSN2"], result["bSN2"]]
+        return result
 
     def observeField(self, fieldid, nexposures):
         fieldidx = int(np.where(self.fieldid == fieldid)[0])
@@ -271,24 +268,29 @@ class Simulation(object):
         for i in range(nexposures):
             # each "exposure" is a design
 
-            res = self.bookKeeping(fieldidx, i=i)
-
-            if len(res) == 1:
-                # it's bright time, check apg req
-                if res[0] < 900:
-                    self.bookKeeping(fieldidx, i=i)
-            else:
-                # it's dark time, check BOSS req
-                if res[0] < 5 or res[1] < 2.5:
-                    self.bookKeeping(fieldidx, i=i)
-
-            self.scheduler.fields.completeDesign(fieldid, self.curr_mjd)
-
             if(self.curr_mjd > self.nextchange):
                 oops = (self.curr_mjd - self.nextchange) * 24 * 60
                 if oops > 5:
                     print("NOOOO! BAD!", oops)
-                    print(i, nexposures, self.telescope)
+                    # print(i, nexposures, self.telescope)
+                continue
+
+            res = self.bookKeeping(fieldidx, i=i)
+
+            if self.bright():
+                if res["apgSN2"] < 600:
+                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                          finish=False)
+                    res = self.bookKeeping(fieldidx, i=i)
+                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                          finish=True)
+            else:
+                if res["rSN2"] < 4 or res["bSN2"] < 2:
+                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                          finish=False)
+                    res = self.bookKeeping(fieldidx, i=i)
+                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                          finish=True)
 
     def observeMJD(self, mjd):
         # uncomment to do a quick check
@@ -320,7 +322,7 @@ class Simulation(object):
                     self.curr_mjd = self.curr_mjd + self.nom_duration
                     continue
                 # raise Exception()
-                print("skipped ", self.curr_mjd)
+                # print("skipped ", self.curr_mjd)
                 self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
                 self.obsHist["ra"].append(np.nan)
                 self.obsHist["bright"].append(self.bright())
