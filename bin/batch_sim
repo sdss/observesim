@@ -43,6 +43,7 @@ def runSim(args):
             #     continue
             sim.observeMJD(mjd)
     print("skipped for physical obstructions", sim.hit_lims)
+    print(f"REDO: apg {sim.redo_apg} r {sim.redo_r} b {sim.redo_b}")
     endTime = time.time()
 
     # assert len(lsts) == len(observed), "lst tracking munged"

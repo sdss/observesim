@@ -116,6 +116,10 @@ class Simulation(object):
 
         self.hit_lims = 0
 
+        self.redo_apg = 0
+        self.redo_r = 0
+        self.redo_b = 0
+
     def moveDuPontTelescope(self, mjd, fieldidx):
         next_ra, next_dec = self.field_ra[fieldidx], self.field_dec[fieldidx]
 
@@ -277,20 +281,27 @@ class Simulation(object):
 
             res = self.bookKeeping(fieldidx, i=i)
 
-            if self.bright():
-                if res["apgSN2"] < 600:
-                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
-                                          finish=False)
-                    res = self.bookKeeping(fieldidx, i=i)
-                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
-                                          finish=True)
-            else:
-                if res["rSN2"] < 4 or res["bSN2"] < 2:
-                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
-                                          finish=False)
-                    res = self.bookKeeping(fieldidx, i=i)
-                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
-                                          finish=True)
+            self.scheduler.update(fieldid=fieldid, result=res, finish=True)
+
+            # if self.bright():
+            #     if res["apgSN2"] < 600:
+            #         self.redo_apg += 1
+            #         self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+            #                               finish=False)
+            #         res = self.bookKeeping(fieldidx, i=i)
+            #         self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+            #                               finish=True)
+            # else:
+            #     if res["rSN2"] < 3 or res["bSN2"] < 1.2:
+            #         if res["rSN2"] < 3:
+            #             self.redo_r += 1
+            #         else:
+            #             self.redo_b += 1
+            #         self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+            #                               finish=False)
+            #         res = self.bookKeeping(fieldidx, i=i)
+            #         self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+            #                               finish=True)
 
     def observeMJD(self, mjd):
         # uncomment to do a quick check

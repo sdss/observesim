@@ -806,14 +806,20 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
     # need to find the right version
     spiders_names = [p for p in progs if "bhm_spiders_agn" in p]
     assert len(spiders_names) != 0, "didn't find an appropriate spiders_agn carton!"
-    prog_name = spiders_names[0]
+    # prog_name = spiders_names[0]
 
-    targets = np.extract(loc_targs['carton'] == prog_name, loc_targs)
+    # targets = np.extract(loc_targs['carton'] == prog_name, loc_targs)
+
+    w_spiders = [l in spiders_names for l in loc_targs['carton']]
+    targets = np.extract(w_spiders, loc_targs)
 
     obs_targets = fitsio.read(obs_file,
                               columns=["pk", "carton", "obs_mjd", "ra", "dec"])
 
-    obs_targets = np.extract(obs_targets['carton'] == prog_name, obs_targets)
+    # obs_targets = np.extract(obs_targets['carton'] == prog_name, obs_targets)
+
+    w_spiders = [l in spiders_names for l in obs_targets['carton']]
+    obs_targets = np.extract(w_spiders, obs_targets)
 
     # for time domain, ensure we get the earliest version
     obs_targets = np.sort(obs_targets, order="obs_mjd")
