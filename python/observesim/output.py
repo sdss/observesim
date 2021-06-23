@@ -146,7 +146,7 @@ header = """<html><head><meta http-equiv="Content-Type" content="text/html; char
 <h1>Observesim: {plan}</h1>
 <p>This page summarizes the observesim results for the {plan} robostrategy runs <a href="https://data.sdss.org/sas/sdss5/sandbox/robostrategy/allocations/{plan}">found here</a></p>
 
-<p>A video animation of this simulation is available!! <a href="moviePngsAllSky/sdss5_sim.mp4">Right click and "Save As"</a></p>
+<p>A video animation of this simulation is available!! <a href="moviePngsAllSky/sdss5_sim.mp4" download>Download</a></p>
 
 <h2>Summary</h2>
 <p> The results for each observatory are summarized below. The average completion % for each field cadence class is shown, as well as the number of exposures falling into each class (note the log scale). </p>"""

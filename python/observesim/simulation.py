@@ -114,6 +114,9 @@ class Simulation(object):
 
         self.coord = SkyCoord(self.field_ra * u.deg, self.field_dec * u.deg)
 
+        self.slews = list()
+        self.slew_mjds = list()
+
         self.hit_lims = 0
 
         self.redo_apg = 0
@@ -252,6 +255,7 @@ class Simulation(object):
 
         self.curr_mjd = self.curr_mjd + duration + self.bossReadout
 
+        # move telescope for tracking
         self.moveTelescope(self.curr_mjd, fieldidx)
 
         self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
@@ -265,6 +269,9 @@ class Simulation(object):
         fieldidx = int(np.where(self.fieldid == fieldid)[0])
 
         slewtime = self.moveTelescope(self.curr_mjd, fieldidx)
+
+        self.slews.append(int(slewtime))
+        self.slew_mjds.append(int(self.curr_mjd))
 
         # slewtime is in seconds...
         self.curr_mjd = self.curr_mjd + self.cals + np.float32(slewtime / 60. / 60. / 24.)
@@ -281,27 +288,31 @@ class Simulation(object):
 
             res = self.bookKeeping(fieldidx, i=i)
 
-            self.scheduler.update(fieldid=fieldid, result=res, finish=True)
-
-            # if self.bright():
-            #     if res["apgSN2"] < 600:
-            #         self.redo_apg += 1
-            #         self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
-            #                               finish=False)
-            #         res = self.bookKeeping(fieldidx, i=i)
-            #         self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
-            #                               finish=True)
-            # else:
-            #     if res["rSN2"] < 3 or res["bSN2"] < 1.2:
-            #         if res["rSN2"] < 3:
-            #             self.redo_r += 1
-            #         else:
-            #             self.redo_b += 1
-            #         self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
-            #                               finish=False)
-            #         res = self.bookKeeping(fieldidx, i=i)
-            #         self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
-            #                               finish=True)
+            if self.bright():
+                if res["apgSN2"] < 450:
+                    self.redo_apg += 1
+                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                          finish=False)
+                    res = self.bookKeeping(fieldidx, i=i)
+                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                          finish=True)
+                else:
+                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                          finish=True)
+            else:
+                if res["rSN2"] < 3 or res["bSN2"] < 1.5:
+                    if res["rSN2"] < 3:
+                        self.redo_r += 1
+                    else:
+                        self.redo_b += 1
+                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                          finish=False)
+                    res = self.bookKeeping(fieldidx, i=i)
+                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                          finish=True)
+                else:
+                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                          finish=True)
 
     def observeMJD(self, mjd):
         # uncomment to do a quick check
@@ -344,12 +355,20 @@ class Simulation(object):
 
     def lstToArray(self):
         dtype = [('lst', np.float64),
-                   ('ra', np.float64),
-                   ('bright', np.bool_),
-                   ('fieldid', np.int32)]
+                 ('ra', np.float64),
+                 ('bright', np.bool_),
+                 ('fieldid', np.int32)]
         lstOut = np.zeros(len(self.obsHist["lst"]), dtype=dtype)
         lstOut["lst"] = np.array(self.obsHist["lst"])
         lstOut["ra"] = np.array(self.obsHist["ra"])
         lstOut["bright"] = np.array(self.obsHist["bright"])
         lstOut["fieldid"] = np.array(self.obsHist["fieldid"])
         return(lstOut)
+
+    def slewsToArray(self):
+        dtype = [('time', np.int32),
+                 ('mjd', np.int32)]
+        arrayOut = np.zeros(len(self.slews), dtype=dtype)
+        arrayOut["time"] = np.array(self.slews)
+        arrayOut["mjd"] = np.array(self.slew_mjds)
+        return(arrayOut)

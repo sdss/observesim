@@ -18,6 +18,8 @@ import observesim.weather
 import roboscheduler.scheduler
 import observesim.observe
 from observesim import simulation
+from observesim.output import countFields, cumulativePlot,\
+                              spiders_area_for_program_time, doHist
 
 
 def runSim(args):
@@ -26,7 +28,7 @@ def runSim(args):
     # ###################
     # make sure this starts a clean slate every run!
     # ###################
-    idx, base, plan, observatory, schedule = args
+    idx, base, plan, version, observatory, schedule = args
 
     time.sleep(idx)  # hopefully that avoids read conflicts? xD
     print("running sim ", idx)
@@ -45,12 +47,6 @@ def runSim(args):
     print("skipped for physical obstructions", sim.hit_lims)
     print(f"REDO: apg {sim.redo_apg} r {sim.redo_r} b {sim.redo_b}")
     endTime = time.time()
-
-    # assert len(lsts) == len(observed), "lst tracking munged"
-    # with open("{base}lst_tracking_{idx}.dat".format(base=base, idx=idx), "w") as df:
-    #     print("lst, obs", file=df)
-    #     for l, o in zip(lsts, observed):
-    #         print("{}, {}".format(l, o), file=df)
 
     # with open("{base}weather_tracking_{idx}.dat".format(base=base, idx=idx), "w") as df:
     #     print("mjd, length, observed", file=df)
@@ -76,6 +72,20 @@ def runSim(args):
                                        plan=plan, idx=idx)
     fitsio.write(outobsfile, sim.lstToArray(),
                  clobber=True)
+
+    outobstemplate = "{base}{plan}-{observatory}-slews-{idx}.fits"
+    outobsfile = outobstemplate.format(base=base, observatory=observatory,
+                                       plan=plan, idx=idx)
+    fitsio.write(outobsfile, sim.slewsToArray(),
+                 clobber=True)
+
+    # get the env vars for now so I don't have to rewrite the whole thing
+    rs_base = os.getenv('OBSERVING_PLAN_DIR') + "/"
+    base = os.getenv("OBSERVESIM_OUTPUT_BASE")
+    countFields(base, rs_base, plan, version=version, loc=observatory, N=0)
+    cumulativePlot(base, plan, version=version, loc=observatory)
+    spiders_area_for_program_time(base, rs_base, plan, version=version, loc=observatory)
+    doHist(base, rs_base, plan, version=version, loc=observatory)
 
 # Read arguments
 usage = "sdss5_simulate"
@@ -133,7 +143,7 @@ else:
 
 if multi == -1:
     for i in range(number):
-        runSim((i, base, plan, observatory, schedule))
+        runSim((i, base, plan, version, observatory, schedule))
 
 else:
     assert multi > 1, "must use more than 1 process for multi argument"
@@ -141,7 +151,7 @@ else:
 
     pool = Pool(multi)
 
-    result = pool.map(runSim, ((i, base, plan, observatory, schedule) for i in range(number)))
+    result = pool.map(runSim, ((i, base, plan, version, observatory, schedule) for i in range(number)))
 
     pool.close()
     pool.join()

@@ -35,15 +35,17 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--version", dest="version", type=str,
                         required=False, help="use versioned directory for output",
                         default=None)
-    parser.add_argument("-c", "--count", dest="count", type=str2bool,
-                        required=False, help="redo post-processing file creation, adds 15+ min",
-                        default=True)
+    parser.add_argument("-c", "--count", dest="count", action="store_true",
+                        help="redo post-processing file creation, adds 15+ min")
+    parser.add_argument("-a", "--all", dest="all", action="store_true",
+                        help="redo post-processing file creation, adds 15+ min")
     args = parser.parse_args()
     base = args.base
     plan = args.plan
     version = args.version
     rs_base = args.rs_base
     recount = args.count
+    draw_all = args.all
 
     if base is None:
         base = os.getenv("OBSERVESIM_OUTPUT_BASE")
@@ -59,15 +61,16 @@ if __name__ == "__main__":
         countFields(base, rs_base, plan, version=version, loc="apo", N=0)
         countFields(base, rs_base, plan, version=version, loc="lco", N=0)
 
-    print("drawing cumulativePlot for {}".format(plan))
-    cumulativePlot(base, plan, version=version, loc="lco")
-    cumulativePlot(base, plan, version=version, loc="apo")
-    spiders_area_for_program_time(base, rs_base, plan, version=version, loc="lco")
-    spiders_area_for_program_time(base, rs_base, plan, version=version, loc="apo")
+    if draw_all:
+        print("drawing cumulativePlot for {}".format(plan))
+        cumulativePlot(base, plan, version=version, loc="lco")
+        cumulativePlot(base, plan, version=version, loc="apo")
+        spiders_area_for_program_time(base, rs_base, plan, version=version, loc="lco")
+        spiders_area_for_program_time(base, rs_base, plan, version=version, loc="apo")
 
-    print("drawing old figs for {}".format(plan))
-    doHist(base, rs_base, plan, version=version, loc="lco")
-    doHist(base, rs_base, plan, version=version, loc="apo")
+        print("drawing old figs for {}".format(plan))
+        doHist(base, rs_base, plan, version=version, loc="lco")
+        doHist(base, rs_base, plan, version=version, loc="apo")
 
     print("creating target metrics for {}".format(plan))
     plotTargMetric(base, rs_base, plan, version=version, reqs_file=None)
