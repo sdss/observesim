@@ -116,6 +116,11 @@ class Simulation(object):
 
         self.slews = list()
         self.slew_mjds = list()
+        self.slew_alt = list()
+        self.slew_az = list()
+        self.slew_rot = list()
+        self.slew_ra = list()
+        self.slew_dec = list()
 
         self.hit_lims = 0
 
@@ -126,8 +131,12 @@ class Simulation(object):
     def moveDuPontTelescope(self, mjd, fieldidx):
         next_ra, next_dec = self.field_ra[fieldidx], self.field_dec[fieldidx]
 
-        dec_slew = np.abs(next_ra-self.telescope["ra"])
-        ra_slew = np.abs(next_dec-self.telescope["dec"])
+        ra_slew = np.abs(next_ra-self.telescope["ra"])
+        dec_slew = np.abs(next_dec-self.telescope["dec"])
+
+        if ra_slew > 180:
+            ra_slew = 360 - ra_slew
+            assert ra_slew > 0, "forgot circular math? ra"
 
         dec_time = decTime(dec_slew)
         ra_time = raTime(ra_slew)
@@ -135,7 +144,7 @@ class Simulation(object):
         self.telescope["ra"] = self.field_ra[fieldidx]
         self.telescope["dec"] = self.field_dec[fieldidx]
 
-        return max([dec_time, ra_time])
+        return max([dec_time, ra_time]), ra_slew, dec_slew
 
     def moveSloanTelescope(self, mjd, fieldidx):
         altaz = self.observatory.altaz(Time(mjd, format="mjd"), self.coord[fieldidx])
@@ -145,7 +154,13 @@ class Simulation(object):
 
         alt_slew = np.abs(alt-self.telescope["alt"])
         az_slew = np.abs(az-self.telescope["az"])
+        if az_slew > 180:
+            az_slew = 360 - az_slew
+            assert az_slew > 0, "forgot circular math?  az"
         rot_slew = np.abs(angle-self.telescope["par_angle"])
+        if rot_slew > 180:
+            rot_slew = 360 - rot_slew
+            assert rot_slew > 0, "forgot circular math? rot"
 
         alt_time = alt_slew / self.telescope["alt_slew"]
         az_time = az_slew / self.telescope["az_slew"]
@@ -155,7 +170,7 @@ class Simulation(object):
         self.telescope["az"] = az
         self.telescope["par_angle"] = angle
 
-        return max([alt_time, az_time, rot_time])
+        return max([alt_time, az_time, rot_time]), alt_slew, az_slew, rot_slew
 
     def siteObs(self, fieldid, mjd):
         """Check observability issues at site, e.g. zenith at APO
@@ -268,10 +283,25 @@ class Simulation(object):
     def observeField(self, fieldid, nexposures):
         fieldidx = int(np.where(self.fieldid == fieldid)[0])
 
-        slewtime = self.moveTelescope(self.curr_mjd, fieldidx)
+        slewtime, *axes = self.moveTelescope(self.curr_mjd, fieldidx)
 
         self.slews.append(int(slewtime))
         self.slew_mjds.append(int(self.curr_mjd))
+
+        if len(axes) == 3:
+            self.slew_alt.append(float(axes[0]))
+            self.slew_az.append(float(axes[1]))
+            self.slew_rot.append(float(axes[2]))
+
+            self.slew_ra.append(np.nan)
+            self.slew_dec.append(np.nan)
+        else:
+            self.slew_ra.append(float(axes[0]))
+            self.slew_dec.append(float(axes[1]))
+
+            self.slew_alt.append(np.nan)
+            self.slew_az.append(np.nan)
+            self.slew_rot.append(np.nan)
 
         # slewtime is in seconds...
         self.curr_mjd = self.curr_mjd + self.cals + np.float32(slewtime / 60. / 60. / 24.)
@@ -367,8 +397,19 @@ class Simulation(object):
 
     def slewsToArray(self):
         dtype = [('time', np.int32),
-                 ('mjd', np.int32)]
+                 ('mjd', np.int32),
+                 ('alt', np.float64),
+                 ('az', np.float64),
+                 ('rot', np.float64),
+                 ('ra', np.float64),
+                 ('dec', np.float64)]
         arrayOut = np.zeros(len(self.slews), dtype=dtype)
         arrayOut["time"] = np.array(self.slews)
         arrayOut["mjd"] = np.array(self.slew_mjds)
+        arrayOut["alt"] = np.array(self.slew_alt)
+        arrayOut["az"] = np.array(self.slew_az)
+        arrayOut["rot"] = np.array(self.slew_rot)
+        arrayOut["ra"] = np.array(self.slew_ra)
+        arrayOut["dec"] = np.array(self.slew_dec)
+
         return(arrayOut)
