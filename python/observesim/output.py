@@ -357,7 +357,12 @@ def convertCadence(cad):
     split = cad.split("_")
     nums = split[-1]
     name = "".join([str(n) + "_" for n in split[:-1]])
-    epochs, exps = nums.split("x")
+    try:
+        epochs, exps = nums.split("x")
+    except ValueError:
+        return cad
+    if int(exps) > 6:
+        return cad
     epochs = int(epochs)
 
     name += "{}x" + exps
@@ -836,7 +841,7 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
 
 
 def spiders_area_for_program(base, rs_base, plan, version=None, loc="apo"):
-    targets, obs_targets = grab_summary_files(base, rs_base, plan, version=None, loc=loc)
+    targets, obs_targets = grab_summary_files(base, rs_base, plan, version=version, loc=loc)
 
     planned, obs = compute_area_above_threshold(targets, obs_targets, threshold=0.8, nside=64)
 
@@ -847,7 +852,7 @@ def spiders_area_for_program(base, rs_base, plan, version=None, loc="apo"):
 
 
 def spiders_area_for_program_time(base, rs_base, plan, version=None, loc="apo"):
-    targets, obs_targets = grab_summary_files(base, rs_base, plan, version=None, loc=loc)
+    targets, obs_targets = grab_summary_files(base, rs_base, plan, version=version, loc=loc)
 
     start_mjd = int(np.min(obs_targets["obs_mjd"]))
     end_mjd = int(np.max(obs_targets["obs_mjd"])) + 1

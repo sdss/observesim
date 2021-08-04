@@ -27,9 +27,9 @@ def sortFields(fieldids, nexps, exp, maxTime=0):
 
 def apoCheck(alt, az):
     enc = [a > 45 or z > 100 or z < 80 for a, z in zip(alt, az)]
-    alt = [a < 86 and a > 30 for a in alt]
+    altc = [a < 86 and a > 30 for a in alt]
 
-    return np.logical_and(enc, alt)
+    return np.logical_and(enc, altc)
 
 
 def lcoCheck(alt, az):
@@ -66,7 +66,7 @@ class Simulation(object):
     """A class to encapsulate an SDSS-5 simulation
     """
 
-    def __init__(self, plan, observatory, idx=1, schedule="normal"):
+    def __init__(self, plan, observatory, idx=1, schedule="normal", redo_exp=True):
         if(observatory == 'apo'):
             timezone = "US/Mountain"
             fclear = 0.5
@@ -83,10 +83,14 @@ class Simulation(object):
             self.obsCheck = lcoCheck
             self.moveTelescope = self. moveDuPontTelescope
 
+        self.redo_exp = redo_exp
+
         self.obsHist = {"lst": list(),
                         "ra": list(),
                         "bright": list(),
-                        "fieldid": list()}
+                        "fieldid": list(),
+                        "weather": list(),
+                        "mjd": list()}
 
         self.scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory,
                                                            schedule=schedule)
@@ -172,7 +176,7 @@ class Simulation(object):
 
         return max([alt_time, az_time, rot_time]), alt_slew, az_slew, rot_slew
 
-    def siteObs(self, fieldid, mjd):
+    def siteObs(self, fieldidx, mjd):
         """Check observability issues at site, e.g. zenith at APO
            or enclosure, etc
            for any number of mjds, e.g. for a whole observing window
@@ -184,17 +188,17 @@ class Simulation(object):
             mjd = np.array([mjd])
 
         try:
-            len(fieldid)
+            len(fieldidx)
         except TypeError:
-            fieldid = np.array([fieldid])
+            fieldidx = np.array([fieldidx])
 
-        altaz = self.observatory.altaz(Time(mjd, format="mjd"), self.coord[fieldid],
+        altaz = self.observatory.altaz(Time(mjd, format="mjd"), self.coord[fieldidx],
                                        grid_times_targets=True)
         # altaz shape = (fields x mjds)
         alt = altaz.alt.deg.flatten()
         az = altaz.az.deg.flatten()
         res = self.obsCheck(alt, az)
-        good = res.reshape((len(fieldid), len(mjd)))
+        good = res.reshape((len(fieldidx), len(mjd)))
 
         # axis 1 is along fields, I guess...
         return np.all(good, axis=1)
@@ -243,6 +247,7 @@ class Simulation(object):
                     # self.curr_mjd = self.curr_mjd + self.nom_duration/20
                     return -1, 1./20, False
             fieldid = int(self.fieldid[fieldidx])
+
             return fieldid, nexposures, False
         else:
             return -1, 1, False
@@ -277,6 +282,8 @@ class Simulation(object):
         self.obsHist["ra"].append(self.field_ra[fieldidx])
         self.obsHist["bright"].append(self.bright())
         self.obsHist["fieldid"].append(self.fieldid[fieldidx])
+        self.obsHist["weather"].append(False)
+        self.obsHist["mjd"].append(self.curr_mjd)
 
         return result
 
@@ -319,7 +326,7 @@ class Simulation(object):
             res = self.bookKeeping(fieldidx, i=i)
 
             if self.bright():
-                if res["apgSN2"] < 450:
+                if res["apgSN2"] < 450 and self.redo_exp:
                     self.redo_apg += 1
                     self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
                                           finish=False)
@@ -330,7 +337,7 @@ class Simulation(object):
                     self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
                                           finish=True)
             else:
-                if res["rSN2"] < 3 or res["bSN2"] < 1.5:
+                if (res["rSN2"] < 3 or res["bSN2"] < 1.5) and self.redo_exp:
                     if res["rSN2"] < 3:
                         self.redo_r += 1
                     else:
@@ -345,29 +352,44 @@ class Simulation(object):
                                           finish=True)
 
     def observeMJD(self, mjd):
-        # uncomment to do a quick check
-        exp_tonight = 0
         mjd_evening_twilight = self.scheduler.evening_twilight(mjd)
         mjd_morning_twilight = self.scheduler.morning_twilight(mjd)
-        night_len = mjd_morning_twilight - mjd_evening_twilight
         self.curr_mjd = mjd_evening_twilight
-        int_mjd = int(self.curr_mjd)
-        if int_mjd % 100 == 0:
-            print("!!!!", int_mjd)
+        # int_mjd = int(self.curr_mjd)
+        if mjd % 100 == 0:
+            print("!!!!", mjd)
 
-        guesses = np.arange(0, 1, 0.05)
+        # guesses = np.arange(0, 1, 0.05)
+
+        self.nextchange = mjd_morning_twilight
 
         while(self.curr_mjd < mjd_morning_twilight and
               self.curr_mjd < self.scheduler.end_mjd()):
             # should we do this now?
             isclear, nextchange_weather = self.weather.clear(mjd=self.curr_mjd)
             onoff, nextchange_on = self.scheduler.on(mjd=self.curr_mjd)
-            nextchange_all = np.array([nextchange_weather, nextchange_on, mjd_morning_twilight])
-            self.nextchange = np.min(nextchange_all)
-            if not ((isclear == True) and (onoff == 'on')):
-                if(self.nextchange > self.curr_mjd):
-                    self.curr_mjd = self.nextchange
-                continue
+
+            nextchange = np.min(np.array([nextchange_weather, nextchange_on, mjd_morning_twilight]))
+
+            if not isclear:
+                # count = 0
+                # dur = float(nextchange - self.curr_mjd)
+                while self.curr_mjd < nextchange:
+                    if nextchange - self.curr_mjd < self.nom_duration:
+                        self.curr_mjd = nextchange
+                        continue
+                    self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
+                    self.obsHist["ra"].append(-1)
+                    self.obsHist["bright"].append(self.bright())
+                    self.obsHist["fieldid"].append(-1)
+                    self.obsHist["weather"].append(True)
+                    self.obsHist["mjd"].append(self.curr_mjd)
+                    self.curr_mjd += self.nom_duration + self.bossReadout + self.cals
+                    # count += 1
+                # print("WEATHER ", self.curr_mjd, f"night {night_len*24:.1f}, weather {dur*24:.1f}", count)
+            elif (onoff != 'on'):
+                self.curr_mjd = nextchange
+
             fieldid, nexposures, noTime = self.nextField()
             if fieldid == -1:
                 if noTime:
@@ -379,20 +401,27 @@ class Simulation(object):
                 self.obsHist["ra"].append(np.nan)
                 self.obsHist["bright"].append(self.bright())
                 self.obsHist["fieldid"].append(-1)
+                self.obsHist["weather"].append(False)
+                self.obsHist["mjd"].append(self.curr_mjd)
                 self.curr_mjd = self.curr_mjd + self.nom_duration
                 continue
             self.observeField(fieldid, nexposures)
 
     def lstToArray(self):
+        assert len(self.obsHist["weather"]) == len(self.obsHist["lst"]), "lst tracking bad!"
         dtype = [('lst', np.float64),
                  ('ra', np.float64),
                  ('bright', np.bool_),
-                 ('fieldid', np.int32)]
+                 ('fieldid', np.int32),
+                 ('weather', np.bool_),
+                 ('mjd', np.float64)]
         lstOut = np.zeros(len(self.obsHist["lst"]), dtype=dtype)
         lstOut["lst"] = np.array(self.obsHist["lst"])
         lstOut["ra"] = np.array(self.obsHist["ra"])
         lstOut["bright"] = np.array(self.obsHist["bright"])
         lstOut["fieldid"] = np.array(self.obsHist["fieldid"])
+        lstOut["weather"] = np.array(self.obsHist["weather"])
+        lstOut["mjd"] = np.array(self.obsHist["mjd"])
         return(lstOut)
 
     def slewsToArray(self):

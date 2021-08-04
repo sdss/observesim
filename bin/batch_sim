@@ -28,12 +28,12 @@ def runSim(args):
     # ###################
     # make sure this starts a clean slate every run!
     # ###################
-    idx, base, plan, version, observatory, schedule = args
+    idx, base, plan, version, observatory, schedule, redo_exp, check = args
 
-    time.sleep(idx)  # hopefully that avoids read conflicts? xD
+    time.sleep(idx)  # hopefully that avoids read conflicts?
     print("running sim ", idx)
 
-    sim = simulation.Simulation(plan, observatory, idx=idx, schedule=schedule)
+    sim = simulation.Simulation(plan, observatory, idx=idx, schedule=schedule, redo_exp=redo_exp)
 
     startTime = time.time()
     # Loop through nights
@@ -41,8 +41,8 @@ def runSim(args):
         warnings.simplefilter("ignore", category=ErfaWarning)
         for mjd in sim.scheduler.mjds:
             # uncomment to do a quick check
-            # if mjd > 59700:
-            #     continue
+            if mjd > 59600 and check:
+                continue
             sim.observeMJD(mjd)
     print("skipped for physical obstructions", sim.hit_lims)
     print(f"REDO: apg {sim.redo_apg} r {sim.redo_r} b {sim.redo_b}")
@@ -79,6 +79,9 @@ def runSim(args):
     fitsio.write(outobsfile, sim.slewsToArray(),
                  clobber=True)
 
+    if check:
+        return None
+
     # get the env vars for now so I don't have to rewrite the whole thing
     rs_base = os.getenv('OBSERVING_PLAN_DIR') + "/"
     base = os.getenv("OBSERVESIM_OUTPUT_BASE")
@@ -112,6 +115,10 @@ parser.add_argument("-v", "--version", dest="version", type=str,
 parser.add_argument("-s", "--schedule", dest="schedule", type=str,
                     required=False, help="master schedule to use",
                     default="maximal_v2")
+parser.add_argument("-r", "--redo", dest="redo_exp", action="store_true",
+                    help="redo exposures if snr below threshold")
+parser.add_argument("-c", "--check", dest="check", action="store_true",
+                    help="do minimal sim to check changes")
 args = parser.parse_args()
 base = args.base
 plan = args.plan
@@ -120,30 +127,26 @@ number = args.number
 multi = args.multi
 version = args.version
 schedule = args.schedule
+redo_exp = args.redo_exp
+check = args.check
 
 if base is None:
     base = os.getenv("OBSERVESIM_OUTPUT_BASE")
 
 assert base is not None, "must specify result base"
 
-if version is not None:
-    base = os.path.join(base, version)
-    try:
-        os.makedirs(base)
-    except:
-        pass
-    base += "/"
-else:
-    base = os.path.join(base, plan)
-    try:
-        os.makedirs(base)
-    except:
-        pass
-    base += "/"
+if version is None:
+    version = plan + "-hack_obsmode"
+base = os.path.join(base, version)
+try:
+    os.makedirs(base)
+except:
+    pass
+base += "/"
 
 if multi == -1:
     for i in range(number):
-        runSim((i, base, plan, version, observatory, schedule))
+        runSim((i, base, plan, version, observatory, schedule, redo_exp, check))
 
 else:
     assert multi > 1, "must use more than 1 process for multi argument"
@@ -151,7 +154,7 @@ else:
 
     pool = Pool(multi)
 
-    result = pool.map(runSim, ((i, base, plan, version, observatory, schedule) for i in range(number)))
+    result = pool.map(runSim, ((i, base, plan, version, observatory, schedule, redo_exp, check) for i in range(number)))
 
     pool.close()
     pool.join()
