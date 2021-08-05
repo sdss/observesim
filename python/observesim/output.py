@@ -7,6 +7,7 @@ import fitsio
 import yaml
 import healpy as hp
 from PyAstronomy.pyasl.asl.astroTimeLegacy import daycnv
+from roboscheduler.fields import epochs_completed
 
 __all__ = ["cumulativePlot", "doHist", "plotTargMetric", "writeWebPage",
            "countFields", "spiders_area_for_program_time"]
@@ -79,23 +80,25 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 
     targ_ids = list()
     programs = list()
+    cartons = list()
     gots = list()
     ras = list()
     decs = list()
 
     completeness = fitsio.read(rs_base + "{plan}/rsCompleteness-{plan}-{loc}.fits".format(
                                           loc=loc, plan=plan),
-                               columns=["catalogid", "carton", "assigned", "cadence", "ra", "dec", "catalogid"])
+                               columns=["catalogid", "carton", "program", "assigned", "cadence", "ra", "dec", "catalogid"])
     completeness = completeness[np.where(completeness["catalogid"] != -1)]
 
     comp_dict = dict()
     for c in completeness:
-        comp_dict[c["catalogid"]] = (c["catalogid"], c["carton"], c["assigned"], c["cadence"], c["ra"], c["dec"])
+        comp_dict[c["catalogid"]] = (c["catalogid"], c["carton"], c["program"], c["assigned"], c["cadence"], c["ra"], c["dec"])
 
     for k, c in zip(all_targs, all_cads):
-        targetid, program, got, cadence, ra, dec = comp_dict[k]
+        targetid, carton, program, got, cadence, ra, dec = comp_dict[k]
         targ_ids.append(targetid)
         programs.append(program)
+        cartons.append(carton)
         gots.append(got)
         ras.append(ra)
         decs.append(dec)
@@ -105,6 +108,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     dtype = [('pk', np.int32),
              ('target_id', np.int32),
              ('cadence', np.dtype('a40')),
+             ('program', np.dtype('a40')),
              ('carton', np.dtype('a40')),
              ('field_id', np.int32),
              ('assigned', np.int32),
@@ -118,7 +122,8 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     obs_targs["field_id"] = all_fields
     obs_targs["obs_mjd"] = all_mjds
     obs_targs["assigned"] = gots
-    obs_targs["carton"] = programs
+    obs_targs["program"] = programs
+    obs_targs["carton"] = cartons
     obs_targs["target_id"] = targ_ids
     obs_targs["ra"] = ras
     obs_targs["dec"] = decs
@@ -314,6 +319,39 @@ def getCounts(res_base, rs_base, plan, version=None, loc="apo"):
     return counts, planned, [c for c in fields["cadence"]]
 
 
+def countEpochs(res_base, rs_base, plan, version=None, loc="apo"):
+    if version is not None:
+        v_base = os.path.join(res_base, version)
+        v_base += "/"
+    else:
+        v_base = os.path.join(res_base, plan)
+        v_base += "/"
+    files = os.listdir(v_base)
+
+    N = 0
+
+    sim_data = fitsio.read(v_base + "{plan}-{loc}-fields-{n}.fits".format(plan=plan, loc=loc, n=N))
+    obs_data = fitsio.read(v_base + "{plan}-{loc}-observations-{n}.fits".format(plan=plan, loc=loc, n=N))
+    cads = fitsio.read(rs_base + "{plan}/rsCadences-{plan}-{loc}.fits".format(plan=plan, loc=loc))
+
+    counts = list()
+    planned = list()
+    cadences = list()
+
+    for f in sim_data:
+        obs_idx = f["observations"][:int(f["nobservations"])]
+        mjds = [obs_data[i]["mjd"] for i in obs_idx]
+        cad = f["cadence"]
+        this_cad = cads[cads["CADENCE"] == cad][0]
+        obs_epochs, last_epoch = epochs_completed(mjds, this_cad["MAX_LENGTH"])
+
+        counts.append(obs_epochs)
+        planned.append(this_cad["NEPOCHS"])
+        cadences.append(cad)
+
+    return counts, planned, cadences
+
+
 def tabulate(counts, planned, cadence):
     completion = dict()
     visits = dict()
@@ -377,7 +415,8 @@ def convertCadence(cad):
 def doHist(res_base, rs_base, plan, version=None, loc="apo", level=0.95):
     """Create old histograms by cadence
     """
-    args = getCounts(res_base, rs_base, plan, version=version, loc=loc)
+    # args = getCounts(res_base, rs_base, plan, version=version, loc=loc)
+    args = countEpochs(res_base, rs_base, plan, version=version, loc=loc)
     completion, vis_count, plan_count = tabulate(*args)
     print("found {} cadences".format(len(completion.keys())))
 
@@ -548,6 +587,8 @@ def cumulativePlot(base, plan, version=None, loc="apo"):
     used_progs = list()  # ugh why are the observatories not the same...
 
     for k, v in plot_progs.items():
+        if "ops" in k:
+            continue
         plt.figure(figsize=(8,5))
         ax = plt.subplot(111)
         cal_days = daycnv(mjds+2400000.5, mode="dt")
@@ -638,9 +679,9 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
         v_base += "/"
 
     apo_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
-                            columns=["obs_mjd", "carton", "pk"])
+                            columns=["obs_mjd", "program", "pk"])
     lco_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
-                            columns=["obs_mjd", "carton", "pk"])
+                            columns=["obs_mjd", "program", "pk"])
     lco_targs_mjds = {i: [] for i in np.unique(lco_targs["pk"])}
     apo_targs_mjds = {i: [] for i in np.unique(apo_targs["pk"])}
 
@@ -648,11 +689,11 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
 
     for t in lco_targs:
         lco_targs_mjds[t["pk"]].append(t["obs_mjd"])
-        targ_to_prog[t["pk"]] = t["carton"]
+        targ_to_prog[t["pk"]] = t["program"]
 
     for t in apo_targs:
         apo_targs_mjds[t["pk"]].append(t["obs_mjd"])
-        targ_to_prog[t["pk"]] = t["carton"]
+        targ_to_prog[t["pk"]] = t["program"]
 
     # #####################
     # #####################
@@ -662,12 +703,12 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
     apo_progs = {c: [] for c in all_progs}
 
     for t, v in lco_targs_mjds.items():
-        if passesCadence(v):
-            lco_progs[targ_to_prog[t]].append(t)
+        lco_progs[targ_to_prog[t]].append(t)
+        # if passesCadence(v):
 
     for t, v in apo_targs_mjds.items():
-        if passesCadence(v):
-            apo_progs[targ_to_prog[t]].append(t)
+        apo_progs[targ_to_prog[t]].append(t)
+        # if passesCadence(v):
 
     # #####################
     # #####################
@@ -705,12 +746,12 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
     req_by_cad = yaml.load(open(reqs_file))
 
     apo_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
-                           columns=["target_pk", "carton", "assigned"])
-    apo_comp_prog = np.array([p.strip() for p in apo_comp["carton"]])
+                           columns=["target_pk", "program", "assigned"])
+    apo_comp_prog = np.array([p.strip() for p in apo_comp["program"]])
 
     lco_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
-                           columns=["target_pk", "carton", "assigned"])
-    lco_comp_prog = np.array([p.strip() for p in lco_comp["carton"]])
+                           columns=["target_pk", "program", "assigned"])
+    lco_comp_prog = np.array([p.strip() for p in lco_comp["program"]])
 
     sum_text = ("{cad:30s}, {req:9s}, {input:8s}, {assign:9s}, {total:8s}, "
                 "{apo:8s}, {lco:8s}, {assign_apo:10s}, {assign_lco:10s}\n").format(
@@ -801,29 +842,29 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
     comp_file = rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc)
 
     all_targets = fitsio.read(comp_file,
-                              columns=["covered", "carton", "ra", "dec", "assigned"])
+                              columns=["covered", "program", "ra", "dec", "assigned"])
 
     loc_targs = np.extract(all_targets["covered"] > 0, all_targets)
 
-    progs = np.unique(loc_targs["carton"])
+    progs = np.unique(loc_targs["program"])
 
     # since mike is naming these with version numbers now
     # need to find the right version
-    spiders_names = [p for p in progs if "bhm_spiders_agn" in p]
+    spiders_names = [p for p in progs if "bhm_spiders" in p]
     assert len(spiders_names) != 0, "didn't find an appropriate spiders_agn carton!"
     # prog_name = spiders_names[0]
 
     # targets = np.extract(loc_targs['carton'] == prog_name, loc_targs)
 
-    w_spiders = [l in spiders_names for l in loc_targs['carton']]
+    w_spiders = [l in spiders_names for l in loc_targs['program']]
     targets = np.extract(w_spiders, loc_targs)
 
     obs_targets = fitsio.read(obs_file,
-                              columns=["pk", "carton", "obs_mjd", "ra", "dec"])
+                              columns=["pk", "program", "obs_mjd", "ra", "dec"])
 
     # obs_targets = np.extract(obs_targets['carton'] == prog_name, obs_targets)
 
-    w_spiders = [l in spiders_names for l in obs_targets['carton']]
+    w_spiders = [l in spiders_names for l in obs_targets['program']]
     obs_targets = np.extract(w_spiders, obs_targets)
 
     # for time domain, ensure we get the earliest version
