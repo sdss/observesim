@@ -85,6 +85,7 @@ def runSim(args):
     # get the env vars for now so I don't have to rewrite the whole thing
     rs_base = os.getenv('OBSERVING_PLAN_DIR') + "/"
     base = os.getenv("OBSERVESIM_OUTPUT_BASE")
+
     countFields(base, rs_base, plan, version=version, loc=observatory, N=0)
     cumulativePlot(base, plan, version=version, loc=observatory)
     spiders_area_for_program_time(base, rs_base, plan, version=version, loc=observatory)
@@ -136,7 +137,7 @@ if base is None:
 assert base is not None, "must specify result base"
 
 if version is None:
-    version = plan + "-hack_obsmode"
+    version = plan
 base = os.path.join(base, version)
 try:
     os.makedirs(base)

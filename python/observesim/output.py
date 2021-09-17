@@ -105,8 +105,8 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
         # if cadence != c:
         #     print("field cad: {}, targ cad: {}".format(c, cadence))
         #     print("pk: {}, targ id: {}".format(k, targetid))
-    dtype = [('pk', np.int32),
-             ('target_id', np.int32),
+    dtype = [('catalogid', np.int64),
+             ('target_id', np.int64),
              ('cadence', np.dtype('a40')),
              ('program', np.dtype('a40')),
              ('carton', np.dtype('a40')),
@@ -117,7 +117,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
              ('dec', np.float64)]
     obs_targs = np.zeros(len(all_targs), dtype=dtype)
 
-    obs_targs["pk"] = all_targs
+    obs_targs["catalogid"] = all_targs
     obs_targs["cadence"] = all_cads
     obs_targs["field_id"] = all_fields
     obs_targs["obs_mjd"] = all_mjds
@@ -131,6 +131,9 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     # catch those -1 obs mjds!!! Oops
     where_not_observed = np.where(obs_targs["obs_mjd"] > 5e4)
     cleaned_targs = obs_targs[where_not_observed]
+
+    # fitsio.write(v_base + "allObsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc),
+    #              obs_targs, clobber=True)
 
     if save:
         fitsio.write(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc),
@@ -343,7 +346,7 @@ def countEpochs(res_base, rs_base, plan, version=None, loc="apo"):
         mjds = [obs_data[i]["mjd"] for i in obs_idx]
         cad = f["cadence"]
         this_cad = cads[cads["CADENCE"] == cad][0]
-        obs_epochs, last_epoch = epochs_completed(mjds, this_cad["MAX_LENGTH"])
+        obs_epochs, last_epoch = epochs_completed(mjds, 0.6)
 
         counts.append(obs_epochs)
         planned.append(this_cad["NEPOCHS"])
@@ -373,24 +376,6 @@ def tabulate(counts, planned, cadence):
     return completion, visits, plan_count
 
 
-# def convertCadence(cad):
-#     if not "-" in cad:
-#         return cad.strip()
-#     name, num = cad.split("-")
-#     try:
-#         num = int(num)
-#     except ValueError:
-#         # this catches like 2 cadences
-#         # bright/dark used after "-"
-#         return cad.strip()
-#     if num < 6:
-#         return name + "-1:5"
-#     elif num < 11:
-#         return name + "-6:10"
-#     else:
-#         return name + "-10+"
-
-
 def convertCadence(cad):
     split = cad.split("_")
     nums = split[-1]
@@ -415,9 +400,10 @@ def convertCadence(cad):
 def doHist(res_base, rs_base, plan, version=None, loc="apo", level=0.95):
     """Create old histograms by cadence
     """
-    # args = getCounts(res_base, rs_base, plan, version=version, loc=loc)
-    args = countEpochs(res_base, rs_base, plan, version=version, loc=loc)
+    args = getCounts(res_base, rs_base, plan, version=version, loc=loc)
     completion, vis_count, plan_count = tabulate(*args)
+    args = countEpochs(res_base, rs_base, plan, version=version, loc=loc)
+    epoch_completion, epoch_vis_count, epoch_plan_count = tabulate(*args)
     print("found {} cadences".format(len(completion.keys())))
 
     orig_keys = completion.keys()
@@ -435,6 +421,16 @@ def doHist(res_base, rs_base, plan, version=None, loc="apo", level=0.95):
         reduced_vis[k].extend(vis_count[key])
         reduced_plan[k].extend(plan_count[key])
 
+    epoch_reduced_keys = {k: [] for k in sort_keys}
+    epoch_reduced_vis = {k: [] for k in sort_keys}
+    epoch_reduced_plan = {k: [] for k in sort_keys}
+
+    for key, v in epoch_completion.items():
+        k = convertCadence(key)
+        epoch_reduced_keys[k].extend(v)
+        epoch_reduced_vis[k].extend(vis_count[key])
+        epoch_reduced_plan[k].extend(plan_count[key])
+
     plt.figure(figsize=(12, 12))
 
     ax1 = plt.subplot(211)
@@ -448,6 +444,8 @@ def doHist(res_base, rs_base, plan, version=None, loc="apo", level=0.95):
 
     vis = list()
     planned = list()
+
+    emean = list()
 
     for k, v in reduced_keys.items():
         x.append(cad_to_indx[k])
@@ -463,10 +461,13 @@ def doHist(res_base, rs_base, plan, version=None, loc="apo", level=0.95):
         plan_sum = np.sum(reduced_plan[k])
         planned.append(plan_sum)
 
+    for k, v in epoch_reduced_keys.items():
+        emean.append(np.mean(v) * 100)
+
     width = 0.3
 
-    ax1.bar(np.array(x) - width, mean, width, color="b", label="mean")
-    ax1.bar(np.array(x), median, width, color="r", label="median")
+    ax1.bar(np.array(x) - width, mean, width, color="b", label="exp")
+    ax1.bar(np.array(x), emean, width, color="r", label="epoch")
     ax1.set_xticks(x, minor=False)
     ax1.set_xticklabels(label, rotation='vertical')
     ax1.set_ylabel("% comp".format(int(level*100)))
@@ -679,55 +680,39 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
         v_base += "/"
 
     apo_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
-                            columns=["obs_mjd", "program", "pk"])
+                            columns=["program", "catalogid"])
     lco_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
-                            columns=["obs_mjd", "program", "pk"])
-    lco_targs_mjds = {i: [] for i in np.unique(lco_targs["pk"])}
-    apo_targs_mjds = {i: [] for i in np.unique(apo_targs["pk"])}
+                            columns=["program", "catalogid"])
 
-    targ_to_prog = dict()
+    apo_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
+                           columns=["catalogid", "program", "assigned"])
+    apo_comp_prog = np.array([p.strip() for p in apo_comp["program"]])
 
-    for t in lco_targs:
-        lco_targs_mjds[t["pk"]].append(t["obs_mjd"])
-        targ_to_prog[t["pk"]] = t["program"]
+    lco_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
+                           columns=["catalogid", "program", "assigned"])
+    lco_comp_prog = np.array([p.strip() for p in lco_comp["program"]])
 
-    for t in apo_targs:
-        apo_targs_mjds[t["pk"]].append(t["obs_mjd"])
-        targ_to_prog[t["pk"]] = t["program"]
-
-    # #####################
-    # #####################
-
-    all_progs = np.sort(np.unique([v for k, v in targ_to_prog.items()]))
-    lco_progs = {c: [] for c in all_progs}
-    apo_progs = {c: [] for c in all_progs}
-
-    for t, v in lco_targs_mjds.items():
-        lco_progs[targ_to_prog[t]].append(t)
-        # if passesCadence(v):
-
-    for t, v in apo_targs_mjds.items():
-        apo_progs[targ_to_prog[t]].append(t)
-        # if passesCadence(v):
-
-    # #####################
-    # #####################
+    programs = np.unique(apo_comp_prog)
+    apo_counts = list()
+    lco_counts = list()
+    for p in programs:
+        apo_prog = apo_comp[apo_comp["program"] == p]
+        lco_prog = apo_comp[apo_comp["program"] == p]
+        apo_counts.append(np.sum(np.in1d(apo_prog['catalogid'], apo_targs['catalogid'])))
+        lco_counts.append(np.sum(np.in1d(lco_prog['catalogid'], lco_targs['catalogid'])))
 
     plt.figure(figsize=(16, 10))
 
     ax1 = plt.subplot(111)
 
-    apo_counts = [len(v) for k, v in apo_progs.items()]
-    lco_counts = [len(v) for k, v in lco_progs.items()]
-    names = [k.strip() for k in apo_progs.keys()]  # same as lco_prog.keys()
-    x = np.arange(len(names))
+    x = np.arange(len(programs))
 
     width = 0.3
 
     ax1.bar(x - width, lco_counts, width, color="c", label="lco", log=True)
     ax1.bar(x, apo_counts, width, color="r", label="apo", log=True)
     ax1.set_xticks(x, minor=False)
-    ax1.set_xticklabels(names, rotation='vertical')
+    ax1.set_xticklabels(programs, rotation='vertical')
     ax1.set_ylabel("# targs")
     # ax1.set_yscale("log")
 
@@ -745,25 +730,17 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
 
     req_by_cad = yaml.load(open(reqs_file))
 
-    apo_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
-                           columns=["target_pk", "program", "assigned"])
-    apo_comp_prog = np.array([p.strip() for p in apo_comp["program"]])
-
-    lco_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
-                           columns=["target_pk", "program", "assigned"])
-    lco_comp_prog = np.array([p.strip() for p in lco_comp["program"]])
-
     sum_text = ("{cad:30s}, {req:9s}, {input:8s}, {assign:9s}, {total:8s}, "
                 "{apo:8s}, {lco:8s}, {assign_apo:10s}, {assign_lco:10s}\n").format(
                 cad="carton", req="required", input="input", total="total",
                 apo="apo", lco="lco", assign_apo="assign_apo",
                 assign_lco="assign_lco", assign="assigned")
 
-    for k in apo_progs.keys():
-        apo = len(apo_progs[k])
+    for i, k in enumerate(programs):
+        apo = apo_counts[i]
         apo_plan, apo_assign = countPlanned(k.strip(), apo_comp_prog, apo_comp["assigned"])
 
-        lco = len(lco_progs[k])
+        lco = lco_counts[i]
         lco_plan, lco_assign = countPlanned(k.strip(), lco_comp_prog, lco_comp["assigned"])
 
         if k.strip() in req_by_cad:
@@ -860,7 +837,7 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
     targets = np.extract(w_spiders, loc_targs)
 
     obs_targets = fitsio.read(obs_file,
-                              columns=["pk", "program", "obs_mjd", "ra", "dec"])
+                              columns=["catalogid", "program", "obs_mjd", "ra", "dec"])
 
     # obs_targets = np.extract(obs_targets['carton'] == prog_name, obs_targets)
 
@@ -870,7 +847,7 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
     # for time domain, ensure we get the earliest version
     obs_targets = np.sort(obs_targets, order="obs_mjd")
 
-    pks, idxs = np.unique(obs_targets["pk"], return_index=True)
+    pks, idxs = np.unique(obs_targets["catalogid"], return_index=True)
 
     # since obs_targets has an entry for each observation!!
     obs_targets = obs_targets[idxs]

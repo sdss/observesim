@@ -222,6 +222,7 @@ class Simulation(object):
             return -1, 1, True
         fieldid, nexposures = self.scheduler.nextfield(mjd=self.curr_mjd,
                                                        maxExp=maxExp)
+        # assert fieldid is not None, f"can't schedule {self.curr_mjd}, {self.bright()}"
         if(fieldid is not None):
             fieldidx = np.where(self.fieldid == fieldid)[0]
             site_check = self.siteObs(fieldidx, [self.curr_mjd + n*(self.nom_duration) for n in range(nexposures)])
@@ -389,6 +390,10 @@ class Simulation(object):
                 # print("WEATHER ", self.curr_mjd, f"night {night_len*24:.1f}, weather {dur*24:.1f}", count)
             elif (onoff != 'on'):
                 self.curr_mjd = nextchange
+
+            if self.nextchange - self.curr_mjd < self.nom_duration:
+                self.curr_mjd = self.nextchange
+                continue
 
             fieldid, nexposures, noTime = self.nextField()
             if fieldid == -1:
