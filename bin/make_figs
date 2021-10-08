@@ -30,7 +30,7 @@ if __name__ == "__main__":
                         required=False, help="location of rs files if not specified in env",
                         default=None)
     parser.add_argument("-p", "--plan", dest="plan", type=str,
-                        required=False, help="design plan",
+                        required=True, help="design plan",
                         default='plan-0')
     parser.add_argument("-v", "--version", dest="version", type=str,
                         required=False, help="use versioned directory for output",
@@ -62,6 +62,8 @@ if __name__ == "__main__":
     # print("drawing old figs for {}".format(plan))
     # doHist(base, rs_base, plan, version=version, loc="lco")
     # doHist(base, rs_base, plan, version=version, loc="apo")
+    # spiders_area_for_program_time(base, rs_base, plan, version=version, loc="lco")
+    # spiders_area_for_program_time(base, rs_base, plan, version=version, loc="apo")
     # sys.exit(0)
 
     if recount:
@@ -71,8 +73,8 @@ if __name__ == "__main__":
 
     if draw_all:
         print("drawing cumulativePlot for {}".format(plan))
-        cumulativePlot(base, plan, version=version, loc="lco")
-        cumulativePlot(base, plan, version=version, loc="apo")
+        cumulativePlot(base, plan, rs_base, version=version, loc="lco")
+        cumulativePlot(base, plan, rs_base, version=version, loc="apo")
         spiders_area_for_program_time(base, rs_base, plan, version=version, loc="lco")
         spiders_area_for_program_time(base, rs_base, plan, version=version, loc="apo")
 

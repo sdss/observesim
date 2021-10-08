@@ -497,7 +497,7 @@ def doHist(res_base, rs_base, plan, version=None, loc="apo", level=0.95):
     plt.savefig(os.path.join(res_base, version)+"/{}-{}-cadence_bar.png".format(plan, loc))
 
 
-def combineProgramMjds(base, plan, version=None, loc="apo", N=0):
+def combineProgramMjds(base, plan, rs_base, version=None, loc="apo", N=0):
     if version is not None:
         v_base = os.path.join(base, version)
         v_base += "/"
@@ -506,20 +506,23 @@ def combineProgramMjds(base, plan, version=None, loc="apo", N=0):
         v_base += "/"
 
     obs_data = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc),
-                           columns=["obs_mjd", "carton"])
+                           columns=["obs_mjd", "catalogid"])
+    comp_data = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc),
+                            columns=["catalogid", "program"])
 
-    progs = np.unique(obs_data["carton"])
+    progs = np.unique(comp_data["program"])
 
     prog_mjds = dict()
     for p in progs:
-        w_targs = np.where(obs_data["carton"] == p)
+        comp_prog = comp_data[comp_data["program"] == p]
+        w_targs = np.in1d(obs_data['catalogid'], comp_prog['catalogid'])
         prog_mjds[p] = obs_data[w_targs]["obs_mjd"]
 
     return prog_mjds
 
 
-def cumulativePlot(base, plan, version=None, loc="apo"):
-    prog_mjds = combineProgramMjds(base, plan, version=version, loc=loc)
+def cumulativePlot(base, plan, rs_base, version=None, loc="apo"):
+    prog_mjds = combineProgramMjds(base, plan, rs_base, version=version, loc=loc)
     # new_prog = [convertCadence(k) for k in prog_mjds.keys()]
     new_prog = [k for k in prog_mjds.keys()]
     all_mjds = list()
@@ -575,8 +578,8 @@ def cumulativePlot(base, plan, version=None, loc="apo"):
     months = mdates.MonthLocator()  # every month
     years_fmt = mdates.DateFormatter('%Y')
 
-    programs_to_highlight = ["bhm_rm_core", "bhm_spiders_agn_supercosmos", "bhm_spiders_agn_lsdr8",
-                             "mwm_galactic_core", "mwm_snc_100pc_boss", "mwm_tess_planet"]
+    programs_to_highlight = ["bhm_rm", "bhm_spiders", "bhm_csc",
+                             "mwm_galactic", "mwm_rv", "mwm_planet"]
 
     year1 = list()
     year2 = list()
@@ -617,7 +620,7 @@ def cumulativePlot(base, plan, version=None, loc="apo"):
             year5.append(bars[4])
 
     # make bar plots of programs by year
-    plt.figure(figsize=(8,5))
+    plt.figure(figsize=(8, 5))
     ax1 = plt.subplot(111)
     width = 0.1
     x_cor = np.arange(0, len(used_progs))
@@ -819,15 +822,15 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
     comp_file = rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc)
 
     all_targets = fitsio.read(comp_file,
-                              columns=["covered", "program", "ra", "dec", "assigned"])
+                              columns=["catalogid", "covered", "program", "ra", "dec", "assigned"])
 
-    loc_targs = np.extract(all_targets["covered"] > 0, all_targets)
+    loc_targs = np.extract(all_targets["assigned"] > 0, all_targets)
 
     progs = np.unique(loc_targs["program"])
 
     # since mike is naming these with version numbers now
     # need to find the right version
-    spiders_names = [p for p in progs if "bhm_spiders" in p]
+    spiders_names = [p for p in progs if "spiders" in p]
     assert len(spiders_names) != 0, "didn't find an appropriate spiders_agn carton!"
     # prog_name = spiders_names[0]
 
@@ -841,8 +844,11 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
 
     # obs_targets = np.extract(obs_targets['carton'] == prog_name, obs_targets)
 
-    w_spiders = [l in spiders_names for l in obs_targets['program']]
-    obs_targets = np.extract(w_spiders, obs_targets)
+    # w_spiders = [l in spiders_names for l in obs_targets['program']]
+    # obs_targets = np.extract(w_spiders, obs_targets)
+
+    mask = np.in1d(obs_targets['catalogid'], targets['catalogid'])
+    obs_targets = obs_targets[mask]
 
     # for time domain, ensure we get the earliest version
     obs_targets = np.sort(obs_targets, order="obs_mjd")
@@ -863,8 +869,8 @@ def spiders_area_for_program(base, rs_base, plan, version=None, loc="apo"):
 
     planned, obs = compute_area_above_threshold(targets, obs_targets, threshold=0.8, nside=64)
 
-    # print(f"{plan} planned: Ntargets={len(targets)}, Area={planned:.2f} deg^2")
-    # print(f"{plan} obs: Ntargets={len(obs_targets)}, Area={obs:.2f} deg^2")
+    print(f"{plan} planned: Ntargets={len(targets)}, Area={planned:.2f} deg^2")
+    print(f"{plan} obs: Ntargets={len(obs_targets)}, Area={obs:.2f} deg^2")
 
     return planned, obs
 
@@ -902,6 +908,7 @@ def spiders_area_for_program_time(base, rs_base, plan, version=None, loc="apo"):
             obs_completed = np.where(obs_frac_map >= threshold, 1, 0)
 
         obs_area_completed = pixarea * np.sum(obs_completed)
+        # print(m, len(mjd_targs), obs_area_completed)
 
         area_comp.append(obs_area_completed)
 
