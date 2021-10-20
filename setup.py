@@ -39,7 +39,7 @@ def run(packages, install_requires, dependency_links):
           install_requires=install_requires,
           dependency_links=dependency_links,
           package_dir={'': 'python'},
-          scripts=['bin/sdss5_simulate'],
+          scripts=['bin/batch_sim', 'bin/make_figs'],
           classifiers=[
               'Development Status :: 4 - Beta',
               'Intended Audience :: Science/Research',
