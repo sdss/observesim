@@ -471,6 +471,7 @@ def doHist(res_base, rs_base, plan, version=None, loc="apo", level=0.95):
     ax1.set_xticks(x, minor=False)
     ax1.set_xticklabels(label, rotation='vertical')
     ax1.set_ylabel("% comp".format(int(level*100)))
+    ax1.set_ylim([0, 105])
     ax1.legend()
 
     ax3 = ax1.twiny()
@@ -519,6 +520,24 @@ def combineProgramMjds(base, plan, rs_base, version=None, loc="apo", N=0):
         prog_mjds[p] = obs_data[w_targs]["obs_mjd"]
 
     return prog_mjds
+
+
+def plannedProgExps(plan, rs_base, loc="apo"):
+    comp_data = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc),
+                            columns=["catalogid", "program", "cadence", "covered", "category"])
+    cadences = fitsio.read(rs_base + "/{plan}/rsCadences-{plan}-{loc}.fits".format(plan=plan, loc=loc),
+                           columns=["CADENCE", "NEXP"])
+
+    comp_data = comp_data[np.where(comp_data["covered"])]
+
+    progs = {i: 0 for i in np.unique(comp_data["program"])}
+    for c in comp_data:
+        if c["category"] != "science":
+            continue
+        cad = cadences[np.where(cadences["CADENCE"] == c["cadence"])]
+        progs[c["program"]] += np.sum(cad["NEXP"])
+
+    return progs
 
 
 def cumulativePlot(base, plan, rs_base, version=None, loc="apo"):
@@ -590,8 +609,12 @@ def cumulativePlot(base, plan, rs_base, version=None, loc="apo"):
 
     used_progs = list()  # ugh why are the observatories not the same...
 
+    plannedCounts = plannedProgExps(plan, rs_base, loc=loc)
     for k, v in plot_progs.items():
         if "ops" in k:
+            continue
+        elif not k in plannedCounts:
+            print(f"{k} not in plannedCounts!!")
             continue
         plt.figure(figsize=(8,5))
         ax = plt.subplot(111)
@@ -600,6 +623,7 @@ def cumulativePlot(base, plan, rs_base, version=None, loc="apo"):
         ax.set_title(k)
         ax.set_ylabel("# visits", fontsize=16)
         ax.set_xlabel("date", fontsize=16)
+        ax.axhline(plannedCounts[k])
 
         ax.xaxis.set_major_locator(years)
         ax.xaxis.set_major_formatter(years_fmt)

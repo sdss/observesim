@@ -64,6 +64,7 @@ if __name__ == "__main__":
     # doHist(base, rs_base, plan, version=version, loc="apo")
     # spiders_area_for_program_time(base, rs_base, plan, version=version, loc="lco")
     # spiders_area_for_program_time(base, rs_base, plan, version=version, loc="apo")
+    # cumulativePlot(base, plan, rs_base, version=version, loc="apo")
     # sys.exit(0)
 
     if recount:

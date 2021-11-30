@@ -31,9 +31,11 @@ def runSim(args):
     idx, base, plan, version, observatory, schedule, redo_exp, check = args
 
     time.sleep(idx)  # hopefully that avoids read conflicts?
-    print("running sim ", idx)
+    print(f"running {observatory} sim {plan} VER {version} seed {idx}")
 
-    sim = simulation.Simulation(plan, observatory, idx=idx, schedule=schedule, redo_exp=redo_exp)
+    sim = simulation.Simulation(plan, observatory,
+                                idx=idx, schedule=schedule,
+                                redo_exp=redo_exp)
 
     startTime = time.time()
     # Loop through nights
@@ -80,6 +82,7 @@ def runSim(args):
                  clobber=True)
 
     if check:
+        print("just a check, no outputs needed")
         return None
 
     # get the env vars for now so I don't have to rewrite the whole thing
@@ -87,7 +90,7 @@ def runSim(args):
     base = os.getenv("OBSERVESIM_OUTPUT_BASE")
 
     countFields(base, rs_base, plan, version=version, loc=observatory, N=0)
-    cumulativePlot(base, plan, version=version, loc=observatory)
+    cumulativePlot(base, plan, rs_base, version=version, loc=observatory)
     spiders_area_for_program_time(base, rs_base, plan, version=version, loc=observatory)
     doHist(base, rs_base, plan, version=version, loc=observatory)
 

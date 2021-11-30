@@ -228,6 +228,7 @@ class Simulation(object):
             site_check = self.siteObs(fieldidx, [self.curr_mjd + n*(self.nom_duration) for n in range(nexposures)])
             # maxTime = self.nextchange - self.curr_mjd
             maxTime = maxExp * self.nom_duration
+
             if not site_check:
                 field_idxs, nexps = self.scheduler.nextfield(mjd=self.curr_mjd,
                                                              maxExp=maxExp,
@@ -251,6 +252,8 @@ class Simulation(object):
 
             return fieldid, nexposures, False
         else:
+            # if not self.bright():
+            #     assert False, f"{self.curr_mjd} ugh"
             return -1, 1, False
 
     def bookKeeping(self, fieldidx, i=-1):
@@ -314,6 +317,7 @@ class Simulation(object):
         # slewtime is in seconds...
         self.curr_mjd = self.curr_mjd + self.cals + np.float32(slewtime / 60. / 60. / 24.)
 
+        field_exp_count = nexposures
         for i in range(nexposures):
             # each "exposure" is a design
 
@@ -327,7 +331,8 @@ class Simulation(object):
             res = self.bookKeeping(fieldidx, i=i)
 
             if self.bright():
-                if res["apgSN2"] < 450 and self.redo_exp:
+                if res["apgSN2"] < 100 and self.redo_exp:
+                    field_exp_count += 1
                     self.redo_apg += 1
                     self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
                                           finish=False)
@@ -338,8 +343,9 @@ class Simulation(object):
                     self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
                                           finish=True)
             else:
-                if (res["rSN2"] < 3 or res["bSN2"] < 1.5) and self.redo_exp:
-                    if res["rSN2"] < 3:
+                if (res["rSN2"] < 0.2 or res["bSN2"] < 0.2) and self.redo_exp:
+                    field_exp_count += 1
+                    if res["rSN2"] < 0.2:
                         self.redo_r += 1
                     else:
                         self.redo_b += 1
@@ -351,6 +357,36 @@ class Simulation(object):
                 else:
                     self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
                                           finish=True)
+        if self.bright():
+            ap_tot = np.sum(self.scheduler.observations.apgSN2[-1*field_exp_count:])
+            # print(f"{nexposures} {field_exp_count} {len(self.scheduler.observations.apgSN2[-1*field_exp_count:])}")
+            # print(f"AP SN {ap_tot:7.1f} VS {300 * nexposures}")
+            if ap_tot < 650 * nexposures and self.redo_exp:
+                self.redo_apg += 1
+                self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                      finish=False)
+                res = self.bookKeeping(fieldidx, i=i)
+                self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                      finish=True)
+        else:
+            r_tot = np.sum(self.scheduler.observations.rSN2[-1*field_exp_count:])
+            b_tot = np.sum(self.scheduler.observations.bSN2[-1*field_exp_count:])
+            # print(f"{nexposures} {field_exp_count} {len(self.scheduler.observations.bSN2[-1*field_exp_count:])}")
+            # print(f"B  SN {b_tot:7.1f} VS {2.5 * nexposures} \nR  SN {r_tot:7.1f} VS {5 * nexposures}")
+            if (b_tot < 1.4 * nexposures or r_tot < 3.4 * nexposures) and self.redo_exp:
+                if r_tot < 3.4 * nexposures:
+                    self.redo_r += 1
+                else:
+                    self.redo_b += 1
+                self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                      finish=False)
+                res = self.bookKeeping(fieldidx, i=i)
+                self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                      finish=True)
+            else:
+                self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                                      finish=True)
+
 
     def observeMJD(self, mjd):
         mjd_evening_twilight = self.scheduler.evening_twilight(mjd)
