@@ -43,7 +43,7 @@ def runSim(args):
         warnings.simplefilter("ignore", category=ErfaWarning)
         for mjd in sim.scheduler.mjds:
             # uncomment to do a quick check
-            if mjd > 59600 and check:
+            if mjd > sim.scheduler.mjds[45] and check:
                 continue
             sim.observeMJD(mjd)
     print("skipped for physical obstructions", sim.hit_lims)
