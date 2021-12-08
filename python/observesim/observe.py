@@ -145,15 +145,15 @@ class Observe(object):
         apg = self.apgSN2(norm_rand) / am**0.05
         return r, b, apg * 2  # 2x apg exp for each boss exp
 
-    def result(self, fieldid=None, mjd=None, airmass=1,
+    def result(self, field_pk=None, mjd=None, airmass=1,
                epochidx=None, **kwargs):
         """Return simulated result of an observation
 
         Parameters:
         ----------
 
-        fieldid : int, np.int32
-            id of field to observe
+        field_pk : int, np.int32
+            pk of field to observe
 
         mjd : float, np.float64
             MJD start time of observation (days)

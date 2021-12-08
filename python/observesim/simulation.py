@@ -88,7 +88,7 @@ class Simulation(object):
         self.obsHist = {"lst": list(),
                         "ra": list(),
                         "bright": list(),
-                        "fieldid": list(),
+                        "field_pk": list(),
                         "weather": list(),
                         "mjd": list()}
 
@@ -103,7 +103,7 @@ class Simulation(object):
         self.scheduler.initdb(designbase=plan)
         self.field_ra = self.scheduler.fields.racen
         self.field_dec = self.scheduler.fields.deccen
-        self.fieldid = self.scheduler.fields.field_id
+        self.field_pk = self.scheduler.fields.pk
 
         cadencelist = self.scheduler.fields.cadencelist.cadences
         cadences = self.scheduler.fields.cadence
@@ -220,11 +220,11 @@ class Simulation(object):
         if maxExp == 0:
             # self.curr_mjd = self.curr_mjd + self.nom_duration
             return -1, 1, True
-        fieldid, nexposures = self.scheduler.nextfield(mjd=self.curr_mjd,
+        field_pk, nexposures = self.scheduler.nextfield(mjd=self.curr_mjd,
                                                        maxExp=maxExp)
         # assert fieldid is not None, f"can't schedule {self.curr_mjd}, {self.bright()}"
-        if(fieldid is not None):
-            fieldidx = np.where(self.fieldid == fieldid)[0]
+        if(field_pk is not None):
+            fieldidx = np.where(self.field_pk == field_pk)[0]
             site_check = self.siteObs(fieldidx, [self.curr_mjd + n*(self.nom_duration) for n in range(nexposures)])
             # maxTime = self.nextchange - self.curr_mjd
             maxTime = maxExp * self.nom_duration
@@ -248,9 +248,9 @@ class Simulation(object):
                     # print("baawaaaaaahhhahahaa :( ")
                     # self.curr_mjd = self.curr_mjd + self.nom_duration/20
                     return -1, 1./20, False
-            fieldid = int(self.fieldid[fieldidx])
+            field_pk = int(self.field_pk[fieldidx])
 
-            return fieldid, nexposures, False
+            return field_pk, nexposures, False
         else:
             # if not self.bright():
             #     assert False, f"{self.curr_mjd} ugh"
@@ -269,13 +269,13 @@ class Simulation(object):
                 print("booooooooo")
                 # assert False, "ugh"
 
-        result = self.observe.result(mjd=self.curr_mjd, fieldid=self.fieldid[fieldidx],
+        result = self.observe.result(mjd=self.curr_mjd, field_pk=self.field_pk[fieldidx],
                                      airmass=airmass,
                                      epochidx=self.scheduler.fields.icadence[fieldidx])
         duration = result["duration"]
         if duration < 0 or np.isnan(duration):
             print("HOOOWWWOWOWOWOWW")
-            print(i, alt, az, self.curr_mjd, fieldid)
+            print(i, alt, az, self.curr_mjd, field_pk)
 
         self.curr_mjd = self.curr_mjd + duration + self.bossReadout
 
@@ -285,14 +285,14 @@ class Simulation(object):
         self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
         self.obsHist["ra"].append(self.field_ra[fieldidx])
         self.obsHist["bright"].append(self.bright())
-        self.obsHist["fieldid"].append(self.fieldid[fieldidx])
+        self.obsHist["field_pk"].append(self.field_pk[fieldidx])
         self.obsHist["weather"].append(False)
         self.obsHist["mjd"].append(self.curr_mjd)
 
         return result
 
-    def observeField(self, fieldid, nexposures):
-        fieldidx = int(np.where(self.fieldid == fieldid)[0])
+    def observeField(self, field_pk, nexposures):
+        fieldidx = int(np.where(self.field_pk == field_pk)[0])
 
         slewtime, *axes = self.moveTelescope(self.curr_mjd, fieldidx)
 
@@ -334,13 +334,13 @@ class Simulation(object):
                 if res["apgSN2"] < 100 and self.redo_exp:
                     field_exp_count += 1
                     self.redo_apg += 1
-                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                    self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                           finish=False)
                     res = self.bookKeeping(fieldidx, i=i)
-                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                    self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                           finish=True)
                 else:
-                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                    self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                           finish=True)
             else:
                 if (res["rSN2"] < 0.2 or res["bSN2"] < 0.2) and self.redo_exp:
@@ -349,13 +349,13 @@ class Simulation(object):
                         self.redo_r += 1
                     else:
                         self.redo_b += 1
-                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                    self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                           finish=False)
                     res = self.bookKeeping(fieldidx, i=i)
-                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                    self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                           finish=True)
                 else:
-                    self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                    self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                           finish=True)
         if self.bright():
             ap_tot = np.sum(self.scheduler.observations.apgSN2[-1*field_exp_count:])
@@ -363,10 +363,10 @@ class Simulation(object):
             # print(f"AP SN {ap_tot:7.1f} VS {300 * nexposures}")
             if ap_tot < 650 * nexposures and self.redo_exp:
                 self.redo_apg += 1
-                self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                       finish=False)
                 res = self.bookKeeping(fieldidx, i=i)
-                self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                       finish=True)
         else:
             r_tot = np.sum(self.scheduler.observations.rSN2[-1*field_exp_count:])
@@ -378,13 +378,13 @@ class Simulation(object):
                     self.redo_r += 1
                 else:
                     self.redo_b += 1
-                self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                       finish=False)
                 res = self.bookKeeping(fieldidx, i=i)
-                self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                       finish=True)
             else:
-                self.scheduler.update(fieldid=self.fieldid[fieldidx], result=res,
+                self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                       finish=True)
 
 
@@ -418,7 +418,7 @@ class Simulation(object):
                     self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
                     self.obsHist["ra"].append(-1)
                     self.obsHist["bright"].append(self.bright())
-                    self.obsHist["fieldid"].append(-1)
+                    self.obsHist["field_pk"].append(-1)
                     self.obsHist["weather"].append(True)
                     self.obsHist["mjd"].append(self.curr_mjd)
                     self.curr_mjd += self.nom_duration + self.bossReadout + self.cals
@@ -431,8 +431,8 @@ class Simulation(object):
                 self.curr_mjd = self.nextchange
                 continue
 
-            fieldid, nexposures, noTime = self.nextField()
-            if fieldid == -1:
+            field_pk, nexposures, noTime = self.nextField()
+            if field_pk == -1:
                 if noTime:
                     self.curr_mjd = self.curr_mjd + self.nom_duration
                     continue
@@ -441,26 +441,26 @@ class Simulation(object):
                 self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
                 self.obsHist["ra"].append(np.nan)
                 self.obsHist["bright"].append(self.bright())
-                self.obsHist["fieldid"].append(-1)
+                self.obsHist["field_pk"].append(-1)
                 self.obsHist["weather"].append(False)
                 self.obsHist["mjd"].append(self.curr_mjd)
                 self.curr_mjd = self.curr_mjd + self.nom_duration
                 continue
-            self.observeField(fieldid, nexposures)
+            self.observeField(field_pk, nexposures)
 
     def lstToArray(self):
         assert len(self.obsHist["weather"]) == len(self.obsHist["lst"]), "lst tracking bad!"
         dtype = [('lst', np.float64),
                  ('ra', np.float64),
                  ('bright', np.bool_),
-                 ('fieldid', np.int32),
+                 ('field_pk', np.int32),
                  ('weather', np.bool_),
                  ('mjd', np.float64)]
         lstOut = np.zeros(len(self.obsHist["lst"]), dtype=dtype)
         lstOut["lst"] = np.array(self.obsHist["lst"])
         lstOut["ra"] = np.array(self.obsHist["ra"])
         lstOut["bright"] = np.array(self.obsHist["bright"])
-        lstOut["fieldid"] = np.array(self.obsHist["fieldid"])
+        lstOut["field_pk"] = np.array(self.obsHist["field_pk"])
         lstOut["weather"] = np.array(self.obsHist["weather"])
         lstOut["mjd"] = np.array(self.obsHist["mjd"])
         return(lstOut)
