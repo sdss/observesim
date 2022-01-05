@@ -448,6 +448,9 @@ class Simulation(object):
                 continue
             self.observeField(field_pk, nexposures)
 
+        if mjd % 10 == 0:
+            self.scheduler.priorityLogger.write(name=str(mjd))
+
     def lstToArray(self):
         assert len(self.obsHist["weather"]) == len(self.obsHist["lst"]), "lst tracking bad!"
         dtype = [('lst', np.float64),
