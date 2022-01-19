@@ -13,21 +13,33 @@ __all__ = ["cumulativePlot", "doHist", "plotTargMetric", "writeWebPage",
            "countFields", "spiders_area_for_program_time"]
 
 
-def read_field(field_id, exp_to_mjd, assign):
+def read_field(fname, alloc, exp_to_mjd):
     # fetch info, match mjd to exp
-    field_targs = assign[np.where(assign["fieldid"] == field_id)]
 
-    if len(field_targs["exposure"]) == 0:
-        max_exp = 0
-    else:
-        max_exp = np.max(field_targs["exposure"])
+    w_names = fitsio.read(fname, ext=1)
 
-    if max_exp > len(exp_to_mjd) - 1:
-        exp_to_mjd.extend([-1 for i in range(max_exp - len(exp_to_mjd) + 1)])
+    w_idx = fitsio.read(fname, ext=2)
 
-    mjds = [exp_to_mjd[i] for i in field_targs["exposure"]]
+    catalog_ids = list()
+    cadences = list()
+    mjds = list()
 
-    return field_targs["catalogid"], field_targs["cadence"], mjds
+    for m, i in zip(exp_to_mjd, range(alloc["iexpst"], alloc["iexpnd"]+1)):
+        # zip will end when exp_to_mjd ends if it is shorter than
+        # nplanned (i.e. the range)
+        if len(w_idx["robotID"].shape) == 1:
+            assert len(exp_to_mjd) == 1, "obs len != plan len"
+            w_assigned = np.where(w_idx["robotID"] != -1)
+        else:
+            w_assigned = np.where(w_idx["robotID"][:, i] != -1)
+
+        assert len(w_assigned[0]) <= 500, "more ids than robots!"
+
+        catalog_ids.extend(list(w_names["catalogid"][w_assigned]))
+        cadences.extend(list(w_names["cadence"][w_assigned]))
+        mjds.extend([m for i in w_assigned[0]])
+
+    return catalog_ids, cadences, mjds
 
 
 def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True):
@@ -41,13 +53,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
         v_base = os.path.join(res_base, plan)
         v_base += "/"
 
-    assign = fitsio.read(rs_base + "{plan}/rsAssignments-{plan}-{loc}.fits".format(plan=plan, loc=loc))
-    print("ASSIGN LEN ", len(assign))
-    print("unique", len(np.unique(assign["catalogid"])))
-    assign = assign[np.where(np.logical_and(assign["catalogid"] != -1, assign["catalogid"] != 0))]
-    print("ASSIGN LEN ", len(assign))
-
-    allocation = fitsio.read(rs_base + "{plan}/rsAllocation-{plan}-{loc}.fits".format(plan=plan, loc=loc))
+    allocation = fitsio.read(rs_base + "{plan}/final/rsAllocationFinal-{plan}-{loc}.fits".format(plan=plan, loc=loc))
 
     sim_data = fitsio.read(v_base + "{plan}-{loc}-fields-{n}.fits".format(plan=plan, loc=loc, n=N))
     obs_data = fitsio.read(v_base + "{plan}-{loc}-observations-{n}.fits".format(plan=plan, loc=loc, n=N))
@@ -56,7 +62,8 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     all_targs = list()
     all_cads = list()
     all_mjds = list()
-    all_fields = list()
+    all_field_ids = list()
+    all_field_pks = list()
 
     start_time = time.time()
 
@@ -65,18 +72,26 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
         obs_idx = f["observations"][:int(f["nobservations"])]
         mjds = [obs_data[i]["mjd"] for i in obs_idx]
         cad = f["cadence"]
-        # real_fid = allocation[f["fieldid"]]["fieldid"]
-        real_fid = f["fieldid"]
 
-        ids, cadences, targ_mjds = read_field(real_fid, mjds, assign)
+        # field_pk is an index into rsAllocationFinal for each observatory
+        # so definitely keep doing that in roboscheduler
+        alloc = allocation[f["pk"]]
+
+        fname = "{plan}/final/rsFieldAssignmentsFinal-{plan}-{loc}-{fieldid}.fits"
+        fname = rs_base + fname.format(plan=plan, loc=loc, fieldid=f["fieldid"])
+
+        ids, cadences, targ_mjds = read_field(fname, alloc, mjds)
         all_targs.extend(ids)
         all_cads.extend(cadences)
         all_mjds.extend(targ_mjds)
-        all_fields.extend([real_fid for f in ids])
+        all_field_ids.extend([f["fieldid"] for i in ids])
+        all_field_pks.extend([f["pk"] for i in ids])
+
+        # print(f["pk"], f["fieldid"], "GOT", len(ids), len(all_targs))
 
     assert len(all_targs) == len(all_cads), "targ != cad!!"
     assert len(all_targs) == len(all_mjds), "targ != mjd!!"
-    assert len(all_targs) == len(all_fields), "targ != field!!"
+    assert len(all_targs) == len(all_field_ids), "targ != field!!"
 
     targ_ids = list()
     programs = list()
@@ -111,6 +126,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
              ('program', np.dtype('a40')),
              ('carton', np.dtype('a40')),
              ('field_id', np.int32),
+             ('field_pk', np.int32),
              ('assigned', np.int32),
              ('obs_mjd', np.float64),
              ('ra', np.float64),
@@ -119,7 +135,8 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 
     obs_targs["catalogid"] = all_targs
     obs_targs["cadence"] = all_cads
-    obs_targs["field_id"] = all_fields
+    obs_targs["field_id"] = all_field_ids
+    obs_targs["field_pk"] = all_field_pks
     obs_targs["obs_mjd"] = all_mjds
     obs_targs["assigned"] = gots
     obs_targs["program"] = programs
@@ -129,6 +146,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     obs_targs["dec"] = decs
 
     # catch those -1 obs mjds!!! Oops
+    # UPDATE: with rs*Final updates, this should be unnecessary, but harmless
     where_not_observed = np.where(obs_targs["obs_mjd"] > 5e4)
     cleaned_targs = obs_targs[where_not_observed]
 
@@ -154,7 +172,7 @@ header = """<html><head><meta http-equiv="Content-Type" content="text/html; char
 <h1>Observesim: {plan}</h1>
 <p>This page summarizes the observesim results for the {plan} robostrategy runs <a href="https://data.sdss.org/sas/sdss5/sandbox/robostrategy/allocations/{plan}">found here</a></p>
 
-<p>A video animation of this simulation is available!! <a href="moviePngsAllSky/sdss5_sim.mp4" download>Download</a></p>
+<p>A video animation of this simulation is available! <a href="moviePngsAllSky/sdss5_sim.mp4" download>Download</a></p>
 
 <h2>Summary</h2>
 <p> The results for each observatory are summarized below. The average completion % for each field cadence class is shown, as well as the number of exposures falling into each class (note the log scale). </p>"""
@@ -164,7 +182,8 @@ bar_plots = """<a href="{plan}-apo-cadence_bar.pdf"><img src="{plan}-apo-cadence
 
 fits_out = """<h2> Output files: </h2>
 <p> Each input field from the rsAllocation file is recorded in a fields file for  <a href="{plan}-apo-fields-0.fits">APO</a> and <a href="{plan}-lco-fields-0.fits">LCO</a>.
-The fields files contain indices into an observations to record info for each observation. <a href="{plan}-apo-observations-0.fits"> APO observations</a>, and <a href="{plan}-lco-observations-0.fits"> LCO observations</a>. </p>"""
+The fields files contain indices into an observations to record info for each observation. <a href="{plan}-apo-observations-0.fits"> APO observations</a>, and <a href="{plan}-lco-observations-0.fits"> LCO observations</a>. </p>
+<p> A record of the priority decisions made by roboscheduler is now <a href="priorityLogs/"> available </a></p>"""
 
 target_table = """<h2>Summary of Observed Targets </h2>
 <p>For each observation of a field, the targets planned to be observed are specified in an
@@ -312,12 +331,17 @@ def getCounts(res_base, rs_base, plan, version=None, loc="apo"):
         sim_data = fitsio.read(v_base + f)
         counts.append(sim_data['nobservations'])
 
-    fields = fitsio.read(rs_base+"{plan}/rsAllocation-{plan}-{loc}.fits".format(plan=plan, loc=loc),
-                         columns=["needed", "cadence"])
+    fields = fitsio.read(rs_base+"{plan}/final/rsAllocationFinal-{plan}-{loc}.fits".format(plan=plan, loc=loc),
+                         columns=["fieldid", "needed", "cadence"])
 
     planned = fields['needed']
 
     counts = np.mean(np.array(counts), axis=0)
+
+    assert len(sim_data) == len(fields), "THIS IS NOT APPLES AND APPLES!!"
+
+    for s, f in zip(sim_data, fields):
+        assert s["fieldid"] == f["fieldid"], "fields mixed up"
 
     return counts, planned, [c for c in fields["cadence"]]
 
@@ -377,6 +401,8 @@ def tabulate(counts, planned, cadence):
 
 
 def convertCadence(cad):
+    if "_v" in cad:
+        cad = cad[:cad.index("_v")]
     split = cad.split("_")
     nums = split[-1]
     name = "".join([str(n) + "_" for n in split[:-1]])
@@ -406,6 +432,8 @@ def doHist(res_base, rs_base, plan, version=None, loc="apo", level=0.95):
     epoch_completion, epoch_vis_count, epoch_plan_count = tabulate(*args)
     print("found {} cadences".format(len(completion.keys())))
 
+    print(f"N exp {len(vis_count)}, N epoch {len(epoch_vis_count)}")
+
     orig_keys = completion.keys()
     new_keys = [convertCadence(k) for k in orig_keys]
     sort_keys = np.sort(np.unique(new_keys))
@@ -428,8 +456,8 @@ def doHist(res_base, rs_base, plan, version=None, loc="apo", level=0.95):
     for key, v in epoch_completion.items():
         k = convertCadence(key)
         epoch_reduced_keys[k].extend(v)
-        epoch_reduced_vis[k].extend(vis_count[key])
-        epoch_reduced_plan[k].extend(plan_count[key])
+        # epoch_reduced_vis[k].extend(epoch_vis_count[key])
+        # epoch_reduced_plan[k].extend(epoch_plan_count[key])
 
     plt.figure(figsize=(12, 12))
 
@@ -524,11 +552,11 @@ def combineProgramMjds(base, plan, rs_base, version=None, loc="apo", N=0):
 
 def plannedProgExps(plan, rs_base, loc="apo"):
     comp_data = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc),
-                            columns=["catalogid", "program", "cadence", "covered", "category"])
+                            columns=["program", "cadence", "assigned", "category"])
     cadences = fitsio.read(rs_base + "/{plan}/rsCadences-{plan}-{loc}.fits".format(plan=plan, loc=loc),
                            columns=["CADENCE", "NEXP"])
 
-    comp_data = comp_data[np.where(comp_data["covered"])]
+    comp_data = comp_data[np.where(comp_data["assigned"])]
 
     progs = {i: 0 for i in np.unique(comp_data["program"])}
     for c in comp_data:
@@ -719,14 +747,15 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
                            columns=["catalogid", "program", "assigned"])
     lco_comp_prog = np.array([p.strip() for p in lco_comp["program"]])
 
-    programs = np.unique(apo_comp_prog)
-    apo_counts = list()
-    lco_counts = list()
+    programs = [p for p in np.unique(apo_comp_prog) if p.lower() != "sky"]
+    apo_done_counts = list()
+    lco_done_counts = list()
     for p in programs:
+        # count observesim done
         apo_prog = apo_comp[apo_comp["program"] == p]
         lco_prog = apo_comp[apo_comp["program"] == p]
-        apo_counts.append(np.sum(np.in1d(apo_prog['catalogid'], apo_targs['catalogid'])))
-        lco_counts.append(np.sum(np.in1d(lco_prog['catalogid'], lco_targs['catalogid'])))
+        apo_done_counts.append(np.sum(np.in1d(apo_prog['catalogid'], apo_targs['catalogid'])))
+        lco_done_counts.append(np.sum(np.in1d(lco_prog['catalogid'], lco_targs['catalogid'])))
 
     plt.figure(figsize=(16, 10))
 
@@ -736,8 +765,8 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
 
     width = 0.3
 
-    ax1.bar(x - width, lco_counts, width, color="c", label="lco", log=True)
-    ax1.bar(x, apo_counts, width, color="r", label="apo", log=True)
+    ax1.bar(x - width, lco_done_counts, width, color="c", label="lco", log=True)
+    ax1.bar(x, apo_done_counts, width, color="r", label="apo", log=True)
     ax1.set_xticks(x, minor=False)
     ax1.set_xticklabels(programs, rotation='vertical')
     ax1.set_ylabel("# targs")
@@ -748,7 +777,7 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
     labels = ax1.get_xticks()
     ax3.set_xlim(ax1.get_xlim())
     ax3.set_xticks(labels)
-    ax3.set_xticklabels([x + y for x, y in zip(apo_counts, lco_counts)], rotation='vertical')
+    ax3.set_xticklabels([x + y for x, y in zip(apo_done_counts, lco_done_counts)], rotation='vertical')
 
     ax1.legend()
 
@@ -764,10 +793,11 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
                 assign_lco="assign_lco", assign="assigned")
 
     for i, k in enumerate(programs):
-        apo = apo_counts[i]
+        # check robostrategy planned vs assigned
+        apo = apo_done_counts[i]
         apo_plan, apo_assign = countPlanned(k.strip(), apo_comp_prog, apo_comp["assigned"])
 
-        lco = lco_counts[i]
+        lco = lco_done_counts[i]
         lco_plan, lco_assign = countPlanned(k.strip(), lco_comp_prog, lco_comp["assigned"])
 
         if k.strip() in req_by_cad:

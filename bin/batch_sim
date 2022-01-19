@@ -81,8 +81,10 @@ def runSim(args):
     fitsio.write(outobsfile, sim.slewsToArray(),
                  clobber=True)
 
+    sim.scheduler.priorityLogger.write(name=observatory)
+
     if check:
-        print("just a check, no outputs needed")
+        print("just a check, no figures needed")
         return None
 
     # get the env vars for now so I don't have to rewrite the whole thing
@@ -118,7 +120,7 @@ parser.add_argument("-v", "--version", dest="version", type=str,
                     default=None)
 parser.add_argument("-s", "--schedule", dest="schedule", type=str,
                     required=False, help="master schedule to use",
-                    default="maximal_v2")
+                    default="normal_v3")
 parser.add_argument("-r", "--redo", dest="redo_exp", action="store_true",
                     help="redo exposures if snr below threshold")
 parser.add_argument("-c", "--check", dest="check", action="store_true",
@@ -147,6 +149,8 @@ try:
 except:
     pass
 base += "/"
+
+os.environ["RS_OUTDIR"] = base
 
 if multi == -1:
     for i in range(number):

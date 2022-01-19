@@ -383,10 +383,6 @@ class Simulation(object):
                 res = self.bookKeeping(fieldidx, i=i)
                 self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                       finish=True)
-            else:
-                self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
-                                      finish=True)
-
 
     def observeMJD(self, mjd):
         mjd_evening_twilight = self.scheduler.evening_twilight(mjd)
@@ -448,8 +444,8 @@ class Simulation(object):
                 continue
             self.observeField(field_pk, nexposures)
 
-        if mjd % 10 == 0:
-            self.scheduler.priorityLogger.write(name=str(mjd))
+        # if mjd % 10 == 0:
+        #     self.scheduler.priorityLogger.write(name=str(mjd) + "-" + self.observatory.name)
 
     def lstToArray(self):
         assert len(self.obsHist["weather"]) == len(self.obsHist["lst"]), "lst tracking bad!"
