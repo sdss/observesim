@@ -93,13 +93,7 @@ if __name__ == "__main__":
         doHist(base, rs_base, plan, version=version, loc="apo")
 
     print("creating target metrics for {}".format(plan))
-    # plotTargMetric(base, rs_base, plan, version=version, reqs_file=None)
-
-    movieFrameDir = CountFramesAllSky(base, plan, version=version)
-
-    # now makes mp4 file from frames in FramesForMP4 dir
-    os.chdir(movieFrameDir)
-    subprocess.call('ffmpeg -r 10 -i frame%03d.png -vcodec mpeg4 -y sdss5_sim.mp4', shell=True)
+    plotTargMetric(base, rs_base, plan, version=version, reqs_file=None)
 
     # now makes mp4 file from frames in FramesForMP4 dir
     if draw_all:
