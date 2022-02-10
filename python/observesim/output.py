@@ -22,6 +22,14 @@ def read_field(fname, alloc, exp_to_mjd):
 
     catalog_ids = list()
     cadences = list()
+    cartons = list()
+    programs = list()
+    target_pks = list()
+    carton_pks = list()
+    c2t_pks = list()
+    categories = list()
+    ras = list()
+    decs = list()
     mjds = list()
 
     for m, i in zip(exp_to_mjd, range(alloc["iexpst"], alloc["iexpnd"]+1)):
@@ -37,9 +45,18 @@ def read_field(fname, alloc, exp_to_mjd):
 
         catalog_ids.extend(list(w_names["catalogid"][w_assigned]))
         cadences.extend(list(w_names["cadence"][w_assigned]))
+        cartons.extend(list(w_names["carton"][w_assigned]))
+        programs.extend(list(w_names["program"][w_assigned]))
+        target_pks.extend(list(w_names["target_pk"][w_assigned]))
+        carton_pks.extend(list(w_names["carton_pk"][w_assigned]))
+        c2t_pks.extend(list(w_names["carton_to_target_pk"][w_assigned]))
+        categories.extend(list(w_names["category"][w_assigned]))
+        ras.extend(list(w_names["ra"][w_assigned]))
+        decs.extend(list(w_names["dec"][w_assigned]))
         mjds.extend([m for i in w_assigned[0]])
 
-    return catalog_ids, cadences, mjds
+    return (catalog_ids, cadences, cartons, programs, target_pks,
+            carton_pks, c2t_pks, categories, ras, decs, mjds)
 
 
 def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True):
@@ -59,11 +76,19 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     obs_data = fitsio.read(v_base + "{plan}-{loc}-observations-{n}.fits".format(plan=plan, loc=loc, n=N))
 
     # prep out struct
-    all_targs = list()
+    all_ids = list()
     all_cads = list()
     all_mjds = list()
     all_field_ids = list()
     all_field_pks = list()
+    all_programs = list()
+    all_target_pks = list()
+    all_cartons = list()
+    all_carton_pks = list()
+    all_c2t_pks = list()
+    all_categories = list()
+    all_ras = list()
+    all_decs = list()
 
     start_time = time.time()
 
@@ -80,12 +105,21 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
         fname = "{plan}/final/rsFieldAssignmentsFinal-{plan}-{loc}-{fieldid}.fits"
         fname = rs_base + fname.format(plan=plan, loc=loc, fieldid=f["fieldid"])
 
-        ids, cadences, targ_mjds = read_field(fname, alloc, mjds)
-        all_targs.extend(ids)
+        cat_ids, cadences, cartons, programs, target_pks, carton_pks, c2t_pks,\
+            categories, ras, decs, targ_mjds = read_field(fname, alloc, mjds)
+        all_targs.extend(cat_ids)
         all_cads.extend(cadences)
         all_mjds.extend(targ_mjds)
-        all_field_ids.extend([f["fieldid"] for i in ids])
-        all_field_pks.extend([f["pk"] for i in ids])
+        all_field_ids.extend([f["fieldid"] for i in cat_ids])
+        all_field_pks.extend([f["pk"] for i in cat_ids])
+        all_programs.extend(programs)
+        all_target_pks.extend(target_pks)
+        all_cartons.extend(cartons)
+        all_carton_pks.extend(carton_pks)
+        all_c2t_pks.extend(c2t_pks)
+        all_categories.extend(categories)
+        all_ras.extend(ras)
+        all_decs.extend(decs)
 
         # print(f["pk"], f["fieldid"], "GOT", len(ids), len(all_targs))
 
@@ -93,41 +127,39 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     assert len(all_targs) == len(all_mjds), "targ != mjd!!"
     assert len(all_targs) == len(all_field_ids), "targ != field!!"
 
-    targ_ids = list()
-    programs = list()
-    cartons = list()
-    gots = list()
-    ras = list()
-    decs = list()
 
-    completeness = fitsio.read(rs_base + "{plan}/rsCompleteness-{plan}-{loc}.fits".format(
-                                          loc=loc, plan=plan),
-                               columns=["catalogid", "carton", "program", "assigned", "cadence", "ra", "dec", "catalogid"])
-    completeness = completeness[np.where(completeness["catalogid"] != -1)]
+    # completeness = fitsio.read(rs_base + "{plan}/rsCompleteness-{plan}-{loc}.fits".format(
+    #                                       loc=loc, plan=plan),
+    #                            columns=["catalogid", "carton", "program", "assigned", "cadence", "ra", "dec"])
+    # completeness = completeness[np.where(completeness["catalogid"] != -1)]
 
-    comp_dict = dict()
-    for c in completeness:
-        comp_dict[c["catalogid"]] = (c["catalogid"], c["carton"], c["program"], c["assigned"], c["cadence"], c["ra"], c["dec"])
+    # comp_dict = dict()
+    # for c in completeness:
+    #     comp_dict[c["catalogid"]] = (c["catalogid"], c["carton"], c["program"], c["assigned"], c["cadence"], c["ra"], c["dec"])
 
-    for k, c in zip(all_targs, all_cads):
-        targetid, carton, program, got, cadence, ra, dec = comp_dict[k]
-        targ_ids.append(targetid)
-        programs.append(program)
-        cartons.append(carton)
-        gots.append(got)
-        ras.append(ra)
-        decs.append(dec)
-        # if cadence != c:
-        #     print("field cad: {}, targ cad: {}".format(c, cadence))
-        #     print("pk: {}, targ id: {}".format(k, targetid))
+    # for k, c in zip(all_targs, all_cads):
+    #     targetid, carton, program, got, cadence, ra, dec = comp_dict[k]
+    #     targ_ids.append(targetid)
+    #     programs.append(program)
+    #     cartons.append(carton)
+    #     # gots.append(got)
+    #     ras.append(ra)
+    #     decs.append(dec)
+    #     # if cadence != c:
+    #     #     print("field cad: {}, targ cad: {}".format(c, cadence))
+    #     #     print("pk: {}, targ id: {}".format(k, targetid))
+
     dtype = [('catalogid', np.int64),
-             ('target_id', np.int64),
+             ('target_pk', np.int64),
+             ('carton_to_target_pk', np.int64),
+             ('carton_pk', np.int64),
              ('cadence', np.dtype('a40')),
              ('program', np.dtype('a40')),
              ('carton', np.dtype('a40')),
+             ('category', np.dtype('a40')),
              ('field_id', np.int32),
              ('field_pk', np.int32),
-             ('assigned', np.int32),
+             # ('assigned', np.int32),
              ('obs_mjd', np.float64),
              ('ra', np.float64),
              ('dec', np.float64)]
@@ -138,12 +170,13 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     obs_targs["field_id"] = all_field_ids
     obs_targs["field_pk"] = all_field_pks
     obs_targs["obs_mjd"] = all_mjds
-    obs_targs["assigned"] = gots
-    obs_targs["program"] = programs
-    obs_targs["carton"] = cartons
-    obs_targs["target_id"] = targ_ids
-    obs_targs["ra"] = ras
-    obs_targs["dec"] = decs
+    # obs_targs["assigned"] = gots
+    obs_targs["program"] = all_programs
+    obs_targs["carton"] = all_cartons
+    obs_targs["category"] = all_categories
+    obs_targs["target_pk"] = all_target_pks
+    obs_targs["ra"] = all_ras
+    obs_targs["dec"] = all_decs
 
     # catch those -1 obs mjds!!! Oops
     # UPDATE: with rs*Final updates, this should be unnecessary, but harmless
