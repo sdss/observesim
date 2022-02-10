@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
+import os
 
 import numpy as np
 from astroplan import Observer
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 import astropy.units as u
+import yaml
 
 import observesim.weather
 import roboscheduler.scheduler
@@ -81,7 +80,7 @@ class Simulation(object):
             elev = 2134
             self.telescope = {"ra": 0, "dec": -30}
             self.obsCheck = lcoCheck
-            self.moveTelescope = self. moveDuPontTelescope
+            self.moveTelescope = self.moveDuPontTelescope
 
         self.redo_exp = redo_exp
 
@@ -92,8 +91,17 @@ class Simulation(object):
                         "weather": list(),
                         "mjd": list()}
 
+        out_path = os.getenv('RS_OUTDIR')
+        priority_file = os.path.join(out_path, "priority.yml")
+        if os.path.isfile(priority_file):
+            print(f"found priority file, applying: \n {priority_file}")
+            priorities = yaml.load(open(priority_file), Loader=yaml.FullLoader)
+        else:
+            priorities = dict()
+
         self.scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory,
-                                                           schedule=schedule)
+                                                           schedule=schedule,
+                                                           priorities=priorities)
         self.weather = observesim.weather.Weather(mjd_start=self.scheduler.start,
                                                   mjd_end=self.scheduler.end,
                                                   seed=idx, fclear=fclear)
