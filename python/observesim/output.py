@@ -35,13 +35,13 @@ def read_field(fname, alloc, exp_to_mjd):
     for m, i in zip(exp_to_mjd, range(alloc["iexpst"], alloc["iexpnd"]+1)):
         # zip will end when exp_to_mjd ends if it is shorter than
         # nplanned (i.e. the range)
-        if len(w_idx["robotID"].shape) == 1:
+        if len(w_idx["equivRobotID"].shape) == 1:
             assert len(exp_to_mjd) == 1, "obs len != plan len"
-            w_assigned = np.where(w_idx["robotID"] != -1)
+            w_assigned = np.where(w_idx["equivRobotID"] != -1)
         else:
-            w_assigned = np.where(w_idx["robotID"][:, i] != -1)
+            w_assigned = np.where(w_idx["equivRobotID"][:, i] != -1)
 
-        assert len(w_assigned[0]) <= 500, "more ids than robots!"
+        # assert len(w_assigned[0]) <= 500, "more ids than robots!"
 
         catalog_ids.extend(list(w_names["catalogid"][w_assigned]))
         cadences.extend(list(w_names["cadence"][w_assigned]))
@@ -76,7 +76,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     obs_data = fitsio.read(v_base + "{plan}-{loc}-observations-{n}.fits".format(plan=plan, loc=loc, n=N))
 
     # prep out struct
-    all_ids = list()
+    all_targs = list()
     all_cads = list()
     all_mjds = list()
     all_field_ids = list()
@@ -175,6 +175,8 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     obs_targs["carton"] = all_cartons
     obs_targs["category"] = all_categories
     obs_targs["target_pk"] = all_target_pks
+    obs_targs["carton_to_target_pk"] = all_c2t_pks
+    obs_targs["carton_pk"] = all_carton_pks
     obs_targs["ra"] = all_ras
     obs_targs["dec"] = all_decs
 
