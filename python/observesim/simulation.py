@@ -292,10 +292,10 @@ class Simulation(object):
 
         self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
         self.obsHist["ra"].append(self.field_ra[fieldidx])
-        self.obsHist["bright"].append(self.bright())
+        self.obsHist["bright"].append(self.scheduler.skybrightness(self.curr_mjd))
         self.obsHist["field_pk"].append(self.field_pk[fieldidx])
         self.obsHist["weather"].append(False)
-        self.obsHist["mjd"].append(self.curr_mjd)
+        self.obsHist["mjd"].append(float(self.curr_mjd))
 
         return result
 
@@ -397,12 +397,20 @@ class Simulation(object):
         mjd_morning_twilight = self.scheduler.morning_twilight(mjd)
         self.curr_mjd = mjd_evening_twilight
         # int_mjd = int(self.curr_mjd)
+
+        surveyGoal = np.sum(self.scheduler.fields.slots)
+        surveyDone = np.sum([len(self.scheduler.fields.hist[i]) for i in self.scheduler.fields.pk])
+
+        self.scheduler.surveyComplete = surveyDone / surveyGoal
+
         if mjd % 100 == 0:
-            print("!!!!", mjd)
+            print("!!!!", mjd, self.scheduler.surveyComplete, " done")
 
         # guesses = np.arange(0, 1, 0.05)
 
         self.nextchange = mjd_morning_twilight
+
+        this_moon = 0
 
         while(self.curr_mjd < mjd_morning_twilight and
               self.curr_mjd < self.scheduler.end_mjd()):
@@ -421,10 +429,10 @@ class Simulation(object):
                         continue
                     self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
                     self.obsHist["ra"].append(-1)
-                    self.obsHist["bright"].append(self.bright())
+                    self.obsHist["bright"].append(float(self.scheduler.skybrightness(self.curr_mjd)))
                     self.obsHist["field_pk"].append(-1)
                     self.obsHist["weather"].append(True)
-                    self.obsHist["mjd"].append(self.curr_mjd)
+                    self.obsHist["mjd"].append(float(self.curr_mjd))
                     self.curr_mjd += self.nom_duration + self.bossReadout + self.cals
                     # count += 1
                 # print("WEATHER ", self.curr_mjd, f"night {night_len*24:.1f}, weather {dur*24:.1f}", count)
@@ -435,20 +443,26 @@ class Simulation(object):
                 self.curr_mjd = self.nextchange
                 continue
 
+            if self.scheduler.skybrightness(self.curr_mjd) > this_moon:
+                this_moon = self.scheduler.skybrightness(self.curr_mjd)
+
             field_pk, nexposures, noTime = self.nextField()
             if field_pk == -1:
                 if noTime:
                     self.curr_mjd = self.curr_mjd + self.nom_duration
                     continue
-                # raise Exception()
+                if this_moon < 0.98:
+                    print("skipped ", self.curr_mjd, self.scheduler.skybrightness(self.curr_mjd), this_moon)
+                    # raise Exception()
                 # print("skipped ", self.curr_mjd)
                 self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
                 self.obsHist["ra"].append(np.nan)
-                self.obsHist["bright"].append(self.bright())
+                self.obsHist["bright"].append(float(this_moon))
                 self.obsHist["field_pk"].append(-1)
                 self.obsHist["weather"].append(False)
-                self.obsHist["mjd"].append(self.curr_mjd)
+                self.obsHist["mjd"].append(float(self.curr_mjd))
                 self.curr_mjd = self.curr_mjd + self.nom_duration
+                print(self.curr_mjd, self.obsHist["mjd"][-1]-self.curr_mjd)
                 continue
             self.observeField(field_pk, nexposures)
 
@@ -459,7 +473,7 @@ class Simulation(object):
         assert len(self.obsHist["weather"]) == len(self.obsHist["lst"]), "lst tracking bad!"
         dtype = [('lst', np.float64),
                  ('ra', np.float64),
-                 ('bright', np.bool_),
+                 ('bright', np.float32),
                  ('field_pk', np.int32),
                  ('weather', np.bool_),
                  ('mjd', np.float64)]

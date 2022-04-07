@@ -120,7 +120,7 @@ parser.add_argument("-v", "--version", dest="version", type=str,
                     default=None)
 parser.add_argument("-s", "--schedule", dest="schedule", type=str,
                     required=False, help="master schedule to use",
-                    default="normal_v3")
+                    default="normal_v4")
 parser.add_argument("-r", "--redo", dest="redo_exp", action="store_true",
                     help="redo exposures if snr below threshold")
 parser.add_argument("-c", "--check", dest="check", action="store_true",

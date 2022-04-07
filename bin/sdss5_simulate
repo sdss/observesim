@@ -7,115 +7,146 @@ from __future__ import absolute_import
 
 # Perform an SDSS-V simulation
 
+import os
+import warnings
 import argparse
 import time
 import numpy as np
 import fitsio
+from astropy.utils.exceptions import ErfaWarning
 import observesim.weather
 import roboscheduler.scheduler
 import observesim.observe
+from observesim import simulation
+from observesim.output import countFields, cumulativePlot,\
+                              spiders_area_for_program_time, doHist
+
+
+def runSim(args):
+    """ run a simulation
+    """
+    # ###################
+    # make sure this starts a clean slate every run!
+    # ###################
+    idx, base, plan, version, observatory, schedule, redo_exp, check = args
+
+    print(f"running {observatory} sim {plan} VER {version} seed {idx}")
+
+    sim = simulation.Simulation(plan, observatory,
+                                idx=idx, schedule=schedule,
+                                redo_exp=redo_exp)
+
+    startTime = time.time()
+    # Loop through nights
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=ErfaWarning)
+        for mjd in sim.scheduler.mjds:
+            # uncomment to do a quick check
+            if mjd > sim.scheduler.mjds[45] and check:
+                continue
+            sim.observeMJD(mjd)
+    print("skipped for physical obstructions", sim.hit_lims)
+    print(f"REDO: apg {sim.redo_apg} r {sim.redo_r} b {sim.redo_b}")
+    endTime = time.time()
+
+    # with open("{base}weather_tracking_{idx}.dat".format(base=base, idx=idx), "w") as df:
+    #     print("mjd, length, observed", file=df)
+    #     for m, o in weather_used.items():
+    #         print("{}, {}, {}".format(m, o["length"], o["observed"]), file=df)
+
+    print("{} completed in {}".format(idx, endTime-startTime))
+
+    outobstemplate = "{base}{plan}-{observatory}-observations-{idx}.fits"
+    outobsfile = outobstemplate.format(base=base, observatory=observatory,
+                                       plan=plan, idx=idx)
+    fitsio.write(outobsfile, sim.scheduler.observations.toarray(),
+                 clobber=True)
+
+    outobstemplate = "{base}{plan}-{observatory}-fields-{idx}.fits"
+    outobsfile = outobstemplate.format(base=base, observatory=observatory,
+                                       plan=plan, idx=idx)
+    fitsio.write(outobsfile, sim.scheduler.fields.toarray(),
+                 clobber=True)
+
+    outobstemplate = "{base}{plan}-{observatory}-lst-{idx}.fits"
+    outobsfile = outobstemplate.format(base=base, observatory=observatory,
+                                       plan=plan, idx=idx)
+    fitsio.write(outobsfile, sim.lstToArray(),
+                 clobber=True)
+
+    outobstemplate = "{base}{plan}-{observatory}-slews-{idx}.fits"
+    outobsfile = outobstemplate.format(base=base, observatory=observatory,
+                                       plan=plan, idx=idx)
+    fitsio.write(outobsfile, sim.slewsToArray(),
+                 clobber=True)
+
+    priorityLogName = observatory + str(idx)
+    sim.scheduler.priorityLogger.write(name=priorityLogName)
+
+    if check:
+        print("just a check, no figures needed")
+        return None
+
+    # get the env vars for now so I don't have to rewrite the whole thing
+    rs_base = os.getenv('OBSERVING_PLAN_DIR') + "/"
+    base = os.getenv("OBSERVESIM_OUTPUT_BASE")
+
+    countFields(base, rs_base, plan, version=version, loc=observatory, N=idx)
+    # cumulativePlot(base, plan, rs_base, version=version, loc=observatory)
+    # spiders_area_for_program_time(base, rs_base, plan, version=version, loc=observatory)
+    # doHist(base, rs_base, plan, version=version, loc=observatory)
+
 
 # Read arguments
 usage = "sdss5_simulate"
 description = "Simulate the SDSS-V schedule"
 parser = argparse.ArgumentParser(description=description, usage=usage)
 parser.add_argument("-b", "--base", dest="base", type=str,
-                    required=True, help="output FITS base name")
+                    required=False, help="output FITS base name",
+                    default=None)
 parser.add_argument("-p", "--plan", dest="plan", type=str,
                     required=False, help="design plan",
                     default='plan-0')
-parser.add_argument("-s", "--seed", dest="seed", type=int,
-                    required=False, help="random seed",
-                    default=1)
 parser.add_argument("-t", "--telescope", dest="telescope", type=str,
                     required=False, help="telescope ('apo' or 'lco')",
                     default='apo')
+parser.add_argument("-n", "--number", dest="number", type=int,
+                    required=False, help="random seed number, used for label as well",
+                    default=1)
+parser.add_argument("-v", "--version", dest="version", type=str,
+                    required=False, help="use versioned directory for output",
+                    default=None)
+parser.add_argument("-s", "--schedule", dest="schedule", type=str,
+                    required=False, help="master schedule to use",
+                    default="normal_v4")
+parser.add_argument("-r", "--redo", dest="redo_exp", action="store_true",
+                    help="redo exposures if snr below threshold")
+parser.add_argument("-c", "--check", dest="check", action="store_true",
+                    help="do minimal sim to check changes")
 args = parser.parse_args()
 base = args.base
 plan = args.plan
-seed = args.seed
 observatory = args.telescope
-if(observatory == 'apo'):
-    fclear = 0.5
-if(observatory == 'lco'):
-    fclear = 0.7
+number = args.number
+version = args.version
+schedule = args.schedule
+redo_exp = args.redo_exp
+check = args.check
 
-# Set up schedule and weather
-scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory)
-weather = observesim.weather.Weather(mjd_start=scheduler.start,
-                                     mjd_end=scheduler.end,
-                                     seed=seed, fclear=fclear)
-observe = observesim.observe.Observe()
+if base is None:
+    base = os.getenv("OBSERVESIM_OUTPUT_BASE")
 
-# Initialize observedb
-scheduler.initdb(designbase=plan)
-# scheduler.set_priority_all(scheduler.mjds[0])
+assert base is not None, "must specify result base"
 
-duration = np.float32(18. / 60. / 24.)
+if version is None:
+    version = plan
+base = os.path.join(base, version)
+try:
+    os.makedirs(base)
+except:
+    pass
+base += "/"
 
-lsts = list()
-observed = list()
+os.environ["RS_OUTDIR"] = base
 
-startTime = time.time()
-# Loop through nights
-for mjd in scheduler.mjds:
-    mjd_evening_twilight = scheduler.evening_twilight(mjd)
-    mjd_morning_twilight = scheduler.morning_twilight(mjd)
-    curr_mjd = mjd_evening_twilight
-    int_mjd = int(curr_mjd)
-    if int_mjd % 100 == 0:
-        print("!!!!", int_mjd)
-    # print(int_mjd)
-    while(curr_mjd < mjd_morning_twilight and
-          curr_mjd < scheduler.end_mjd()):
-        isclear, nextchange_weather = weather.clear(mjd=curr_mjd)
-        onoff, nextchange_on = scheduler.on(mjd=curr_mjd)
-        nextchange_all = np.array([nextchange_weather, nextchange_on])
-        nextchange = np.min(nextchange_all)
-        if((isclear == True) and (onoff == 'on')):
-            maxExp = int((nextchange - curr_mjd)//duration)
-            if maxExp == 0:
-                curr_mjd = curr_mjd + duration
-                continue
-            fieldid, nexposures = scheduler.nextfield(mjd=curr_mjd,
-                                                      maxExp=maxExp)
-            if(fieldid is not None):
-                for i in range(nexposures):
-                    # add each exposure
-                    lsts.append(scheduler.lst(curr_mjd)[0])
-                    observed.append(scheduler.fields.racen[fieldid])
-                    curr_mjd = curr_mjd + duration
-                    if(curr_mjd > nextchange):
-                        duration = (duration - (curr_mjd - nextchange))
-                        curr_mjd = nextchange
-
-                    result = observe.result(mjd=curr_mjd, fieldid=fieldid,
-                                            duration=duration)
-                    scheduler.update(fieldid=fieldid, result=result)
-            else:
-                lsts.append(scheduler.lst(curr_mjd)[0])
-                observed.append(-1)
-                curr_mjd = curr_mjd + duration
-        else:
-            if(nextchange > curr_mjd):
-                curr_mjd = nextchange
-
-endTime = time.time()
-
-assert len(lsts) == len(observed), "lst tracking munged"
-with open("{base}lst_tracking.dat".format(base=base), "w") as df:
-    print("lst, obs", file=df)
-    for l, o in zip(lsts, observed):
-        print("{}, {}".format(l, o), file=df)
-
-print("completed in {}".format(endTime-startTime))
-
-outobstemplate = "{base}{plan}-{observatory}-observations.fits"
-outobsfile = outobstemplate.format(base=base, plan=plan, observatory=observatory)
-fitsio.write(outobsfile, scheduler.observations.toarray(),
-             clobber=True)
-
-outobstemplate = "{base}{plan}-{observatory}-fields.fits"
-outobsfile = outobstemplate.format(base=base, plan=plan, observatory=observatory)
-fitsio.write(outobsfile, scheduler.fields.toarray(),
-             clobber=True)
+runSim((number, base, plan, version, observatory, schedule, redo_exp, check))

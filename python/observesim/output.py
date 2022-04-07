@@ -72,8 +72,8 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 
     allocation = fitsio.read(rs_base + "{plan}/final/rsAllocationFinal-{plan}-{loc}.fits".format(plan=plan, loc=loc))
 
-    sim_data = fitsio.read(v_base + "{plan}-{loc}-fields-{n}.fits".format(plan=plan, loc=loc, n=N))
-    obs_data = fitsio.read(v_base + "{plan}-{loc}-observations-{n}.fits".format(plan=plan, loc=loc, n=N))
+    sim_data = fitsio.read(v_base + f"{plan}-{loc}-fields-{N}.fits")
+    obs_data = fitsio.read(v_base + f"{plan}-{loc}-observations-{N}.fits")
 
     # prep out struct
     all_targs = list()
@@ -189,7 +189,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     #              obs_targs, clobber=True)
 
     if save:
-        fitsio.write(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc),
+        fitsio.write(v_base + f"obsTargets-{plan}-{loc}-{N}.fits",
                      cleaned_targs, clobber=True)
 
     return obs_targs
