@@ -117,10 +117,12 @@ class Simulation(object):
         cadences = self.scheduler.fields.cadence
 
         self.nom_duration = np.float32(15. / 60. / 24.)
-        self.cals = np.float32(3. / 60. / 24.)
+        # self.cals = np.float32(3. / 60. / 24.)
+        self.field_overhead = np.float32(5. / 60. / 24.)
+        self.design_overhead = np.float32(7. / 60. / 24.)
         self.observe = observesim.observe.Observe(defaultExp=self.nom_duration,
                                                   cadencelist=cadencelist, cadences=cadences)
-        self.bossReadout = np.float32(70. / 60. / 60. / 24.)
+        # self.bossReadout = np.float32(70. / 60. / 60. / 24.)
 
         self.curr_mjd = np.float32(1e9)
 
@@ -229,13 +231,14 @@ class Simulation(object):
             # self.curr_mjd = self.curr_mjd + self.nom_duration
             return -1, 1, True
         field_pk, nexposures = self.scheduler.nextfield(mjd=self.curr_mjd,
-                                                       maxExp=maxExp)
+                                                        maxExp=maxExp)
         # assert fieldid is not None, f"can't schedule {self.curr_mjd}, {self.bright()}"
         if(field_pk is not None):
             fieldidx = np.where(self.field_pk == field_pk)[0]
             site_check = self.siteObs(fieldidx, [self.curr_mjd + n*(self.nom_duration) for n in range(nexposures)])
             # maxTime = self.nextchange - self.curr_mjd
-            maxTime = maxExp * self.nom_duration
+            # maxTime = maxExp * self.nom_duration
+            maxTime = maxExp * (self.nom_duration)
 
             if not site_check:
                 field_idxs, nexps = self.scheduler.nextfield(mjd=self.curr_mjd,
@@ -285,7 +288,8 @@ class Simulation(object):
             print("HOOOWWWOWOWOWOWW")
             print(i, alt, az, self.curr_mjd, field_pk)
 
-        self.curr_mjd = self.curr_mjd + duration + self.bossReadout
+        # self.curr_mjd = self.curr_mjd + duration + self.bossReadout
+        self.curr_mjd = self.curr_mjd + self.design_overhead
 
         # move telescope for tracking
         self.moveTelescope(self.curr_mjd, fieldidx)
@@ -323,7 +327,8 @@ class Simulation(object):
             self.slew_rot.append(np.nan)
 
         # slewtime is in seconds...
-        self.curr_mjd = self.curr_mjd + self.cals + np.float32(slewtime / 60. / 60. / 24.)
+        # self.curr_mjd = self.curr_mjd + self.cals + np.float32(slewtime / 60. / 60. / 24.)
+        self.curr_mjd = self.curr_mjd + self.field_overhead
 
         field_exp_count = nexposures
         for i in range(nexposures):
@@ -433,7 +438,7 @@ class Simulation(object):
                     self.obsHist["field_pk"].append(-1)
                     self.obsHist["weather"].append(True)
                     self.obsHist["mjd"].append(float(self.curr_mjd))
-                    self.curr_mjd += self.nom_duration + self.bossReadout + self.cals
+                    self.curr_mjd += self.nom_duration
                     # count += 1
                 # print("WEATHER ", self.curr_mjd, f"night {night_len*24:.1f}, weather {dur*24:.1f}", count)
             elif (onoff != 'on'):
