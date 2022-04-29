@@ -112,7 +112,7 @@ parser.add_argument("-t", "--telescope", dest="telescope", type=str,
                     default='apo')
 parser.add_argument("-n", "--number", dest="number", type=int,
                     required=False, help="random seed number, used for label as well",
-                    default=1)
+                    default=0)
 parser.add_argument("-v", "--version", dest="version", type=str,
                     required=False, help="use versioned directory for output",
                     default=None)

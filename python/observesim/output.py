@@ -223,8 +223,8 @@ The fields files contain indices into an observations to record info for each ob
 target_table = """<h2>Summary of Observed Targets </h2>
 <p>For each observation of a field, the targets planned to be observed are specified in an
 rsAssignments file. The targets can therefor be matched to field observations. The results of
-this matching are here for <a href="obsTargets-{plan}-apo.fits">APO</a>
-and <a href="obsTargets-{plan}-apo.fits">LCO</a>. They can then be sorted by cadence to determine how many
+this matching are here for <a href="obsTargets-{plan}-apo-0.fits">APO</a>
+and <a href="obsTargets-{plan}-apo-0.fits">LCO</a>. They can then be sorted by cadence to determine how many
 targets where observed total. The plot below shows a summary of total targets per cadence, note the log
 scale.</p>
 
@@ -569,7 +569,7 @@ def combineProgramMjds(base, plan, rs_base, version=None, loc="apo", N=0):
         v_base = os.path.join(base, plan)
         v_base += "/"
 
-    obs_data = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc),
+    obs_data = fitsio.read(v_base + "obsTargets-{plan}-{loc}-0.fits".format(plan=plan, loc=loc),
                            columns=["obs_mjd", "catalogid"])
     comp_data = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc),
                             columns=["catalogid", "program"])
@@ -769,9 +769,9 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
         v_base = os.path.join(base, plan)
         v_base += "/"
 
-    apo_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
+    apo_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}-0.fits".format(plan=plan, loc="apo"),
                             columns=["program", "catalogid"])
-    lco_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
+    lco_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}-0.fits".format(plan=plan, loc="lco"),
                             columns=["program", "catalogid"])
 
     apo_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
@@ -907,7 +907,7 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
         v_base = os.path.join(base, plan)
         v_base += "/"
 
-    obs_file = v_base + "obsTargets-{plan}-{loc}.fits".format(plan=plan, loc=loc)
+    obs_file = v_base + "obsTargets-{plan}-{loc}-0.fits".format(plan=plan, loc=loc)
     comp_file = rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc)
 
     all_targets = fitsio.read(comp_file,
