@@ -19,13 +19,14 @@ from roboscheduler.moonphase import moonphase2
 def countFieldMjd(obs=None, field_ids=None, mjd=None):
     done = np.extract(obs["mjd"] < mjd, obs)
     fields, counts = np.unique(done["field_pk"], return_counts=True)
-    
-    field_counts = {f: c for f,c in zip(fields, counts)}
-    
+
+    field_counts = {f: c for f, c in zip(fields, counts)}
+
     return np.array([field_counts.get(f, 0) for f in field_ids])
 
 
 def drawMoonish(phase, ax):
+    # 0 new, 4 full, 8 would be new again
     if phase == 0:
         el_col = "None"
         wed_2_col = "None"
@@ -59,9 +60,9 @@ def drawMoonish(phase, ax):
         wed_2_col = "k"
         wed_1_col = "None"
 
-    wed1 = Wedge((0.0,0.0), r=1, theta1=90, theta2=270, fc=wed_1_col)
-    wed2 = Wedge((0.0,0.0), r=1, theta1=270, theta2=90, fc=wed_2_col)
-    el = Ellipse((0.0,0.0), width=1, height=2, fc=el_col)
+    wed1 = Wedge((0.0, 0.0), r=1, theta1=90, theta2=270, fc=wed_1_col)
+    wed2 = Wedge((0.0, 0.0), r=1, theta1=270, theta2=90, fc=wed_2_col)
+    el = Ellipse((0.0, 0.0), width=1, height=2, fc=el_col)
     ax.add_artist(wed1)
     ax.add_artist(wed2)
     ax.add_artist(el)

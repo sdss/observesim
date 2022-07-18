@@ -289,7 +289,8 @@ class Simulation(object):
             print(i, alt, az, self.curr_mjd, field_pk)
 
         # self.curr_mjd = self.curr_mjd + duration + self.bossReadout
-        self.curr_mjd = self.curr_mjd + self.design_overhead
+        self.curr_mjd = self.curr_mjd + duration + self.design_overhead
+        # print(f"{float(duration):0.4f}, {float(self.design_overhead):0.6f}, {float(self.curr_mjd):0.7f}")
 
         # move telescope for tracking
         self.moveTelescope(self.curr_mjd, fieldidx)
@@ -329,6 +330,7 @@ class Simulation(object):
         # slewtime is in seconds...
         # self.curr_mjd = self.curr_mjd + self.cals + np.float32(slewtime / 60. / 60. / 24.)
         self.curr_mjd = self.curr_mjd + self.field_overhead
+        # print(f"{fieldidx}, {float(self.field_overhead):0.6f}, {float(self.curr_mjd):0.7f}")
 
         field_exp_count = nexposures
         for i in range(nexposures):
