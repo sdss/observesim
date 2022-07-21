@@ -102,9 +102,16 @@ class Simulation(object):
         self.scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory,
                                                            schedule=schedule,
                                                            priorities=priorities)
-        self.weather = observesim.weather.Weather(mjd_start=self.scheduler.start,
-                                                  mjd_end=self.scheduler.end,
-                                                  seed=idx, fclear=fclear)
+
+        if observatory == "apo":
+            self.weather = observesim.weather.Weather2(mjd_start=self.scheduler.start,
+                                                       mjd_end=self.scheduler.end,
+                                                       seed=idx)
+        else:
+            self.weather = observesim.weather.Weather(mjd_start=self.scheduler.start,
+                                                      mjd_end=self.scheduler.end,
+                                                      seed=idx, fclear=fclear)
+
         self.observatory = Observer(longitude=self.scheduler.longitude * u.deg,
                                     latitude=self.scheduler.latitude*u.deg,
                                     elevation=elev*u.m, name=observatory, timezone=timezone)
@@ -125,6 +132,7 @@ class Simulation(object):
         # self.bossReadout = np.float32(70. / 60. / 60. / 24.)
 
         self.curr_mjd = np.float32(1e9)
+        self.nextchange_weather = 5e9
 
         self.coord = SkyCoord(self.field_ra * u.deg, self.field_dec * u.deg)
 
@@ -419,13 +427,20 @@ class Simulation(object):
 
         this_moon = 0
 
+        isclear, self.nextchange_weather = self.weather.clear(now=self.curr_mjd,
+                                                              until=mjd_morning_twilight)
+        # carries on until a change or it hits morning
+
         while(self.curr_mjd < mjd_morning_twilight and
               self.curr_mjd < self.scheduler.end_mjd()):
-            # should we do this now?
-            isclear, nextchange_weather = self.weather.clear(mjd=self.curr_mjd)
+
+            if self.nextchange_weather <= self.curr_mjd:
+                isclear, self.nextchange_weather = self.weather.clear(now=self.curr_mjd,
+                                                                      until=mjd_morning_twilight)
+
             onoff, nextchange_on = self.scheduler.on(mjd=self.curr_mjd)
 
-            nextchange = np.min(np.array([nextchange_weather, nextchange_on, mjd_morning_twilight]))
+            nextchange = np.min(np.array([self.nextchange_weather, nextchange_on, mjd_morning_twilight]))
 
             if not isclear:
                 # count = 0

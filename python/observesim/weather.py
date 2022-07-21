@@ -1,6 +1,11 @@
+import os
+
 import numpy as np
 import numpy.fft as fft
 import scipy.interpolate as interpolate
+
+import tensorflow as tf
+import tensorflow.keras as keras
 
 """Weather module for simulations.
 
@@ -12,6 +17,187 @@ Dependencies:
  scipy
 
 """
+
+
+class Weather2(object):
+    """Weather class
+
+    Parameters:
+    ----------
+
+    model_fname: str, pathlike
+        path to keras model
+
+    mjd_start : float, np.float64
+        Starting MJD to consider
+
+    mjd_end : float, np.float64
+        Ending MJD to consider
+
+    seed : int
+        random seed
+
+    Methods:
+    -------
+
+    clear() : is it clear for the current MJD, and how long
+              until next change?
+"""
+    def __init__(self, model_fname=None,
+                 mjd_start=None, mjd_end=None,
+                 burn_in_days=7., seed=1):
+        self.mjd_start = mjd_start
+        self.mjd_end = mjd_end
+
+        if model_fname is None:
+            model_fname = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + "/etc/weather_model.keras"
+
+        self.model = keras.models.load_model(model_fname)
+        self._initialize_conditions(seed=seed)
+
+    def _mjd_to_phase(self, mjd):
+        """
+        Converts an MJD to a yearly phase (in radians),
+        with 1 January corresponding to a phas of zero.
+
+        Parameters
+        ----------
+
+        mjd : float
+            MJD to convert
+
+        Returns
+        -------
+
+        phase : float
+            Yearly phase, in radians.
+        """
+        mjd_year_start = 59580.
+        phase = (mjd - mjd_year_start) / 365.2425 * 2*np.pi
+        return phase
+
+    def _state_to_clear(self, state):
+        """
+        Converts a state integer to a clear / not clear boolean.
+
+        Parameters
+        ----------
+
+        state : int
+            An integer representing the fine-grained weather
+            state
+
+        Returns
+        -------
+
+        is_clear : boolean
+            Whether the state corresponds to clear weather
+
+        Comments
+        --------
+        The internal state is more fine-grained than a simple
+        boolean clear / not clear rating. This function
+        translates the internal state to a boolean rating.
+        """
+        return state < 2
+
+    def _advance_time(self):
+        """
+        Advances time by one hour, and draws a new state.
+
+        Comments
+        --------
+        The internal state in an integer, which represents
+        the weather in a more fine-grained manner than
+        clear / not clear. This state can then be translated
+        to a clear / not clear rating.
+        """
+        self.mjd += 1/24. # Time delta is fixed to 1 hour
+        year_phase = self._mjd_to_phase(self.mjd)
+        features_now = np.array([[
+            self.state,
+            np.cos(year_phase),
+            np.sin(year_phase),
+            1.
+        ]])
+        p_next_state = self.model.predict(features_now, verbose=0)[0]
+        self.state = self.rng.choice(p_next_state.size, p=p_next_state)
+
+    def _initialize_conditions(self, burn_in_days=7., seed=1):
+        """
+        Initializes the weather model.
+
+        Parameters
+        ----------
+
+        burn_in_days : float
+            Length of time (in days) to use to burn-in the
+            weather Markov Chain model.
+
+        seed : int
+            Random seed to use, for reproducibility.
+
+        Comments
+        --------
+        The Markov Chain model has to "burn-in" in order to reach
+        a random state. The model is initialized before the
+        specified starting MJD, and then run forwards to starting
+        MJD, at which point it should be in a representative
+        random state.
+        """
+        if seed is not None:
+            print("!!using psuedo-random weather!!")
+            self.rng = np.random.default_rng(seed)
+        burn_in_hours = int(np.round(24 * burn_in_days))
+        self.mjd = self.mjd_start - burn_in_hours/24.
+        self.state = 0
+        for h in range(burn_in_hours):
+            self._advance_time()
+
+    def clear(self, now=None, until=None):
+        """
+        Returns whether it is currently clear, and the MJD of
+        the next change.
+
+        Parameters
+        ----------
+
+        now : float
+            MJD to start at, advances time as needed
+
+        until : float
+            MJD to stop at
+
+        Returns
+        -------
+
+        current_clear : boolean
+            Is the MJD clear?
+
+        next_change : float
+            MJD of the next change in clear status
+
+        Comments
+        --------
+        Advances the internal state (both cloud cover and time)
+        to the next change.
+        """
+
+        if now is not None:
+            now = float(now)
+            time = f"{now:.3f} {self.mjd:.3f} {self.mjd-now:.4f}"
+            assert now + 1 / 24 >= self.mjd, "retreiving past weather not supported \n" + time
+            while self.mjd < now or self.mjd - now < 1 / 24:
+                self._advance_time()
+
+        if until is None:
+            # don't go a full day but enough for any long night
+            until = self.mjd + 0.7
+        current_clear = self._state_to_clear(self.state)
+        while self._state_to_clear(self.state) == current_clear and self.mjd <= until:
+            self._advance_time()
+
+        return current_clear, self.mjd
 
 
 class Weather(object):
