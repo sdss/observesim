@@ -45,12 +45,14 @@ class Weather2(object):
 """
     def __init__(self, model_fname=None,
                  mjd_start=None, mjd_end=None,
-                 burn_in_days=7., seed=1):
+                 burn_in_days=7., seed=1,
+                 loc="apo"):
         self.mjd_start = mjd_start
         self.mjd_end = mjd_end
 
         if model_fname is None:
-            model_fname = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + "/etc/weather_model.keras"
+            model_fname = '/'.join(os.path.realpath(__file__).split('/')[0:-1])\
+                        + f"/etc/weather_model_{loc}.keras"
 
         self.model = keras.models.load_model(model_fname)
         self._initialize_conditions(seed=seed)

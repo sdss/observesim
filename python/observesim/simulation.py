@@ -103,14 +103,12 @@ class Simulation(object):
                                                            schedule=schedule,
                                                            priorities=priorities)
 
-        if observatory == "apo":
-            self.weather = observesim.weather.Weather2(mjd_start=self.scheduler.start,
-                                                       mjd_end=self.scheduler.end,
-                                                       seed=idx)
-        else:
-            self.weather = observesim.weather.Weather(mjd_start=self.scheduler.start,
-                                                      mjd_end=self.scheduler.end,
-                                                      seed=idx, fclear=fclear)
+        self.weather = observesim.weather.Weather2(mjd_start=self.scheduler.start,
+                                                   mjd_end=self.scheduler.end,
+                                                   seed=idx, loc=observatory)
+        # self.weather = observesim.weather.Weather(mjd_start=self.scheduler.start,
+        #                                           mjd_end=self.scheduler.end,
+        #                                           seed=idx, fclear=fclear)
 
         self.observatory = Observer(longitude=self.scheduler.longitude * u.deg,
                                     latitude=self.scheduler.latitude*u.deg,
@@ -125,8 +123,8 @@ class Simulation(object):
 
         self.nom_duration = np.float32(15. / 60. / 24.)
         # self.cals = np.float32(3. / 60. / 24.)
-        self.field_overhead = np.float32(5. / 60. / 24.)
-        self.design_overhead = np.float32(7. / 60. / 24.)
+        self.field_overhead = np.float32(7. / 60. / 24.)
+        self.design_overhead = np.float32(5.5 / 60. / 24.)
         self.observe = observesim.observe.Observe(defaultExp=self.nom_duration,
                                                   cadencelist=cadencelist, cadences=cadences)
         # self.bossReadout = np.float32(70. / 60. / 60. / 24.)
