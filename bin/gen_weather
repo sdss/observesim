@@ -1,0 +1,116 @@
+#!/usr/bin/env python
+
+import argparse
+import os
+import sys
+
+import numpy as np
+import tensorflow as tf
+import tensorflow.keras as keras
+
+
+def generate_weather(model_fname, mjd0, mjd1, n_realizations, n_burnin=24*14, seed=None):
+    """
+    Generates a set of realizations of cloud coverage, with a given start and stop date,
+    using a Markov model trained to represent the weather at a specific location. The
+    generated time series has a cadence of 1 hour.
+
+    Inputs:
+      model_fname (str): Filename of Keras weather model.
+      mjd0 (float): Starting MJD for time series.
+      mjd1 (float): Ending MJD for time series.
+      n_realizations (int): # of weather realizations to generate.
+      n_burnin (int): # of extra hours before `mdj0` to run, in order to "burn-in"
+                      Markov chain (defaults to 24*14 hours).
+      seed (int): Seed with which to initialize pseudorandom number generator. The
+                  same seed should produce identical results. Defaults to `None`,
+                  meaning a seed is generated using the computer's pool of entropy.
+
+    Outputs:
+      state (np.ndarray): Weather state at each time, for each realization. A discrete
+                          integer (0-3), with 0 being completely clear, and 3 being
+                          100% cloudy. Shape = (time step, realization).
+      mjd_of_state (np.ndarray): MJD of each entry in `state`. Shape = (time step,).
+    """
+    model = keras.models.load_model(model_fname)
+
+    rng = np.random.default_rng(seed)
+
+    n_steps = int(np.ceil((mjd1-mjd0) * 24))
+
+    # Initial state
+    state = np.zeros((n_steps+n_burnin+1, n_realizations), dtype='f4')
+
+    mjd_ref = 59580.  # 1 January 2022
+    mjd = mjd0 - n_burnin/24.  # Burn in for a specified number of hours
+    mjd_of_state = mjd + np.arange(n_steps+n_burnin+1)/24.
+
+    for i in range(n_steps+n_burnin):
+        mjd = mjd_of_state[i]
+        year_phase = 2*np.pi * (mjd-mjd_ref)/365.2422
+        x = np.stack([
+            state[i],
+            np.full(n_realizations, np.cos(year_phase)),
+            np.full(n_realizations, np.sin(year_phase))
+        ], axis=1).astype('f4')
+
+        p = model.predict(x, verbose=0)
+        P = np.cumsum(p, axis=1)
+        P /= P[:, -1][:, None]
+
+        state[i+1] = np.count_nonzero(
+            rng.uniform(size=p.shape[0])[:, None] > np.cumsum(p, axis=1),
+            axis=1
+        ).astype('f4')
+
+    state = state[n_burnin:]
+    mjd_of_state = mjd_of_state[n_burnin:]
+
+    return state, mjd_of_state
+
+
+def saveModels(begin, end, loc="lco", modelsDir=None):
+    base_path = os.path.realpath(__file__).split('/bin')[0]
+    fname = os.path.join(base_path, f"python/observesim/etc/weather_model_{loc}.keras")
+
+    if modelsDir is None:
+        base = os.getenv("OBSERVESIM_OUTPUT_BASE")
+        modelsDir = os.path.join(base, "weather_models")
+
+    if not os.path.isdir(modelsDir):
+        os.makedirs(modelsDir)
+
+    state, t = generate_weather(fname, begin, end, 32)
+
+    for i in range(32):
+        fname = os.path.join(modelsDir, f"saved_model_{i}.csv")
+        with open(fname, "w") as save:
+            print("mjd, state", file=save)
+            for mjd, s in zip(t, state[:, i]):
+                print(f"{mjd}, {s}", file=save)
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(
+        prog=os.path.basename(sys.argv[0]),
+        description="""create weather files""")
+
+    parser.add_argument("-s", "--start", dest="start", type=int,
+                        required=True, help="start date, mjd")
+    parser.add_argument("-e", "--end", dest="end", type=int,
+                        required=True, help="end date, mjd")
+    parser.add_argument("-o", "--out", dest="out", type=str,
+                        required=False, help="output directory, default current",
+                        default="")
+    parser.add_argument("-l", "--loc", dest="loc", type=str,
+                        required=False, help="location, default apo",
+                        default="lco")
+
+    args = parser.parse_args()
+    start = args.start
+    end = args.end
+    outPath = args.out
+    loc = args.loc
+
+    saveModels(start, end, loc="lco", modelsDir=None)
