@@ -19,6 +19,130 @@ Dependencies:
 """
 
 
+class Weather3(object):
+    """Weather class
+
+    Parameters:
+    ----------
+
+    model_fname: str, pathlike
+        path to saved model
+
+    mjd_start : float, np.float64
+        Starting MJD to consider
+
+    mjd_end : float, np.float64
+        Ending MJD to consider
+
+    seed : int
+        random seed
+
+    Methods:
+    -------
+
+    clear() : is it clear for the current MJD, and how long
+              until next change?
+    """
+    def __init__(self, model_fname=None,
+                 mjd_start=None, mjd_end=None):
+        self.mjd_start = mjd_start
+        self.mjd_end = mjd_end
+
+        self.model = np.genfromtxt(model_fname,
+                                   dtype=None,
+                                   delimiter=",",
+                                   names=True,
+                                   encoding="UTF8")
+
+        # self.idx = np.argmin(np.abs(self.model["mjd"]-self.mjd_start))
+        self.idx = 0
+
+    def _state_to_clear(self, state):
+        """
+        Converts a state integer to a clear / not clear boolean.
+
+        Parameters
+        ----------
+
+        state : int
+            An integer representing the fine-grained weather
+            state
+
+        Returns
+        -------
+
+        is_clear : boolean
+            Whether the state corresponds to clear weather
+
+        Comments
+        --------
+        The internal state is more fine-grained than a simple
+        boolean clear / not clear rating. This function
+        translates the internal state to a boolean rating.
+        """
+        return state < 2
+
+    def _advance_time(self):
+        """
+        Advances time by one hour, and draws a new state.
+
+        Comments
+        --------
+        The internal state in an integer, which represents
+        the weather in a more fine-grained manner than
+        clear / not clear. This state can then be translated
+        to a clear / not clear rating.
+        """
+        self.idx += 1
+        self.mjd = self.model["mjd"][idx]
+        self.state = self.model["state"][idx]
+
+    def clear(self, now=None, until=None):
+        """
+        Returns whether it is currently clear, and the MJD of
+        the next change.
+
+        Parameters
+        ----------
+
+        now : float
+            MJD to start at, advances time as needed
+
+        until : float
+            MJD to stop at
+
+        Returns
+        -------
+
+        current_clear : boolean
+            Is the MJD clear?
+
+        next_change : float
+            MJD of the next change in clear status
+
+        Comments
+        --------
+        Advances the internal state (both cloud cover and time)
+        to the next change.
+        """
+
+        if now is not None:
+            now = float(now)
+            time = f"{now:.3f} {self.mjd:.3f} {self.mjd-now:.4f}"
+            assert now + 1 / 24 >= self.mjd, "retreiving past weather not supported \n" + time
+            while self.mjd < now or self.mjd - now < 1 / 24:
+                self._advance_time()
+
+        if until is None:
+            # don't go a full day but enough for any long night
+            until = self.mjd + 0.7
+        current_clear = self._state_to_clear(self.state)
+        while self._state_to_clear(self.state) == current_clear and self.mjd <= until:
+            self._advance_time()
+
+        return current_clear, self.mjd
+
+
 class Weather2(object):
     """Weather class
 
@@ -42,7 +166,7 @@ class Weather2(object):
 
     clear() : is it clear for the current MJD, and how long
               until next change?
-"""
+    """
     def __init__(self, model_fname=None,
                  mjd_start=None, mjd_end=None,
                  burn_in_days=7., seed=1,
@@ -234,7 +358,7 @@ class Weather(object):
 
     clear(mjd) : is it clear for this MJD, and how long
 
-"""
+    """
     def __init__(self, mjd_start=None, mjd_end=None, dmjd_minutes=10.,
                  sigma=2., alpha=-0.75, fclear=0.5, seed=1):
         self.mjd_start = mjd_start
@@ -298,7 +422,7 @@ class Weather(object):
         Comments:
         --------
         Not high performance. Only takes a single MJD.
-"""
+    """
         isclear = (self.clear_pattern(mjd) < self.fclear)
         if(returnNext is False):
             return(isclear)
