@@ -103,13 +103,13 @@ class Simulation(object):
                                                            schedule=schedule,
                                                            priorities=priorities)
 
-        if loc == "lco":
+        if observatory == "lco":
             base = os.getenv("OBSERVESIM_OUTPUT_BASE")
             modelsDir = os.path.join(base, "weather_models")
-            fname = os.path.join(modelsDir, f"saved_model_{idx}.csv")
+            fname = os.path.join(modelsDir, f"saved_model_{observatory}_{idx}.csv")
             self.weather = observesim.weather.Weather3(mjd_start=self.scheduler.start,
                                                        mjd_end=self.scheduler.end,
-                                                       model_fname=)
+                                                       model_fname=fname)
         else:
             self.weather = observesim.weather.Weather2(mjd_start=self.scheduler.start,
                                                        mjd_end=self.scheduler.end,

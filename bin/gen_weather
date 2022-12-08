@@ -83,7 +83,7 @@ def saveModels(begin, end, loc="lco", modelsDir=None):
     state, t = generate_weather(fname, begin, end, 32)
 
     for i in range(32):
-        fname = os.path.join(modelsDir, f"saved_model_{i}.csv")
+        fname = os.path.join(modelsDir, f"saved_model_{loc}_{i}.csv")
         with open(fname, "w") as save:
             print("mjd, state", file=save)
             for mjd, s in zip(t, state[:, i]):

@@ -56,6 +56,10 @@ class Weather3(object):
 
         # self.idx = np.argmin(np.abs(self.model["mjd"]-self.mjd_start))
         self.idx = 0
+        self.mjd = self.model["mjd"][self.idx]
+        self.state = self.model["state"][self.idx]
+
+        assert self.mjd_end <= self.model["mjd"][-1]
 
     def _state_to_clear(self, state):
         """
@@ -94,8 +98,8 @@ class Weather3(object):
         to a clear / not clear rating.
         """
         self.idx += 1
-        self.mjd = self.model["mjd"][idx]
-        self.state = self.model["state"][idx]
+        self.mjd = self.model["mjd"][self.idx]
+        self.state = self.model["state"][self.idx]
 
     def clear(self, now=None, until=None):
         """
