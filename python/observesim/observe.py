@@ -89,6 +89,58 @@ class SN2(object):
         return np.array([self._sampleCDF(x) for x in mu])
 
 
+class simple_SN2(object):
+    """Class to predict SN2 based on airmass
+    """
+
+    def __init__(self, fit_coef=None, noise_coef=None, cloudy_shift=0):
+        """
+         Parameters:
+        ----------
+            fit_coef : list
+                Coefficients for N-degree 1-D polynomial fit for S/N vs airmass
+
+            noise_coef : list
+                Coefficients for N-degree 1-D polynomial fit to noise model
+
+        """
+        assert fit_coef is not None, "must init with fiducial CDF!"
+        assert noise_coef is not None, "must init with fiducial grid!"
+
+        self.model = np.poly1d(fit_coef)
+        self.noise = np.poly1d(noise_coef)
+        self.cloudy_shift = cloudy_shift
+
+    def __call__(self, am=1.0, cloudy=False):
+        """obtain a SN2 from fid_cdf
+
+        Parameters:
+        ----------
+
+        am : float
+            airmass
+        cloudy: bool
+            apply a negative shift for cloudy weather
+
+        Returns:
+        -------
+
+        SN2 : np.float64, array
+            An array of SN2 correpsonding to the input airmass
+
+        """
+
+        if np.isscalar(am):
+            am = np.array([am])
+        if cloudy:
+            shift = -1*self.cloudy_shift
+        else:
+            shift = self.cloudy_shift
+        N = len(am)
+
+        return self.model(am) + np.random.randn(N)*self.noise(am) + shift
+
+
 class Observe(object):
     """Observe class.
 
@@ -130,23 +182,43 @@ class Observe(object):
             self.defaultExp = defaultExp
         # self.defaultSN2 = 3000.
 
-        fid_file = '/'.join(os.path.realpath(__file__).split('/')[0:-3]) + "/data/sn_fiducials.fits"
+        # fid_file = '/'.join(os.path.realpath(__file__).split('/')[0:-3]) + "/data/sn_fiducials.fits"
 
-        fid_data = fitsio.read(fid_file)
+        # fid_data = fitsio.read(fid_file)
 
-        self.apgSN2 = SN2(fid_cdf=fid_data["apg_fid"], fid_grid=fid_data["apg_grid"])
-        self.rSN2 = SN2(fid_cdf=fid_data["r_fid"], fid_grid=fid_data["r_grid"])
-        self.bSN2 = SN2(fid_cdf=fid_data["b_fid"], fid_grid=fid_data["b_grid"])
+        # self.apgSN2 = SN2(fid_cdf=fid_data["apg_fid"], fid_grid=fid_data["apg_grid"])
+        # self.rSN2 = SN2(fid_cdf=fid_data["r_fid"], fid_grid=fid_data["r_grid"])
+        # self.bSN2 = SN2(fid_cdf=fid_data["b_fid"], fid_grid=fid_data["b_grid"])
 
-    def _amSN(self, am):
-        norm_rand = np.random.randn() / 10 + 0.7
-        r = self.rSN2(norm_rand) / am
-        b = self.bSN2(norm_rand) / am
-        apg = self.apgSN2(norm_rand) / am**0.05
-        return r, b, apg * 2  # 2x apg exp for each boss exp
+        model_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + "/etc/cadence_reqs.yml"
+        models = yaml.load(open(reqs_file))
+
+        self.apgSN2 = simple_SN2(fit_coef=models["b"],
+                                 noise_coef=models["bnoise"],
+                                 cloudy_shift=models["bshift"])
+        self.rSN2 = simple_SN2(fit_coef=models["r"],
+                               noise_coef=models["rnoise"],
+                               cloudy_shift=models["rshift"])
+        self.bSN2 = simple_SN2(fit_coef=models["ap"],
+                               noise_coef=models["apnoise"],
+                               cloudy_shift=models["apshift"])
+
+    # def _amSN(self, am):
+    #     norm_rand = np.random.randn() / 10 + 0.7
+    #     r = self.rSN2(norm_rand) / am
+    #     b = self.bSN2(norm_rand) / am
+    #     apg = self.apgSN2(norm_rand) / am**0.05
+    #     return r, b, apg * 2  # 2x apg exp for each boss exp
+
+    def _amSN(self, am, cloudy=False):
+        r = self.rSN2(am, cloudy=cloudy)
+        b = self.bSN2(am, cloudy=cloudy)
+        apg = self.apgSN2(am, cloudy=cloudy)
+        apg2 = self.apgSN2(am, cloudy=cloudy)
+        return r, b, apg + apg2  # 2x apg exp for each boss exp
 
     def result(self, field_pk=None, mjd=None, airmass=1,
-               epochidx=None, **kwargs):
+               epochidx=None, cloudy=False, **kwargs):
         """Return simulated result of an observation
 
         Parameters:
@@ -171,7 +243,7 @@ class Observe(object):
             has keys 'sn2', 'mjd', 'duration'
         """
 
-        r, b, apg = self._amSN(airmass)
+        r, b, apg = self._amSN(airmass, cloudy=cloudy)
 
         fresult = self._result0
         fresult['apgSN2'] = apg

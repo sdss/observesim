@@ -282,7 +282,7 @@ class Simulation(object):
             #     assert False, f"{self.curr_mjd} ugh"
             return -1, 1, False
 
-    def bookKeeping(self, fieldidx, i=-1):
+    def bookKeeping(self, fieldidx, i=-1, cloudy=False):
         """figure out SN and keep track, etc
         """
         alt, az = self.scheduler.radec2altaz(mjd=self.curr_mjd,
@@ -296,7 +296,7 @@ class Simulation(object):
                 # assert False, "ugh"
 
         result = self.observe.result(mjd=self.curr_mjd, field_pk=self.field_pk[fieldidx],
-                                     airmass=airmass,
+                                     airmass=airmass, cloudy=cloudy,
                                      epochidx=self.scheduler.fields.icadence[fieldidx])
         duration = result["duration"]
         if duration < 0 or np.isnan(duration):
@@ -319,7 +319,7 @@ class Simulation(object):
 
         return result
 
-    def observeField(self, field_pk, nexposures):
+    def observeField(self, field_pk, nexposures, cloudy=False):
         fieldidx = int(np.where(self.field_pk == field_pk)[0])
 
         slewtime, *axes = self.moveTelescope(self.curr_mjd, fieldidx)
@@ -358,30 +358,30 @@ class Simulation(object):
                     # print(i, nexposures, self.telescope)
                 continue
 
-            res = self.bookKeeping(fieldidx, i=i)
+            res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
 
             if self.bright():
-                if res["apgSN2"] < 100 and self.redo_exp:
+                if res["apgSN2"] < 2025 and self.redo_exp:
                     field_exp_count += 1
                     self.redo_apg += 1
                     self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                           finish=False)
-                    res = self.bookKeeping(fieldidx, i=i)
+                    res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
                     self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                           finish=True)
                 else:
                     self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                           finish=True)
             else:
-                if (res["rSN2"] < 0.2 or res["bSN2"] < 0.2) and self.redo_exp:
+                if (res["rSN2"] < 3.0 or res["bSN2"] < 1.5) and self.redo_exp:
                     field_exp_count += 1
-                    if res["rSN2"] < 0.2:
+                    if res["rSN2"] < 3.0:
                         self.redo_r += 1
                     else:
                         self.redo_b += 1
                     self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                           finish=False)
-                    res = self.bookKeeping(fieldidx, i=i)
+                    res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
                     self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                           finish=True)
                 else:
@@ -391,11 +391,11 @@ class Simulation(object):
             ap_tot = np.sum(self.scheduler.observations.apgSN2[-1*field_exp_count:])
             # print(f"{nexposures} {field_exp_count} {len(self.scheduler.observations.apgSN2[-1*field_exp_count:])}")
             # print(f"AP SN {ap_tot:7.1f} VS {300 * nexposures}")
-            if ap_tot < 650 * nexposures and self.redo_exp:
+            if ap_tot < 2025 * nexposures and self.redo_exp:
                 self.redo_apg += 1
                 self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                       finish=False)
-                res = self.bookKeeping(fieldidx, i=i)
+                res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
                 self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                       finish=True)
         else:
@@ -403,14 +403,14 @@ class Simulation(object):
             b_tot = np.sum(self.scheduler.observations.bSN2[-1*field_exp_count:])
             # print(f"{nexposures} {field_exp_count} {len(self.scheduler.observations.bSN2[-1*field_exp_count:])}")
             # print(f"B  SN {b_tot:7.1f} VS {2.5 * nexposures} \nR  SN {r_tot:7.1f} VS {5 * nexposures}")
-            if (b_tot < 1.4 * nexposures or r_tot < 3.4 * nexposures) and self.redo_exp:
-                if r_tot < 3.4 * nexposures:
+            if (b_tot < 2 * nexposures or r_tot < 4 * nexposures) and self.redo_exp:
+                if r_tot < 4 * nexposures:
                     self.redo_r += 1
                 else:
                     self.redo_b += 1
                 self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                       finish=False)
-                res = self.bookKeeping(fieldidx, i=i)
+                res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
                 self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
                                       finish=True)
 
@@ -434,7 +434,7 @@ class Simulation(object):
 
         this_moon = 0
 
-        isclear, self.nextchange_weather = self.weather.clear(now=self.curr_mjd,
+        isclear, self.nextchange_weather, cloudy = self.weather.clear(now=self.curr_mjd,
                                                               until=mjd_morning_twilight)
         # carries on until a change or it hits morning
 
@@ -442,7 +442,7 @@ class Simulation(object):
               self.curr_mjd < self.scheduler.end_mjd()):
 
             if self.nextchange_weather <= self.curr_mjd:
-                isclear, self.nextchange_weather = self.weather.clear(now=self.curr_mjd,
+                isclear, self.nextchange_weather, cloudy = self.weather.clear(now=self.curr_mjd,
                                                                       until=mjd_morning_twilight)
 
             onoff, nextchange_on = self.scheduler.on(mjd=self.curr_mjd)
@@ -493,7 +493,7 @@ class Simulation(object):
                 self.curr_mjd = self.curr_mjd + self.nom_duration
                 print(self.curr_mjd, self.obsHist["mjd"][-1]-self.curr_mjd)
                 continue
-            self.observeField(field_pk, nexposures)
+            self.observeField(field_pk, nexposures, cloudy=cloudy)
 
         # if mjd % 10 == 0:
         #     self.scheduler.priorityLogger.write(name=str(mjd) + "-" + self.observatory.name)
