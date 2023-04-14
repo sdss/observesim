@@ -138,7 +138,10 @@ class simple_SN2(object):
             shift = self.cloudy_shift
         N = len(am)
 
-        return self.model(am) + np.random.randn(N)*self.noise(am) + shift
+        # random noise could push it negative, can't have that!
+        raw = self.model(am) + np.random.randn(N)*self.noise(am) + shift
+
+        return np.clip(raw, 0, None)
 
 
 class Observe(object):
