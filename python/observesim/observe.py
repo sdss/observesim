@@ -1,5 +1,6 @@
 import os
 
+import yaml
 import numpy as np
 import fitsio
 
@@ -193,16 +194,16 @@ class Observe(object):
         # self.rSN2 = SN2(fid_cdf=fid_data["r_fid"], fid_grid=fid_data["r_grid"])
         # self.bSN2 = SN2(fid_cdf=fid_data["b_fid"], fid_grid=fid_data["b_grid"])
 
-        model_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + "/etc/cadence_reqs.yml"
-        models = yaml.load(open(reqs_file))
+        model_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + "/etc/sn_models.yml"
+        models = yaml.load(open(model_file))
 
-        self.apgSN2 = simple_SN2(fit_coef=models["b"],
+        self.bSN2 = simple_SN2(fit_coef=models["b"],
                                  noise_coef=models["bnoise"],
                                  cloudy_shift=models["bshift"])
         self.rSN2 = simple_SN2(fit_coef=models["r"],
                                noise_coef=models["rnoise"],
                                cloudy_shift=models["rshift"])
-        self.bSN2 = simple_SN2(fit_coef=models["ap"],
+        self.apgSN2 = simple_SN2(fit_coef=models["ap"],
                                noise_coef=models["apnoise"],
                                cloudy_shift=models["apshift"])
 

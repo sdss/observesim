@@ -74,6 +74,10 @@ class Simulation(object):
                               "alt_slew": 1.5, "az_slew": 2.0, "rot_slew": 2.0}
             self.obsCheck = apoCheck
             self.moveTelescope = self.moveSloanTelescope
+            self.nom_duration = np.float32(15. / 60. / 24.)
+            # self.cals = np.float32(3. / 60. / 24.)
+            self.field_overhead = np.float32(7. / 60. / 24.)
+            self.design_overhead = np.float32(5.5 / 60. / 24.)
         if(observatory == 'lco'):
             timezone = "US/Eastern"
             fclear = 0.7
@@ -81,6 +85,11 @@ class Simulation(object):
             self.telescope = {"ra": 0, "dec": -30}
             self.obsCheck = lcoCheck
             self.moveTelescope = self.moveDuPontTelescope
+            self.nom_duration = np.float32(15. / 60. / 24.)
+            # self.cals = np.float32(3. / 60. / 24.)
+            # extra 90s or so for cals at LCO?
+            self.field_overhead = np.float32(8.5 / 60. / 24.)
+            self.design_overhead = np.float32(5.5 / 60. / 24.)
 
         self.redo_exp = redo_exp
 
@@ -130,10 +139,6 @@ class Simulation(object):
         cadencelist = self.scheduler.fields.cadencelist.cadences
         cadences = self.scheduler.fields.cadence
 
-        self.nom_duration = np.float32(15. / 60. / 24.)
-        # self.cals = np.float32(3. / 60. / 24.)
-        self.field_overhead = np.float32(7. / 60. / 24.)
-        self.design_overhead = np.float32(5.5 / 60. / 24.)
         self.observe = observesim.observe.Observe(defaultExp=self.nom_duration,
                                                   cadencelist=cadencelist, cadences=cadences)
         # self.bossReadout = np.float32(70. / 60. / 60. / 24.)
@@ -397,7 +402,7 @@ class Simulation(object):
                                       finish=False)
                 res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
                 self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
-                                      finish=True)
+                                      finish=False)
         else:
             r_tot = np.sum(self.scheduler.observations.rSN2[-1*field_exp_count:])
             b_tot = np.sum(self.scheduler.observations.bSN2[-1*field_exp_count:])
@@ -412,7 +417,7 @@ class Simulation(object):
                                       finish=False)
                 res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
                 self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
-                                      finish=True)
+                                      finish=False)
 
     def observeMJD(self, mjd):
         mjd_evening_twilight = self.scheduler.evening_twilight(mjd)

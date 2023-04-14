@@ -326,11 +326,20 @@ class Weather2(object):
         if until is None:
             # don't go a full day but enough for any long night
             until = self.mjd + 0.7
+        # current_clear = self._state_to_clear(self.state)
+        # while self._state_to_clear(self.state) == current_clear and self.mjd <= until:
+        #     self._advance_time()
+
+        # return current_clear, self.mjd
+
         current_clear = self._state_to_clear(self.state)
-        while self._state_to_clear(self.state) == current_clear and self.mjd <= until:
+        current_state = int(self.state)
+        while self.state == current_state and self.mjd <= until:
             self._advance_time()
 
-        return current_clear, self.mjd
+        cloudy = self.state > 0
+
+        return current_clear, self.mjd, cloudy
 
 
 class Weather(object):
