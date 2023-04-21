@@ -369,13 +369,13 @@ class Simulation(object):
                 if res["apgSN2"] < 2025 and self.redo_exp:
                     field_exp_count += 1
                     self.redo_apg += 1
-                    self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
+                    self.scheduler.update(field_pk=field_pk, result=res,
                                           finish=False)
                     res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
-                    self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
+                    self.scheduler.update(field_pk=field_pk, result=res,
                                           finish=True)
                 else:
-                    self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
+                    self.scheduler.update(field_pk=field_pk, result=res,
                                           finish=True)
             else:
                 if (res["rSN2"] < 3.0 or res["bSN2"] < 1.5) and self.redo_exp:
@@ -384,13 +384,13 @@ class Simulation(object):
                         self.redo_r += 1
                     else:
                         self.redo_b += 1
-                    self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
+                    self.scheduler.update(field_pk=field_pk, result=res,
                                           finish=False)
                     res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
-                    self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
+                    self.scheduler.update(field_pk=field_pk, result=res,
                                           finish=True)
                 else:
-                    self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
+                    self.scheduler.update(field_pk=field_pk, result=res,
                                           finish=True)
         if self.bright():
             ap_tot = np.sum(self.scheduler.observations.apgSN2[-1*field_exp_count:])
@@ -398,10 +398,10 @@ class Simulation(object):
             # print(f"AP SN {ap_tot:7.1f} VS {300 * nexposures}")
             if ap_tot < 2025 * nexposures and self.redo_exp:
                 self.redo_apg += 1
-                self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
+                self.scheduler.update(field_pk=field_pk, result=res,
                                       finish=False)
                 res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
-                self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
+                self.scheduler.update(field_pk=field_pk, result=res,
                                       finish=False)
         else:
             r_tot = np.sum(self.scheduler.observations.rSN2[-1*field_exp_count:])
@@ -413,10 +413,10 @@ class Simulation(object):
                     self.redo_r += 1
                 else:
                     self.redo_b += 1
-                self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
+                self.scheduler.update(field_pk=field_pk, result=res,
                                       finish=False)
                 res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
-                self.scheduler.update(field_pk=self.field_pk[fieldidx], result=res,
+                self.scheduler.update(field_pk=field_pk, result=res,
                                       finish=False)
 
     def observeMJD(self, mjd):
