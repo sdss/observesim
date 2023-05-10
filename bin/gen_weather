@@ -8,6 +8,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 
+from observesim.weather import Weather2
+
 
 def generate_weather(model_fname, mjd0, mjd1, n_realizations, n_burnin=24*14, seed=None):
     """
@@ -90,6 +92,27 @@ def saveModels(begin, end, loc="lco", modelsDir=None):
                 print(f"{mjd}, {s}", file=save)
 
 
+def apoSaveModels(idx, mjd_start, mjd_end):
+    weather = Weather2(mjd_start=mjd_start,
+                       mjd_end=mjd_end,
+                       seed=idx, loc="apo")
+
+    mjds = list()
+    states = list()
+    while weather.mjd < mjd_end:
+        weather._advance_time()
+        mjds.append(weather.mjd)
+        states.append(weather.state)
+
+    base = os.getenv("OBSERVESIM_OUTPUT_BASE")
+    modelsDir = os.path.join(base, "weather_models")
+    fname = os.path.join(modelsDir, f"saved_model_apo_{idx}.csv")
+    with open(fname, "w") as save:
+        print("mjd, state", file=save)
+        for mjd, s in zip(mjds, states):
+            print(f"{mjd}, {s}", file=save)
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
@@ -113,4 +136,7 @@ if __name__ == "__main__":
     outPath = args.out
     loc = args.loc
 
-    saveModels(start, end, loc="lco", modelsDir=None)
+    if loc == "apo":
+        apoSaveModels(0, start, end)
+    else:
+        saveModels(start, end, loc="lco", modelsDir=None)

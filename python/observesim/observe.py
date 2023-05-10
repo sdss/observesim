@@ -134,7 +134,7 @@ class simple_SN2(object):
         if np.isscalar(am):
             am = np.array([am])
         if cloudy:
-            shift = -1*self.cloudy_shift
+            shift = -1.5*self.cloudy_shift
         else:
             shift = self.cloudy_shift
         N = len(am)

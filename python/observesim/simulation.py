@@ -65,7 +65,8 @@ class Simulation(object):
     """A class to encapsulate an SDSS-5 simulation
     """
 
-    def __init__(self, plan, observatory, idx=1, schedule="normal", redo_exp=True):
+    def __init__(self, plan, observatory, idx=1, schedule="normal", redo_exp=True,
+                 oldWeather=False):
         if(observatory == 'apo'):
             timezone = "US/Mountain"
             fclear = 0.5
@@ -112,21 +113,22 @@ class Simulation(object):
                                                            schedule=schedule,
                                                            priorities=priorities)
 
-        if observatory == "lco":
+        if observatory == "lco" and not oldWeather:
             base = os.getenv("OBSERVESIM_OUTPUT_BASE")
             modelsDir = os.path.join(base, "weather_models")
             fname = os.path.join(modelsDir, f"saved_model_{observatory}_{idx}.csv")
             self.weather = observesim.weather.Weather3(mjd_start=self.scheduler.start,
                                                        mjd_end=self.scheduler.end,
                                                        model_fname=fname)
-        else:
+        elif not oldWeather:
             self.weather = observesim.weather.Weather2(mjd_start=self.scheduler.start,
                                                        mjd_end=self.scheduler.end,
                                                        seed=idx, loc=observatory)
 
-        # self.weather = observesim.weather.Weather(mjd_start=self.scheduler.start,
-        #                                           mjd_end=self.scheduler.end,
-        #                                           seed=idx, fclear=fclear)
+        else:
+            self.weather = observesim.weather.Weather(mjd_start=self.scheduler.start,
+                                                      mjd_end=self.scheduler.end,
+                                                      seed=idx, fclear=fclear)
 
         self.observatory = Observer(longitude=self.scheduler.longitude * u.deg,
                                     latitude=self.scheduler.latitude*u.deg,

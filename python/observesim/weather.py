@@ -232,7 +232,8 @@ class Weather2(object):
         boolean clear / not clear rating. This function
         translates the internal state to a boolean rating.
         """
-        return state < 2
+        # return state < 2
+        return state == 0
 
     def _advance_time(self):
         """
@@ -414,7 +415,7 @@ class Weather(object):
         self.clear_pattern = interpolate.interp1d(self.mjd, self._uvals,
                                                   fill_value='extrapolate')
 
-    def clear(self, mjd=None, returnNext=True):
+    def clear(self, now=None, until=None):
         """For a given MJD, return if it is clear and when next change is.
 
         Parameters:
@@ -435,22 +436,26 @@ class Weather(object):
         nextchange : float, np.float64
             MJD of next change of state
 
+        cloudy: boolean
+            Always false for this version
+
         Comments:
         --------
         Not high performance. Only takes a single MJD.
-    """
-        isclear = (self.clear_pattern(mjd) < self.fclear)
-        if(returnNext is False):
-            return(isclear)
+        """
+        isclear = (self.clear_pattern(now) < self.fclear)
+        # if(returnNext is False):
+        #     return(isclear)
         step = 5.
         ncheck = np.int32(np.ceil(step / (0.5 * self.dmjd)))
         dstep = ncheck * self.dmjd
-        mjd_base = mjd
-        while((mjd_base < self.mjd_end)):
+        mjd_base = now
+        while((mjd_base < until)):
             check_mjds = (mjd_base + self.dmjd * (np.arange(ncheck) + 1.))
             isclear_mjds = (self.clear_pattern(check_mjds) < self.fclear)
             different = np.where(isclear_mjds != isclear)[0]
             if(len(different) > 0):
-                return(isclear, check_mjds[different[0]])
+                return(isclear, check_mjds[different[0]], False)
             mjd_base = mjd_base + dstep
-        return(isclear, self.mjd_end)
+        # modify to match new fns so 3rd pos arg is "cloudy"
+        return(isclear, until, False)
