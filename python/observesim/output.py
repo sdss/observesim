@@ -571,8 +571,7 @@ def combineProgramMjds(base, plan, rs_base, version=None, loc="apo", N=0):
 
     obs_data = fitsio.read(v_base + "obsTargets-{plan}-{loc}-0.fits".format(plan=plan, loc=loc),
                            columns=["obs_mjd", "catalogid"])
-    comp_data = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc),
-                            columns=["catalogid", "program"])
+    comp_data = fitsio.read(rs_base + "/{plan}/final/rsCompletenessFinal-{plan}-both.fits".format(plan=plan), columns=["catalogid", "program"])
 
     progs = np.unique(comp_data["program"])
 
@@ -586,12 +585,13 @@ def combineProgramMjds(base, plan, rs_base, version=None, loc="apo", N=0):
 
 
 def plannedProgExps(plan, rs_base, loc="apo"):
-    comp_data = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc),
-                            columns=["program", "cadence", "assigned", "category"])
+    comp_data = fitsio.read(rs_base + "/{plan}/final/rsCompletenessFinal-{plan}-both.fits".format(plan=plan), 
+                            columns=["program", "cadence", "assigned", 
+                                     "category", f"assigned_{loc}"])
     cadences = fitsio.read(rs_base + "/{plan}/rsCadences-{plan}-{loc}.fits".format(plan=plan, loc=loc),
                            columns=["CADENCE", "NEXP"])
 
-    comp_data = comp_data[np.where(comp_data["assigned"])]
+    comp_data = comp_data[np.where(comp_data[f"assigned_{loc}"])]
 
     progs = {i: 0 for i in np.unique(comp_data["program"])}
     for c in comp_data:
@@ -736,8 +736,11 @@ def yearBars(mjds, v):
 
     for c in cuts:
         use = np.where(mjds <= c)
-        perYear.append(np.max(np.array(v)[use]))
-
+        doneAsOf = np.array(v)[use]
+        if len(doneAsOf) > 0:
+            perYear.append(np.max(doneAsOf))
+        else:
+            perYear.append(0)
     return perYear
 
 
@@ -774,12 +777,13 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
     lco_targs = fitsio.read(v_base + "obsTargets-{plan}-{loc}-0.fits".format(plan=plan, loc="lco"),
                             columns=["program", "catalogid"])
 
-    apo_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="apo"),
-                           columns=["catalogid", "program", "assigned"])
+    all_comp = fitsio.read(rs_base + "/{plan}/final/rsCompletenessFinal-{plan}-both.fits".format(plan=plan),
+                           columns=["catalogid", "program", "assigned_lco", "assigned_apo"])
+
+    apo_comp = all_comp[np.where(all_comp["assigned_apo"])]
     apo_comp_prog = np.array([p.strip() for p in apo_comp["program"]])
 
-    lco_comp = fitsio.read(rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc="lco"),
-                           columns=["catalogid", "program", "assigned"])
+    lco_comp = all_comp[np.where(all_comp["assigned_lco"])]
     lco_comp_prog = np.array([p.strip() for p in lco_comp["program"]])
 
     programs = [p for p in np.unique(apo_comp_prog) if p.lower() != "sky"]
@@ -830,10 +834,10 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
     for i, k in enumerate(programs):
         # check robostrategy planned vs assigned
         apo = apo_done_counts[i]
-        apo_plan, apo_assign = countPlanned(k.strip(), apo_comp_prog, apo_comp["assigned"])
+        apo_plan, apo_assign = countPlanned(k.strip(), apo_comp_prog, apo_comp["assigned_apo"])
 
         lco = lco_done_counts[i]
-        lco_plan, lco_assign = countPlanned(k.strip(), lco_comp_prog, lco_comp["assigned"])
+        lco_plan, lco_assign = countPlanned(k.strip(), lco_comp_prog, lco_comp["assigned_lco"])
 
         if k.strip() in req_by_cad:
             req = req_by_cad[k.strip()]
@@ -854,7 +858,7 @@ def plotTargMetric(base, rs_base, plan, version=None, reqs_file=None):
         print(sum_text, file=sum_file)
 
 
-def compute_area_above_threshold(targets, obs_targets, threshold, nside):
+def compute_area_above_threshold(targets, obs_targets, threshold, nside, loc="apo"):
     '''
      Computes the sky area above a given completeness threshold
      Counts sky pixels on a HEALPix gris with NSIDE=nside
@@ -881,7 +885,7 @@ def compute_area_above_threshold(targets, obs_targets, threshold, nside):
 
     hpx = hp.ang2pix(nside, targets["ra"], targets["dec"], lonlat=True)
     all_map = np.bincount(hpx, minlength=npix)
-    got_map = np.bincount(hpx, weights=np.where(targets["assigned"] > 0, 1, 0), minlength=npix)
+    got_map = np.bincount(hpx, weights=np.where(targets[f"assigned_{loc}"] > 0, 1, 0), minlength=npix)
 
     obs_hpx = hp.ang2pix(nside, obs_targets["ra"], obs_targets["dec"], lonlat=True)
     obs_map = np.bincount(obs_hpx, minlength=npix)
@@ -908,12 +912,12 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
         v_base += "/"
 
     obs_file = v_base + "obsTargets-{plan}-{loc}-0.fits".format(plan=plan, loc=loc)
-    comp_file = rs_base + "/{plan}/rsCompleteness-{plan}-{loc}.fits".format(plan=plan, loc=loc)
+    comp_file = rs_base + "/{plan}/final/rsCompletenessFinal-{plan}-both.fits".format(plan=plan)
 
     all_targets = fitsio.read(comp_file,
-                              columns=["catalogid", "covered", "program", "ra", "dec", "assigned"])
+                              columns=["catalogid", "covered", "program", "ra", "dec", f"assigned_{loc}"])
 
-    loc_targs = np.extract(all_targets["assigned"] > 0, all_targets)
+    loc_targs = np.extract(all_targets[f"assigned_{loc}"] > 0, all_targets)
 
     progs = np.unique(loc_targs["program"])
 
@@ -956,7 +960,7 @@ def grab_summary_files(base, rs_base, plan, version=None, loc="apo"):
 def spiders_area_for_program(base, rs_base, plan, version=None, loc="apo"):
     targets, obs_targets = grab_summary_files(base, rs_base, plan, version=version, loc=loc)
 
-    planned, obs = compute_area_above_threshold(targets, obs_targets, threshold=0.8, nside=64)
+    planned, obs = compute_area_above_threshold(targets, obs_targets, threshold=0.8, nside=64, loc=loc)
 
     print(f"{plan} planned: Ntargets={len(targets)}, Area={planned:.2f} deg^2")
     print(f"{plan} obs: Ntargets={len(obs_targets)}, Area={obs:.2f} deg^2")
