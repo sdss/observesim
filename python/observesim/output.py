@@ -35,13 +35,13 @@ def read_field(fname, alloc, exp_to_mjd):
     for m, i in zip(exp_to_mjd, range(alloc["iexpst"], alloc["iexpnd"]+1)):
         # zip will end when exp_to_mjd ends if it is shorter than
         # nplanned (i.e. the range)
-        if len(w_idx["equivRobotID"].shape) == 1:
+        if len(w_idx["robotID"].shape) == 1:
             assert len(exp_to_mjd) == 1, "obs len != plan len"
-            w_assigned = np.where(w_idx["equivRobotID"] != -1)
+            w_assigned = np.where(w_idx["robotID"] != -1)
         else:
-            w_assigned = np.where(w_idx["equivRobotID"][:, i] != -1)
+            w_assigned = np.where(w_idx["robotID"][:, i] != -1)
 
-        # assert len(w_assigned[0]) <= 500, "more ids than robots!"
+        assert len(w_assigned[0]) <= 500, "more ids than robots!"
 
         catalog_ids.extend(list(w_names["catalogid"][w_assigned]))
         cadences.extend(list(w_names["cadence"][w_assigned]))
@@ -571,7 +571,11 @@ def combineProgramMjds(base, plan, rs_base, version=None, loc="apo", N=0):
 
     obs_data = fitsio.read(v_base + "obsTargets-{plan}-{loc}-0.fits".format(plan=plan, loc=loc),
                            columns=["obs_mjd", "catalogid"])
-    comp_data = fitsio.read(rs_base + "/{plan}/final/rsCompletenessFinal-{plan}-both.fits".format(plan=plan), columns=["catalogid", "program"])
+    comp_data = fitsio.read(rs_base + 
+                            "/{plan}/final/rsCompletenessFinal-{plan}-both.fits".format(plan=plan), 
+                            columns=["catalogid", "program", "carton", 
+                                     f"assigned_{loc}", f"nexps_{loc}",
+                                     "carton_to_target_pk"])
 
     progs = np.unique(comp_data["program"])
 
@@ -581,7 +585,20 @@ def combineProgramMjds(base, plan, rs_base, version=None, loc="apo", N=0):
         w_targs = np.in1d(obs_data['catalogid'], comp_prog['catalogid'])
         prog_mjds[p] = obs_data[w_targs]["obs_mjd"]
 
-    return prog_mjds
+    # assigned = comp_data[np.where(comp_data[f"assigned_{loc}"])]
+
+    cartons = np.unique(comp_data["carton"])
+
+    n_exp_total_carton = dict()
+    carton_mjds = dict()
+    for c in cartons:
+        targs = comp_data[np.where(comp_data["carton"] == c)]
+        n_exp_total_carton[c] = np.sum(targs[f"nexps_{loc}"])
+
+        w_targs = np.in1d(obs_data['catalogid'], targs['catalogid'])
+        carton_mjds[c] = obs_data[w_targs]["obs_mjd"]
+
+    return prog_mjds, carton_mjds, n_exp_total_carton
 
 
 def plannedProgExps(plan, rs_base, loc="apo"):
@@ -604,7 +621,8 @@ def plannedProgExps(plan, rs_base, loc="apo"):
 
 
 def cumulativePlot(base, plan, rs_base, version=None, loc="apo"):
-    prog_mjds = combineProgramMjds(base, plan, rs_base, version=version, loc=loc)
+    prog_mjds, carton_mjds, c_totals = combineProgramMjds(base, plan, rs_base,
+                                                          version=version, loc=loc)
     # new_prog = [convertCadence(k) for k in prog_mjds.keys()]
     new_prog = [k for k in prog_mjds.keys()]
     all_mjds = list()
@@ -617,6 +635,9 @@ def cumulativePlot(base, plan, rs_base, version=None, loc="apo"):
     mjds = np.arange(min_mjd, max_mjd, 1)
     plot_progs = {k: [] for k in sort_keys}
 
+    sort_cartons = np.sort(np.unique([k for k in carton_mjds.keys()]))
+    plot_cartons = {k: [] for k in sort_cartons}
+
     for m in mjds:
         today = dict()
         for k, v in prog_mjds.items():
@@ -628,6 +649,17 @@ def cumulativePlot(base, plan, rs_base, version=None, loc="apo"):
 
         for k, v in today.items():
             plot_progs[k].append(np.sum(v))
+        
+        today = dict()
+        for k, v in carton_mjds.items():
+            count = len(np.where(v < m)[0])
+            if k in today:
+                today[k].append(count)
+            else:
+                today[k] = [count]
+
+        for k, v in today.items():
+            plot_cartons[k].append(np.sum(v))
 
     rows = int(np.ceil(len(np.unique(new_prog))/2))
     fig, axes = plt.subplots(rows, 2, sharex=True)
@@ -672,6 +704,9 @@ def cumulativePlot(base, plan, rs_base, version=None, loc="apo"):
 
     used_progs = list()  # ugh why are the observatories not the same...
 
+    byYearCsv = ("carton, planned, year1_N, year1_frac, year2_N, year2_frac, "
+                 "year3_N, year3_frac, year4_N, year4_frac, year5_N, year5_frac\n")
+
     plannedCounts = plannedProgExps(plan, rs_base, loc=loc)
     for k, v in plot_progs.items():
         if "ops" in k:
@@ -706,6 +741,60 @@ def cumulativePlot(base, plan, rs_base, version=None, loc="apo"):
             year4.append(bars[3])
             year5.append(bars[4])
 
+    for k, v in plot_cartons.items():
+        if "ops" in k:
+            continue
+
+        bars = yearBars(mjds, v)
+        byYearCsv += (f"{k}, {c_totals[k]}, {bars[0]}, {bars[0]/c_totals[k]:.2f}, "
+                      f"{bars[1]}, {bars[1]/c_totals[k]:.2f}, "
+                      f"{bars[2]}, {bars[2]/c_totals[k]:.2f}, "
+                      f"{bars[3]}, {bars[3]/c_totals[k]:.2f}, "
+                      f"{bars[4]}, {bars[4]/c_totals[k]:.2f}\n")
+
+    csvPath = os.path.join(base, version) +\
+              "/{}-{}-cartonsByYear.csv".format(plan, loc)
+    
+    with open(csvPath, "w") as csvFile:
+        print(byYearCsv, file=csvFile)
+
+    cartons = np.genfromtxt(csvPath, names=True,
+                            dtype=None, encoding='utf-8', delimiter=',')
+
+    figBase = os.path.join(base, version)
+
+    for prog in ["bhm", "mwm"]:
+        sub = cartons[np.where([prog in l for l in cartons["carton"]])]
+
+        plt.figure(figsize=(9, 10))
+        ax1 = plt.subplot(111)
+        width = 0.1
+        x_cor = np.arange(0, len(sub))
+
+        ax1.barh(x_cor - 0.2, np.clip(sub["year1_frac"], 0, 2), width, color="c", label="year 1")
+        ax1.barh(x_cor - 0.1, np.clip(sub["year2_frac"], 0, 2), width, color="b", label="year 2")
+        ax1.barh(x_cor + 0.0, np.clip(sub["year3_frac"], 0, 2), width, color="m", label="year 3")
+        ax1.barh(x_cor + 0.1, np.clip(sub["year4_frac"], 0, 2), width, color="r", label="year 4")
+        rects = ax1.barh(x_cor + 0.2, np.clip(sub["year5_frac"], 0, 2), width, color="y", label="year 5")
+        ax1.bar_label(rects, labels=[c["planned"] for c in sub], padding=1)
+
+        ax1.set_yticks(x_cor, minor=False)
+        ax1.set_yticklabels(sub["carton"])
+        ax1.set_xlabel("Observed/Planned")
+        ax1.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+        ax1.tick_params(labeltop=True)
+
+        ax1.set_title("Fractional Carton Completion")
+
+        ax1.set_xlim(0, 2.3)
+
+        ax1.axvline(1, linewidth=1, linestyle="--", color="k", alpha=0.5)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(base, version)+f"/{plan}-{loc}-allYearCartonFrac_{prog}.png")
+        plt.savefig(os.path.join(base, version)+f"/{plan}-{loc}-allYearCartonFrac_{prog}.pdf")
+        plt.close()
+
     # make bar plots of programs by year
     plt.figure(figsize=(8, 5))
     ax1 = plt.subplot(111)
@@ -726,7 +815,7 @@ def cumulativePlot(base, plan, rs_base, version=None, loc="apo"):
     plt.tight_layout()
 
     plt.savefig(os.path.join(base, version)+"/{}-{}-by_year.png".format(plan, loc))
-    plt.close()
+    plt.close()   
 
 
 def yearBars(mjds, v):
