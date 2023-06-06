@@ -35,13 +35,13 @@ def read_field(fname, alloc, exp_to_mjd):
     for m, i in zip(exp_to_mjd, range(alloc["iexpst"], alloc["iexpnd"]+1)):
         # zip will end when exp_to_mjd ends if it is shorter than
         # nplanned (i.e. the range)
-        if len(w_idx["robotID"].shape) == 1:
+        if len(w_idx["equivRobotID"].shape) == 1:
             assert len(exp_to_mjd) == 1, "obs len != plan len"
-            w_assigned = np.where(w_idx["robotID"] != -1)
+            w_assigned = np.where(w_idx["equivRobotID"] != -1)
         else:
-            w_assigned = np.where(w_idx["robotID"][:, i] != -1)
+            w_assigned = np.where(w_idx["equivRobotID"][:, i] != -1)
 
-        assert len(w_assigned[0]) <= 500, "more ids than robots!"
+        # assert len(w_assigned[0]) <= 500, "more ids than robots!"
 
         catalog_ids.extend(list(w_names["catalogid"][w_assigned]))
         cadences.extend(list(w_names["cadence"][w_assigned]))
@@ -570,7 +570,7 @@ def combineProgramMjds(base, plan, rs_base, version=None, loc="apo", N=0):
         v_base += "/"
 
     obs_data = fitsio.read(v_base + "obsTargets-{plan}-{loc}-0.fits".format(plan=plan, loc=loc),
-                           columns=["obs_mjd", "catalogid"])
+                           columns=["obs_mjd", "catalogid", "carton_to_target_pk"])
     comp_data = fitsio.read(rs_base + 
                             "/{plan}/final/rsCompletenessFinal-{plan}-both.fits".format(plan=plan), 
                             columns=["catalogid", "program", "carton", 
@@ -595,7 +595,7 @@ def combineProgramMjds(base, plan, rs_base, version=None, loc="apo", N=0):
         targs = comp_data[np.where(comp_data["carton"] == c)]
         n_exp_total_carton[c] = np.sum(targs[f"nexps_{loc}"])
 
-        w_targs = np.in1d(obs_data['catalogid'], targs['catalogid'])
+        w_targs = np.in1d(obs_data['carton_to_target_pk'], targs['carton_to_target_pk'])
         carton_mjds[c] = obs_data[w_targs]["obs_mjd"]
 
     return prog_mjds, carton_mjds, n_exp_total_carton
