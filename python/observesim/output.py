@@ -17,7 +17,7 @@ __all__ = ["cumulativePlot", "doHist", "plotTargMetric", "writeWebPage",
            "countFields", "spiders_area_for_program_time"]
 
 
-def read_field(fname, alloc, exp_to_mjd):
+def read_field(fname, alloc, exp_to_mjd, reverse=False):
     # fetch info, match mjd to exp
 
     w_names = fitsio.read(fname, ext=1)
@@ -36,7 +36,13 @@ def read_field(fname, alloc, exp_to_mjd):
     decs = list()
     mjds = list()
 
-    for m, i in zip(exp_to_mjd, range(alloc["iexpst"], alloc["iexpnd"]+1)):
+    idx = [i for i in range(alloc["iexpst"], alloc["iexpnd"]+1)]
+    if reverse:
+        print(f"reversing! {fname}")
+        # np.random.shuffle(idx)
+        idx = np.flip(idx)
+
+    for m, i in zip(exp_to_mjd, idx):
         # zip will end when exp_to_mjd ends if it is shorter than
         # nplanned (i.e. the range)
         if len(w_idx["equivRobotID"].shape) == 1:
@@ -79,6 +85,12 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     sim_data = fitsio.read(v_base + f"{plan}-{loc}-fields-{N}.fits")
     obs_data = fitsio.read(v_base + f"{plan}-{loc}-observations-{N}.fits")
 
+    test_file = v_base + "bright_single_fields_for_test.csv"
+    test_fields = np.genfromtxt(test_file, names=True, delimiter=",",
+                                dtype=None, encoding=None)
+    
+    test_ids = [f["field_id"] for f in test_fields]
+
     # prep out struct
     all_targs = list()
     all_cads = list()
@@ -100,8 +112,13 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     for f in sim_data:
         obs_idx = f["observations"][:int(f["nobservations"])]
         mjds = [obs_data[i]["mjd"] for i in obs_idx]
-        cad = f["cadence"]
-
+        # cad = f["cadence"]
+        reverse = False
+        if f["fieldid"] in test_ids:
+            # random = True
+            reverse = True
+            print(f"reversing {f['fieldid']}")
+            # np.random.shuffle(mjds)
         # field_pk is an index into rsAllocationFinal for each observatory
         # so definitely keep doing that in roboscheduler
         alloc = allocation[f["pk"]]
@@ -110,7 +127,8 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
         fname = rs_base + fname.format(plan=plan, loc=loc, fieldid=f["fieldid"])
 
         cat_ids, cadences, cartons, programs, target_pks, carton_pks, c2t_pks,\
-            categories, ras, decs, targ_mjds = read_field(fname, alloc, mjds)
+            categories, ras, decs, targ_mjds = read_field(fname, alloc, mjds,
+                                                          reverse=reverse)
         all_targs.extend(cat_ids)
         all_cads.extend(cadences)
         all_mjds.extend(targ_mjds)

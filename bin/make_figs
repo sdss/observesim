@@ -51,6 +51,7 @@ if __name__ == "__main__":
     recount = args.count
     draw_all = args.all
     web = args.web
+    slow = False
 
     if version is None:
         version = plan
@@ -72,10 +73,10 @@ if __name__ == "__main__":
     # cumulativePlot(base, plan, rs_base, version=version, loc="apo")
     # cumulativePlot(base, plan, rs_base, version=version, loc="lco")
     # runAllCumulativeEpochs(base, plan, version=version)
-    # cumulativeWebpage(base, plan, version=version)
     # cartonCoverageByYearMaps(base, plan, rs_base, version=version)
     # cartonCoverageCumulative(base, plan, version=version,
     #                           cartons=["bhm_aqmes_bonus_faint", "bhm_csc_boss"])
+    # cumulativeWebpage(base, plan, version=version)
     # sys.exit(0)
 
     if web:
@@ -98,7 +99,10 @@ if __name__ == "__main__":
         doHist(base, rs_base, plan, version=version, loc="lco")
         doHist(base, rs_base, plan, version=version, loc="apo")
 
+    if slow:
         cartonCoverageByYearMaps(base, plan, rs_base, version=version)
+        cartonCoverageByYearMaps(base, plan, rs_base, version=version)
+        cumulativeWebpage(base, plan, version=version)
 
     print("creating target metrics for {}".format(plan))
     plotTargMetric(base, rs_base, plan, version=version, reqs_file=None)
