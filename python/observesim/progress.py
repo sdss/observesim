@@ -47,7 +47,35 @@ def fieldsFromDB(obs="APO", plan="eta-5"):
     fields_sum["slots_exposures"] = [i for i in fieldTable["slots_exposures"].values]
     fields_sum["cadence"] = fieldTable["cadence"].values
 
-    return fields_sum
+    Design = targetdb.Design
+    d2f = targetdb.DesignToField
+
+    dquery = Design.select(Design.design_id, d2f.exposure,
+                           d2f.field_pk)\
+                   .join(d2f).join(Field).join(Version)\
+                   .switch(Field).join(Observatory)\
+                   .where(Version.plan == plan,
+                          Observatory.label == obs.upper()).dicts()
+    
+    fieldTable = pd.DataFrame(dquery)
+
+    arrayThatIndexes = fieldTable.to_numpy()
+
+    design_ids = arrayThatIndexes[:, 0]
+    exposures = arrayThatIndexes[:, 1]
+    field_pks = arrayThatIndexes[:, 2]
+
+    all_designs = list()
+
+    for f in fields_sum["pk"]:
+        f_designs = np.where(field_pks == f)
+        exps = exposures[f_designs]
+        args_in_order = f_designs[0][np.argsort(exps)]
+        designs = design_ids[args_in_order]
+        fields_sum["nfilled"][i] = len(designs)
+        all_designs.append(list(designs))
+
+    return fields_sum, all_designs
 
 
 def doneForObs(obs="APO", plan="zeta-3"):

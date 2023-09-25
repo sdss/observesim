@@ -13,6 +13,7 @@ import yaml
 import observesim.weather
 import roboscheduler.scheduler
 import observesim.observe
+from observesim.pgoress import fieldsFromDB
 
 
 def sortFields(fieldids, nexps, exp, maxTime=0):
@@ -66,7 +67,7 @@ class Simulation(object):
     """
 
     def __init__(self, plan, observatory, idx=1, schedule="normal", redo_exp=True,
-                 oldWeather=False):
+                 oldWeather=False, with_hist=False):
         if(observatory == 'apo'):
             timezone = "US/Mountain"
             fclear = 0.5
@@ -133,7 +134,14 @@ class Simulation(object):
         self.observatory = Observer(longitude=self.scheduler.longitude * u.deg,
                                     latitude=self.scheduler.latitude*u.deg,
                                     elevation=elev*u.m, name=observatory, timezone=timezone)
-        self.scheduler.initdb(designbase=plan)
+        if with_hist:
+            fields_sum, all_designs = fieldsFromDB(obs=observatory.upper(),
+                                                   plan=plan)
+            self.scheduler.initdb(designbase=plan, 
+                                  fieldsArray=fields_sum,
+                                  realDesigns=all_designs)
+        else:
+            self.scheduler.initdb(designbase=plan)
         self.field_ra = self.scheduler.fields.racen
         self.field_dec = self.scheduler.fields.deccen
         self.field_pk = self.scheduler.fields.pk
