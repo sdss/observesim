@@ -28,13 +28,14 @@ def runSim(args):
     # ###################
     # make sure this starts a clean slate every run!
     # ###################
-    idx, base, plan, version, observatory, schedule, redo_exp, check, oldWeather = args
+    idx, base, plan, version, observatory, schedule, redo_exp, check, oldWeather, hist = args
 
     print(f"running {observatory} sim {plan} VER {version} seed {idx}")
 
     sim = simulation.Simulation(plan, observatory,
                                 idx=idx, schedule=schedule,
-                                redo_exp=redo_exp, oldWeather=oldWeather)
+                                redo_exp=redo_exp, oldWeather=oldWeather,
+                                with_hist=hist)
 
     startTime = time.time()
     # Loop through nights
@@ -124,7 +125,9 @@ parser.add_argument("-r", "--redo", dest="redo_exp", action="store_true",
 parser.add_argument("-c", "--check", dest="check", action="store_true",
                     help="do minimal sim to check changes")
 parser.add_argument("-w", "--weather", dest="weather", action="store_true",
-                    help="do minimal sim to check changes")
+                    help="user old weather model")
+parser.add_argument("-h", "--hist", dest="hist", action="store_true",
+                    help="grab field info and history from DB")
 args = parser.parse_args()
 base = args.base
 plan = args.plan
@@ -135,6 +138,7 @@ schedule = args.schedule
 redo_exp = args.redo_exp
 check = args.check
 oldWeather = args.weather
+hist = args.hist
 
 if base is None:
     base = os.getenv("OBSERVESIM_OUTPUT_BASE")
@@ -152,4 +156,4 @@ base += "/"
 
 os.environ["RS_OUTDIR"] = base
 
-runSim((number, base, plan, version, observatory, schedule, redo_exp, check, oldWeather))
+runSim((number, base, plan, version, observatory, schedule, redo_exp, check, oldWeather, hist))
