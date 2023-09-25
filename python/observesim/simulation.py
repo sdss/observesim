@@ -13,7 +13,7 @@ import yaml
 import observesim.weather
 import roboscheduler.scheduler
 import observesim.observe
-from observesim.progress import fieldsFromDB
+from observesim.progress import fieldsFromDB, doneForObs
 
 
 def sortFields(fieldids, nexps, exp, maxTime=0):
@@ -172,6 +172,19 @@ class Simulation(object):
         self.redo_apg = 0
         self.redo_r = 0
         self.redo_b = 0
+
+        if with_hist:
+            field_mjds = doneForObs(obs=observatory.upper(), plan=plan)
+
+            result = {"mjd":-99999,
+                      "duration": 900,
+                      "apgSN2": -1.0,
+                      "rSN2": -1.0,
+                      "bSN2": -1.0}
+            for f in field_mjds:
+                result["mjd"] = f["mjd"]
+                self.scheduler.update(field_pk=f["field_pk"], result=result,
+                                      finish=True)
 
     def moveDuPontTelescope(self, mjd, fieldidx):
         next_ra, next_dec = self.field_ra[fieldidx], self.field_dec[fieldidx]

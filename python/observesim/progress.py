@@ -91,7 +91,8 @@ def doneForObs(obs="APO", plan="zeta-3"):
 
     complete = Status.get(label="done")
 
-    query = d2s.select(Field.pk, Field.field_id,
+    query = d2s.select(Field.pk.alias("field_pk"),
+                       Field.field_id,
                        Field.racen, Field.deccen,
                        d2s.mjd, Cadence.label, d2s.design_id)\
                .join(d2f, on=(d2f.design_id == d2s.design_id))\
@@ -103,78 +104,6 @@ def doneForObs(obs="APO", plan="zeta-3"):
                       Version.plan == plan)\
                 .order_by(d2s.mjd).dicts()
 
-    field_mjds = pd.DataFrame(query)
+    # field_mjds = pd.DataFrame(query)
 
-    return field_mjds
-
-
-
-
-    # exp = opsdb.Exposure
-    # cfg = opsdb.Configuration
-    # cf = opsdb.CameraFrame
-    # camera = opsdb.Camera
-    # flavor = opsdb.ExposureFlavor
-
-    # science = flavor.get(label="Science")
-    # if obs.upper() == "APO":
-    #     blue = camera.get(label="b1")
-    # else:
-    #     blue = camera.get(label="b2")
-
-    # # for obs hist
-    # query = exp.select(cfg.design_id, exp.start_time,
-    #                    Field.pk.alias("field_pk"))\
-    #            .join(cfg)\
-    #            .join(d2s, on=(d2s.design_id == cfg.design_id))\
-    #            .join(Status)\
-    #            .switch(exp).join(cf)\
-    #            .switch(d2s)\
-    #            .join(d2f, on=(d2f.design_id == d2s.design_id))\
-    #            .join(Field).join(Version)\
-    #            .where(Status.pk == complete.pk, 
-    #                   exp.exposure_flavor_pk == science.pk,
-    #                   cf.camera_pk == blue.pk,
-    #                   Version.plan == plan).dicts()
-
-    # design_ids = list()
-    # start_times = list()
-    # for q in query:
-    #     design_ids.append(q["design"])
-    #     start_times.append(q["start_time"])
-
-    # dt_times = Time(start_times)
-    # dt_times.format = "mjd"
-    # mjds = [t.value for t in dt_times]
-
-    # return mjds, field_mjds
-
-# PK
-# FIELDID
-# RACEN
-# DECCEN
-# CADENCE
-# NOBSERVATIONS
-# OBSERVATIONS
-
-
-# # OBS
-# FIELD_PK
-# MJD
-# CADENCE
-# NFILLED
-# RACEN
-# DECCEN
-
-# NEXP_CUMUL
-# DESIGN_ID
-
-# AIRMASS
-# SKYBRIGHTNESS
-# LST
-# HA
-
-# DURATION
-# APGSN2
-# RSN2
-# BSN2
+    return query
