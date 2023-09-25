@@ -13,7 +13,7 @@ import yaml
 import observesim.weather
 import roboscheduler.scheduler
 import observesim.observe
-from observesim.pgoress import fieldsFromDB
+from observesim.progress import fieldsFromDB
 
 
 def sortFields(fieldids, nexps, exp, maxTime=0):
@@ -139,7 +139,8 @@ class Simulation(object):
                                                    plan=plan)
             self.scheduler.initdb(designbase=plan, 
                                   fieldsArray=fields_sum,
-                                  realDesigns=all_designs)
+                                  realDesigns=all_designs,
+                                  fromFits=False)
         else:
             self.scheduler.initdb(designbase=plan)
         self.field_ra = self.scheduler.fields.racen

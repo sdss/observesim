@@ -35,7 +35,7 @@ def fieldsFromDB(obs="APO", plan="eta-5"):
                     ('nfilled', np.int32),
                     ('flag', np.int32),
                     ('slots_exposures', np.int32, (24, 2)),
-                    ('cadence', np.dtype('a20'))]
+                    ('cadence', np.dtype('a25'))]
 
     fields_sum = np.zeros(len(fieldTable["field_id"]), dtype=fields_model)
 
@@ -67,7 +67,7 @@ def fieldsFromDB(obs="APO", plan="eta-5"):
 
     all_designs = list()
 
-    for f in fields_sum["pk"]:
+    for i, f in enumerate(fields_sum["pk"]):
         f_designs = np.where(field_pks == f)
         exps = exposures[f_designs]
         args_in_order = f_designs[0][np.argsort(exps)]
@@ -149,32 +149,32 @@ def doneForObs(obs="APO", plan="zeta-3"):
 
     # return mjds, field_mjds
 
-PK
-FIELDID
-RACEN
-DECCEN
-CADENCE
-NOBSERVATIONS
-OBSERVATIONS
+# PK
+# FIELDID
+# RACEN
+# DECCEN
+# CADENCE
+# NOBSERVATIONS
+# OBSERVATIONS
 
 
-# OBS
-FIELD_PK
-MJD
-CADENCE
-NFILLED
-RACEN
-DECCEN
+# # OBS
+# FIELD_PK
+# MJD
+# CADENCE
+# NFILLED
+# RACEN
+# DECCEN
 
-NEXP_CUMUL
-DESIGN_ID
+# NEXP_CUMUL
+# DESIGN_ID
 
-AIRMASS
-SKYBRIGHTNESS
-LST
-HA
+# AIRMASS
+# SKYBRIGHTNESS
+# LST
+# HA
 
-DURATION
-APGSN2
-RSN2
-BSN2
+# DURATION
+# APGSN2
+# RSN2
+# BSN2

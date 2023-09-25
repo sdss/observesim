@@ -126,7 +126,7 @@ parser.add_argument("-c", "--check", dest="check", action="store_true",
                     help="do minimal sim to check changes")
 parser.add_argument("-w", "--weather", dest="weather", action="store_true",
                     help="user old weather model")
-parser.add_argument("-h", "--hist", dest="hist", action="store_true",
+parser.add_argument("--hist", dest="hist", action="store_true",
                     help="grab field info and history from DB")
 args = parser.parse_args()
 base = args.base
