@@ -1,10 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
-
 # Perform an SDSS-V simulation
 
 import os
@@ -14,8 +10,6 @@ import time
 import numpy as np
 import fitsio
 from astropy.utils.exceptions import ErfaWarning
-import observesim.weather
-import roboscheduler.scheduler
 import observesim.observe
 from observesim import simulation
 from observesim.output import countFields, cumulativePlot,\
@@ -37,13 +31,22 @@ def runSim(args):
                                 redo_exp=redo_exp, oldWeather=oldWeather,
                                 with_hist=hist)
 
+    if hist:
+        max_done_mjd = np.max(sim.scheduler.observations.mjd)
+        check_offset = int(max_done_mjd - np.min(sim.scheduler.mjds))
+    else:
+        max_done_mjd = 0.0
+        check_offset = 0
+
     startTime = time.time()
     # Loop through nights
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=ErfaWarning)
         for mjd in sim.scheduler.mjds:
+            if mjd < max_done_mjd:
+                continue
             # uncomment to do a quick check
-            if mjd > sim.scheduler.mjds[45] and check:
+            if mjd > sim.scheduler.mjds[45+check_offset] and check:
                 continue
             sim.observeMJD(mjd)
     print("skipped for physical obstructions", sim.hit_lims)

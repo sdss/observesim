@@ -81,6 +81,7 @@ def fieldsFromDB(obs="APO", plan="eta-5"):
 def doneForObs(obs="APO", plan="zeta-3"):
     os.environ["OBSERVATORY"] = obs.upper()
     from sdssdb.peewee.sdss5db import opsdb
+    opsdb.database.connect()
     
     Field = targetdb.Field
     d2f = targetdb.DesignToField

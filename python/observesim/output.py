@@ -36,7 +36,8 @@ def read_field(fname, alloc, exp_to_mjd):
     decs = list()
     mjds = list()
 
-    for m, i in zip(exp_to_mjd, range(alloc["iexpst"], alloc["iexpnd"]+1)):
+
+    for m, i in zip(exp_to_mjd, range(int(alloc["iexpst"]), int(alloc["iexpnd"])+1)):
         # zip will end when exp_to_mjd ends if it is shorter than
         # nplanned (i.e. the range)
         if len(w_idx["equivRobotID"].shape) == 1:
@@ -79,6 +80,10 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     sim_data = fitsio.read(v_base + f"{plan}-{loc}-fields-{N}.fits")
     obs_data = fitsio.read(v_base + f"{plan}-{loc}-observations-{N}.fits")
 
+    rep_base = "/uufs/chpc.utah.edu/common/home/sdss50/sdsswork/target/robostrategy_replacement/"
+    rep_file = os.path.join(rep_base, plan, f"{plan}_field_replacement_log.fits")
+    rm_replacements = fitsio.read(rep_file)
+
     # prep out struct
     all_targs = list()
     all_cads = list()
@@ -94,20 +99,31 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     all_ras = list()
     all_decs = list()
 
-    start_time = time.time()
+    # start_time = time.time()
 
     print("matching fields for {} {}".format(plan, loc))
     for f in sim_data:
         obs_idx = f["observations"][:int(f["nobservations"])]
         mjds = [obs_data[i]["mjd"] for i in obs_idx]
-        cad = f["cadence"]
+        if len(mjds) == 0:
+            continue
 
-        # field_pk is an index into rsAllocationFinal for each observatory
-        # so definitely keep doing that in roboscheduler
-        alloc = allocation[f["pk"]]
+        cad = f["cadence"]
+        fieldid=f["fieldid"]
+
+        field_cen = allocation[np.where(allocation["fieldid"] == fieldid)]
+        w_alloc = np.where(field_cen["cadence"] == cad)
+
+        if len(w_alloc[0]) == 0:
+            alt_field_row = rm_replacements[np.where(rm_replacements["field_id_new"] == fieldid)]
+            fieldid = int(alt_field_row["field_id_old"])
+            field_cen = allocation[np.where(allocation["fieldid"] == fieldid)]
+            w_alloc = np.where(field_cen["cadence"] == cad)
+
+        alloc = allocation[w_alloc]
 
         fname = "{plan}/final/rsFieldAssignmentsFinal-{plan}-{loc}-{fieldid}.fits"
-        fname = rs_base + fname.format(plan=plan, loc=loc, fieldid=f["fieldid"])
+        fname = rs_base + fname.format(plan=plan, loc=loc, fieldid=fieldid)
 
         cat_ids, cadences, cartons, programs, target_pks, carton_pks, c2t_pks,\
             categories, ras, decs, targ_mjds = read_field(fname, alloc, mjds)
@@ -398,7 +414,7 @@ def countEpochs(res_base, rs_base, plan, version=None, loc="apo"):
 
     sim_data = fitsio.read(v_base + "{plan}-{loc}-fields-{n}.fits".format(plan=plan, loc=loc, n=N))
     obs_data = fitsio.read(v_base + "{plan}-{loc}-observations-{n}.fits".format(plan=plan, loc=loc, n=N))
-    cads = fitsio.read(rs_base + "{plan}/rsCadences-{plan}-{loc}.fits".format(plan=plan, loc=loc))
+    cads = fitsio.read(rs_base + "{plan}/final/rsCadencesFinal-{plan}-{loc}.fits".format(plan=plan, loc=loc))
 
     counts = list()
     planned = list()
@@ -609,7 +625,7 @@ def plannedProgExps(plan, rs_base, loc="apo"):
     comp_data = fitsio.read(rs_base + "/{plan}/final/rsCompletenessFinal-{plan}-both.fits".format(plan=plan), 
                             columns=["program", "cadence", "assigned", 
                                      "category", f"assigned_{loc}"])
-    cadences = fitsio.read(rs_base + "/{plan}/rsCadences-{plan}-{loc}.fits".format(plan=plan, loc=loc),
+    cadences = fitsio.read(rs_base + "/{plan}/final/rsCadencesFinal-{plan}-{loc}.fits".format(plan=plan, loc=loc),
                            columns=["CADENCE", "NEXP"])
 
     comp_data = comp_data[np.where(comp_data[f"assigned_{loc}"])]
