@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 import pandas as pd
-from astropy.time import Time
+from peewee import JOIN
 
 from sdssdb.peewee.sdss5db import database
 database.set_profile('operations')
@@ -10,20 +10,27 @@ from sdssdb.peewee.sdss5db import targetdb
 
 
 def fieldsFromDB(obs="APO", plan="eta-5"):
+    os.environ["OBSERVATORY"] = obs.upper()
+    from sdssdb.peewee.sdss5db import opsdb
+    opsdb.database.connect()
+
     Field = targetdb.Field
     Cadence = targetdb.Cadence
     Version = targetdb.Version
     Observatory = targetdb.Observatory
+    f2p = opsdb.FieldToPriority
 
-    query = Field.select(Field.pk, Field.field_id,
+    query = Field.select(Field.pk.alias("field_pk"), Field.field_id.alias("field_id"),
                     Field.racen, Field.deccen,
                     Field.slots_exposures,
                     Cadence.label.alias("cadence"))\
             .join(Cadence)\
             .switch(Field).join(Version)\
             .switch(Field).join(Observatory)\
+            .switch(Field).join(f2p, JOIN.LEFT_OUTER)\
             .where(Version.plan == plan,
-                   Observatory.label == obs.upper())\
+                    Observatory.label == obs.upper(),
+                    f2p.field_priority_pk == None)\
             .order_by(Field.pk).dicts()
 
     fieldTable = pd.DataFrame(query)
@@ -39,7 +46,7 @@ def fieldsFromDB(obs="APO", plan="eta-5"):
 
     fields_sum = np.zeros(len(fieldTable["field_id"]), dtype=fields_model)
 
-    fields_sum["pk"] = fieldTable["pk"].values
+    fields_sum["pk"] = fieldTable["field_pk"].values
     fields_sum["field_id"] = fieldTable["field_id"].values
     fields_sum["racen"] = fieldTable["racen"].values
     fields_sum["deccen"] = fieldTable["deccen"].values
@@ -89,6 +96,7 @@ def doneForObs(obs="APO", plan="zeta-3"):
     Version = targetdb.Version
     d2s = opsdb.DesignToStatus
     Status = opsdb.CompletionStatus
+    f2p = opsdb.FieldToPriority
 
     complete = Status.get(label="done")
 
@@ -101,8 +109,10 @@ def doneForObs(obs="APO", plan="zeta-3"):
                .switch(d2s)\
                .join(Status)\
                .switch(Field).join(Version)\
+               .switch(Field).join(f2p, JOIN.LEFT_OUTER)\
                .where(Status.pk == complete.pk,
-                      Version.plan == plan)\
+                      Version.plan == plan,
+                      f2p.field_priority_pk == None)\
                 .order_by(d2s.mjd).dicts()
 
     # field_mjds = pd.DataFrame(query)

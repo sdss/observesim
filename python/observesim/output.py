@@ -101,26 +101,38 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 
     # start_time = time.time()
 
+    fields_to_alloc_map = list()
+
     print("matching fields for {} {}".format(plan, loc))
     for f in sim_data:
         obs_idx = f["observations"][:int(f["nobservations"])]
         mjds = [obs_data[i]["mjd"] for i in obs_idx]
-        if len(mjds) == 0:
-            continue
 
         cad = f["cadence"]
         fieldid=f["fieldid"]
 
-        field_cen = allocation[np.where(allocation["fieldid"] == fieldid)]
-        w_alloc = np.where(field_cen["cadence"] == cad)
+
+        w_alloc = np.where(np.logical_and(allocation["fieldid"] == fieldid,
+                                          allocation["cadence"] == cad))
+        # field_cen = allocation[np.where(allocation["fieldid"] == fieldid)]
+        # w_alloc = field_cen[np.where(field_cen["cadence"] == cad)]
 
         if len(w_alloc[0]) == 0:
             alt_field_row = rm_replacements[np.where(rm_replacements["field_id_new"] == fieldid)]
             fieldid = int(alt_field_row["field_id_old"])
-            field_cen = allocation[np.where(allocation["fieldid"] == fieldid)]
-            w_alloc = np.where(field_cen["cadence"] == cad)
+            w_alloc = np.where(np.logical_and(allocation["fieldid"] == fieldid,
+                                              allocation["cadence"] == cad))
+            # field_cen = allocation[np.where(allocation["fieldid"] == fieldid)]
+            # w_alloc = field_cen[np.where(field_cen["cadence"] == cad)]
 
+        w_alloc = int(w_alloc[0])
+        
         alloc = allocation[w_alloc]
+
+        fields_to_alloc_map.append(w_alloc)
+        
+        if len(mjds) == 0:
+            continue
 
         fname = "{plan}/final/rsFieldAssignmentsFinal-{plan}-{loc}-{fieldid}.fits"
         fname = rs_base + fname.format(plan=plan, loc=loc, fieldid=fieldid)
@@ -211,6 +223,9 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     if save:
         fitsio.write(v_base + f"obsTargets-{plan}-{loc}-{N}.fits",
                      cleaned_targs, clobber=True)
+        with open(f"{v_base}/fields_to_RSalloc_map-{loc}.dat", "w") as mapFile:
+            for m in fields_to_alloc_map:
+                print(m, file=mapFile)
 
     return obs_targs
 
@@ -389,14 +404,21 @@ def getCounts(res_base, rs_base, plan, version=None, loc="apo"):
     fields = fitsio.read(rs_base+"{plan}/final/rsAllocationFinal-{plan}-{loc}.fits".format(plan=plan, loc=loc),
                          columns=["fieldid", "needed", "cadence"])
 
+    field_to_alloc_map = np.genfromtxt(f"{v_base}/fields_to_RSalloc_map-{loc}.dat", dtype=int)
+
+    fields = fields[field_to_alloc_map]
+
     planned = fields['needed']
 
     counts = np.mean(np.array(counts), axis=0)
 
-    assert len(sim_data) == len(fields), "THIS IS NOT APPLES AND APPLES!!"
+    # assert len(counts) == len(planned), "THIS IS NOT APPLES AND APPLES!!"
 
-    for s, f in zip(sim_data, fields):
-        assert s["fieldid"] == f["fieldid"], "fields mixed up"
+    for s, f, m in zip(sim_data, fields, field_to_alloc_map):
+        # print(m, s["fieldid"], f["fieldid"], s["nobservations"], f["needed"])
+        if f["needed"] < 200:
+            # filters out RM fields that get new names, etc
+            assert s["fieldid"] == f["fieldid"], "fields mixed up"
 
     return counts, planned, [c for c in fields["cadence"]]
 
