@@ -68,6 +68,16 @@ class Simulation(object):
 
     def __init__(self, plan, observatory, idx=1, schedule="normal", redo_exp=True,
                  oldWeather=False, with_hist=False):
+
+        out_path = os.getenv('RS_OUTDIR')
+        cfg_file = os.path.join(out_path, "sim_cfg.yml")
+        if os.path.isfile(priority_cfg_filefile):
+            print(f"found priority file, applying: \n {cfg_file}")
+            cfg = yaml.load(open(cfg_file), Loader=yaml.FullLoader)
+        else:
+            cfg_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + "/etc/nominal_cfg.yml"
+            cfg = yaml.load(open(cfg_file), Loader=yaml.FullLoader)
+            
         if(observatory == 'apo'):
             timezone = "US/Mountain"
             fclear = 0.5
@@ -76,10 +86,10 @@ class Simulation(object):
                               "alt_slew": 1.5, "az_slew": 2.0, "rot_slew": 2.0}
             self.obsCheck = apoCheck
             self.moveTelescope = self.moveSloanTelescope
-            self.nom_duration = np.float32(15. / 60. / 24.)
+            self.nom_duration = np.float32(cfg["nom_duration_apo"] / 60. / 24.)
             # self.cals = np.float32(3. / 60. / 24.)
-            self.field_overhead = np.float32(7. / 60. / 24.)
-            self.design_overhead = np.float32(5.5 / 60. / 24.)
+            self.field_overhead = np.float32(cfg["field_overhead_apo"] / 60. / 24.)
+            self.design_overhead = np.float32(cfg["design_overhead_apo"] / 60. / 24.)
         if(observatory == 'lco'):
             timezone = "US/Eastern"
             fclear = 0.7
@@ -87,13 +97,16 @@ class Simulation(object):
             self.telescope = {"ra": 0, "dec": -30}
             self.obsCheck = lcoCheck
             self.moveTelescope = self.moveDuPontTelescope
-            self.nom_duration = np.float32(15. / 60. / 24.)
+            self.nom_duration = np.float32(cfg["nom_duration_lco"] / 60. / 24.)
             # self.cals = np.float32(3. / 60. / 24.)
             # extra 90s or so for cals at LCO?
-            self.field_overhead = np.float32(8.5 / 60. / 24.)
-            self.design_overhead = np.float32(5.5 / 60. / 24.)
+            self.field_overhead = np.float32(cfg["field_overhead_lco"] / 60. / 24.)
+            self.design_overhead = np.float32(cfg["design_overhead_lco"] / 60. / 24.)
 
         self.redo_exp = redo_exp
+        self.snr_b = cfg["snr_b"]
+        self.snr_r = cfg["snr_r"]
+        self.snr_ap = cfg["snr_ap"]
 
         self.obsHist = {"lst": list(),
                         "ra": list(),
@@ -390,7 +403,7 @@ class Simulation(object):
             res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
 
             if self.bright():
-                if res["apgSN2"] < 2025 and self.redo_exp:
+                if res["apgSN2"] < self.snr_ap and self.redo_exp:
                     field_exp_count += 1
                     self.redo_apg += 1
                     self.scheduler.update(field_pk=field_pk, result=res,
@@ -402,9 +415,9 @@ class Simulation(object):
                     self.scheduler.update(field_pk=field_pk, result=res,
                                           finish=True)
             else:
-                if (res["rSN2"] < 3.0 or res["bSN2"] < 1.5) and self.redo_exp:
+                if (res["rSN2"] < self.snr_r or res["bSN2"] < self.snr_b) and self.redo_exp:
                     field_exp_count += 1
-                    if res["rSN2"] < 3.0:
+                    if res["rSN2"] < self.snr_r:
                         self.redo_r += 1
                     else:
                         self.redo_b += 1
