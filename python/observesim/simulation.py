@@ -71,7 +71,7 @@ class Simulation(object):
 
         out_path = os.getenv('RS_OUTDIR')
         cfg_file = os.path.join(out_path, "sim_cfg.yml")
-        if os.path.isfile(priority_cfg_filefile):
+        if os.path.isfile(cfg_file):
             print(f"found priority file, applying: \n {cfg_file}")
             cfg = yaml.load(open(cfg_file), Loader=yaml.FullLoader)
         else:
