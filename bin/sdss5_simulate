@@ -1,10 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
-
 # Perform an SDSS-V simulation
 
 import os
@@ -14,12 +10,10 @@ import time
 import numpy as np
 import fitsio
 from astropy.utils.exceptions import ErfaWarning
-import observesim.weather
-import roboscheduler.scheduler
-import observesim.observe
+# import observesim.observe
 from observesim import simulation
-from observesim.output import countFields, cumulativePlot,\
-                              spiders_area_for_program_time, doHist
+from observesim.output import countFields
+from observesim.stats import quickSummary
 
 
 def runSim(args):
@@ -28,21 +22,31 @@ def runSim(args):
     # ###################
     # make sure this starts a clean slate every run!
     # ###################
-    idx, base, plan, version, observatory, schedule, redo_exp, check, oldWeather = args
+    idx, base, plan, version, observatory, schedule, redo_exp, check, oldWeather, hist = args
 
     print(f"running {observatory} sim {plan} VER {version} seed {idx}")
 
     sim = simulation.Simulation(plan, observatory,
                                 idx=idx, schedule=schedule,
-                                redo_exp=redo_exp, oldWeather=oldWeather)
+                                redo_exp=redo_exp, oldWeather=oldWeather,
+                                with_hist=hist)
+
+    if hist:
+        max_done_mjd = np.max(sim.scheduler.observations.mjd)
+        check_offset = int(max_done_mjd - np.min(sim.scheduler.mjds))
+    else:
+        max_done_mjd = 0.0
+        check_offset = 0
 
     startTime = time.time()
     # Loop through nights
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=ErfaWarning)
         for mjd in sim.scheduler.mjds:
+            if mjd < max_done_mjd:
+                continue
             # uncomment to do a quick check
-            if mjd > sim.scheduler.mjds[45] and check:
+            if mjd > sim.scheduler.mjds[45+check_offset] and check:
                 continue
             sim.observeMJD(mjd)
     print("skipped for physical obstructions", sim.hit_lims)
@@ -92,6 +96,9 @@ def runSim(args):
     base = os.getenv("OBSERVESIM_OUTPUT_BASE")
 
     countFields(base, rs_base, plan, version=version, loc=observatory, N=idx)
+
+    quickSummary(base, plan, rs_base, version=version)
+
     # cumulativePlot(base, plan, rs_base, version=version, loc=observatory)
     # spiders_area_for_program_time(base, rs_base, plan, version=version, loc=observatory)
     # doHist(base, rs_base, plan, version=version, loc=observatory)
@@ -118,13 +125,15 @@ parser.add_argument("-v", "--version", dest="version", type=str,
                     default=None)
 parser.add_argument("-s", "--schedule", dest="schedule", type=str,
                     required=False, help="master schedule to use",
-                    default="normal_v4")
+                    default="v6")
 parser.add_argument("-r", "--redo", dest="redo_exp", action="store_true",
                     help="redo exposures if snr below threshold")
 parser.add_argument("-c", "--check", dest="check", action="store_true",
                     help="do minimal sim to check changes")
 parser.add_argument("-w", "--weather", dest="weather", action="store_true",
-                    help="do minimal sim to check changes")
+                    help="user old weather model")
+parser.add_argument("--hist", dest="hist", action="store_true",
+                    help="grab field info and history from DB")
 args = parser.parse_args()
 base = args.base
 plan = args.plan
@@ -135,6 +144,7 @@ schedule = args.schedule
 redo_exp = args.redo_exp
 check = args.check
 oldWeather = args.weather
+hist = args.hist
 
 if base is None:
     base = os.getenv("OBSERVESIM_OUTPUT_BASE")
@@ -152,4 +162,4 @@ base += "/"
 
 os.environ["RS_OUTDIR"] = base
 
-runSim((number, base, plan, version, observatory, schedule, redo_exp, check, oldWeather))
+runSim((number, base, plan, version, observatory, schedule, redo_exp, check, oldWeather, hist))

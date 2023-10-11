@@ -6,6 +6,7 @@ import argparse
 
 from observesim.output import *
 from observesim.cumulative_plots import *
+from observesim.stats import quickSummary
 from observesim.animateSurvey import CountFramesAllSky
 
 
@@ -68,6 +69,7 @@ if __name__ == "__main__":
     # print("drawing old figs for {}".format(plan))
     # doHist(base, rs_base, plan, version=version, loc="lco")
     # doHist(base, rs_base, plan, version=version, loc="apo")
+    # quickSummary(base, plan, rs_base, version=version)
     # spiders_area_for_program_time(base, rs_base, plan, version=version, loc="lco")
     # spiders_area_for_program_time(base, rs_base, plan, version=version, loc="apo")
     # cumulativePlot(base, plan, rs_base, version=version, loc="apo")
@@ -94,6 +96,8 @@ if __name__ == "__main__":
         cumulativePlot(base, plan, rs_base, version=version, loc="apo")
         spiders_area_for_program_time(base, rs_base, plan, version=version, loc="lco")
         spiders_area_for_program_time(base, rs_base, plan, version=version, loc="apo")
+
+        quickSummary(base, plan, rs_base, version=version)
 
         print("drawing old figs for {}".format(plan))
         doHist(base, rs_base, plan, version=version, loc="lco")
