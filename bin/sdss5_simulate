@@ -10,10 +10,10 @@ import time
 import numpy as np
 import fitsio
 from astropy.utils.exceptions import ErfaWarning
-import observesim.observe
+# import observesim.observe
 from observesim import simulation
-from observesim.output import countFields, cumulativePlot,\
-                              spiders_area_for_program_time, doHist
+from observesim.output import countFields
+from observesim.stats import quickSummary
 
 
 def runSim(args):
@@ -96,6 +96,9 @@ def runSim(args):
     base = os.getenv("OBSERVESIM_OUTPUT_BASE")
 
     countFields(base, rs_base, plan, version=version, loc=observatory, N=idx)
+
+    quickSummary(base, plan, rs_base, version=version)
+
     # cumulativePlot(base, plan, rs_base, version=version, loc=observatory)
     # spiders_area_for_program_time(base, rs_base, plan, version=version, loc=observatory)
     # doHist(base, rs_base, plan, version=version, loc=observatory)
@@ -122,7 +125,7 @@ parser.add_argument("-v", "--version", dest="version", type=str,
                     default=None)
 parser.add_argument("-s", "--schedule", dest="schedule", type=str,
                     required=False, help="master schedule to use",
-                    default="normal_v4")
+                    default="v6")
 parser.add_argument("-r", "--redo", dest="redo_exp", action="store_true",
                     help="redo exposures if snr below threshold")
 parser.add_argument("-c", "--check", dest="check", action="store_true",

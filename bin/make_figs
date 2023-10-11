@@ -69,7 +69,7 @@ if __name__ == "__main__":
     # print("drawing old figs for {}".format(plan))
     # doHist(base, rs_base, plan, version=version, loc="lco")
     # doHist(base, rs_base, plan, version=version, loc="apo")
-    # quickSummary(base, plan, rs_base, version=version)
+    quickSummary(base, plan, rs_base, version=version)
     # spiders_area_for_program_time(base, rs_base, plan, version=version, loc="lco")
     # spiders_area_for_program_time(base, rs_base, plan, version=version, loc="apo")
     # cumulativePlot(base, plan, rs_base, version=version, loc="apo")
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     # cartonCoverageByYearMaps(base, plan, rs_base, version=version)
     # cartonCoverageCumulative(base, plan, version=version,
     #                           cartons=["bhm_aqmes_bonus_faint", "bhm_csc_boss"])
-    # sys.exit(0)
+    sys.exit(0)
 
     if web:
         writeWebPage(base, rs_base, plan, version=version)
