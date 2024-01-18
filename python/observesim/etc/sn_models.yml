@@ -1,9 +1,9 @@
-b: [-1.776, 3.467]
-bnoise: [-0.604, 1.376]
-bshift: 0.5
-r: [-5.786, 10.322]
-rnoise: [-4.071, 7.182]
-rshift: 1
-ap: [1100]
-apnoise: 45
-apshift: 50
+b_fit_coef: [-1.776, 3.467]
+b_noise_coef: [-0.604, 1.376]
+b_cloudy_shift: 0.5
+r_fit_coef: [-5.786, 10.322]
+r_noise_coef: [-4.071, 7.182]
+r_cloudy_shift: 1
+ap_fit_coef: [1100]
+ap_noise_coef: 45
+ap_cloudy_shift: 50

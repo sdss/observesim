@@ -94,7 +94,11 @@ class simple_SN2(object):
     """Class to predict SN2 based on airmass
     """
 
-    def __init__(self, fit_coef=None, noise_coef=None, cloudy_shift=0):
+    def __init__(self,
+                 b_fit_coef=None, b_noise_coef=None, b_cloudy_shift=0,
+                 r_fit_coef=None, r_noise_coef=None, r_cloudy_shift=0,
+                 ap_fit_coef=None, ap_noise_coef=None, ap_cloudy_shift=0,
+                 ):
         """
          Parameters:
         ----------
@@ -105,12 +109,16 @@ class simple_SN2(object):
                 Coefficients for N-degree 1-D polynomial fit to noise model
 
         """
-        assert fit_coef is not None, "must init with fiducial CDF!"
-        assert noise_coef is not None, "must init with fiducial grid!"
 
-        self.model = np.poly1d(fit_coef)
-        self.noise = np.poly1d(noise_coef)
-        self.cloudy_shift = cloudy_shift
+        self.b_model = np.poly1d(b_fit_coef)
+        self.b_noise = np.poly1d(b_noise_coef)
+        self.b_cloudy_shift = b_cloudy_shift
+        self.r_model = np.poly1d(r_fit_coef)
+        self.r_noise = np.poly1d(r_noise_coef)
+        self.r_cloudy_shift = r_cloudy_shift
+        self.ap_model = np.poly1d(ap_fit_coef)
+        self.ap_noise = np.poly1d(ap_noise_coef)
+        self.ap_cloudy_shift = ap_cloudy_shift
 
     def __call__(self, am=1.0, cloudy=False):
         """obtain a SN2 from fid_cdf
@@ -134,15 +142,24 @@ class simple_SN2(object):
         if np.isscalar(am):
             am = np.array([am])
         if cloudy:
-            shift = -1.5*self.cloudy_shift
+            b_shift = -1.5*self.b_cloudy_shift
+            r_shift = -1.5*self.r_cloudy_shift
+            ap_shift = -1.5*self.ap_cloudy_shift
         else:
-            shift = self.cloudy_shift
+            b_shift = self.b_cloudy_shift
+            r_shift = self.r_cloudy_shift
+            ap_shift = self.ap_cloudy_shift
         N = len(am)
 
+        random_shared = np.random.randn(N)
         # random noise could push it negative, can't have that!
-        raw = self.model(am) + np.random.randn(N)*self.noise(am) + shift
+        b_raw = self.b_model(am) + random_shared*self.b_noise(am) + b_shift
+        r_raw = self.r_model(am) + random_shared*self.r_noise(am) + r_shift
+        ap_raw = self.ap_model(am) + random_shared*self.ap_noise(am) + ap_shift
 
-        return np.clip(raw, 0, None)
+        return(np.clip(r_raw, 0, None), 
+               np.clip(b_raw, 0, None), 
+               np.clip(ap_raw, 0, None))
 
 
 class Observe(object):
@@ -197,29 +214,20 @@ class Observe(object):
         model_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + "/etc/sn_models.yml"
         models = yaml.load(open(model_file))
 
-        self.bSN2 = simple_SN2(fit_coef=models["b"],
-                                 noise_coef=models["bnoise"],
-                                 cloudy_shift=models["bshift"])
-        self.rSN2 = simple_SN2(fit_coef=models["r"],
-                               noise_coef=models["rnoise"],
-                               cloudy_shift=models["rshift"])
-        self.apgSN2 = simple_SN2(fit_coef=models["ap"],
-                               noise_coef=models["apnoise"],
-                               cloudy_shift=models["apshift"])
-
-    # def _amSN(self, am):
-    #     norm_rand = np.random.randn() / 10 + 0.7
-    #     r = self.rSN2(norm_rand) / am
-    #     b = self.bSN2(norm_rand) / am
-    #     apg = self.apgSN2(norm_rand) / am**0.05
-    #     return r, b, apg * 2  # 2x apg exp for each boss exp
+        # self.SN2 = simple_SN2(b_fit_coef=models["b"],
+        #                       b_noise_coef=models["bnoise"],
+        #                       b_cloudy_shift=models["bshift"],
+        #                       r_fit_coef=models["r"],
+        #                       r_noise_coef=models["rnoise"],
+        #                       r_cloudy_shift=models["rshift"],
+        #                       ap_fit_coef=models["ap"],
+        #                       ap_noise_coef=models["apnoise"],
+        #                       ap_cloudy_shift=models["apshift"])
+        self.SN2 = simple_SN2(**models)
 
     def _amSN(self, am, cloudy=False):
-        r = self.rSN2(am, cloudy=cloudy)
-        b = self.bSN2(am, cloudy=cloudy)
-        apg = self.apgSN2(am, cloudy=cloudy)
-        apg2 = self.apgSN2(am, cloudy=cloudy)
-        return r, b, apg + apg2  # 2x apg exp for each boss exp
+        r, b, apg = self.SN2(am, cloudy=cloudy)
+        return r, b, 2*apg  # 2x apg exp for each boss exp
 
     def result(self, field_pk=None, mjd=None, airmass=1,
                epochidx=None, cloudy=False, **kwargs):

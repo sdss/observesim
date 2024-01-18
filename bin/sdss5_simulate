@@ -22,14 +22,14 @@ def runSim(args):
     # ###################
     # make sure this starts a clean slate every run!
     # ###################
-    idx, base, plan, version, observatory, schedule, redo_exp, check, oldWeather, hist = args
+    idx, base, plan, version, observatory, schedule, redo_exp, check, oldWeather, hist, rsFinal = args
 
     print(f"running {observatory} sim {plan} VER {version} seed {idx}")
 
     sim = simulation.Simulation(plan, observatory,
                                 idx=idx, schedule=schedule,
                                 redo_exp=redo_exp, oldWeather=oldWeather,
-                                with_hist=hist)
+                                with_hist=hist, rsFinal=rsFinal)
 
     if hist:
         max_done_mjd = np.max(sim.scheduler.observations.mjd)
@@ -51,6 +51,7 @@ def runSim(args):
             sim.observeMJD(mjd)
     print("skipped for physical obstructions", sim.hit_lims)
     print(f"REDO: apg {sim.redo_apg} r {sim.redo_r} b {sim.redo_b}")
+    print(f"Total obs: {len(sim.obsHist['lst'])}")
     endTime = time.time()
 
     # with open("{base}weather_tracking_{idx}.dat".format(base=base, idx=idx), "w") as df:
@@ -134,6 +135,9 @@ parser.add_argument("-w", "--weather", dest="weather", action="store_true",
                     help="user old weather model")
 parser.add_argument("--hist", dest="hist", action="store_true",
                     help="grab field info and history from DB")
+parser.add_argument("-f", "--final", dest="final", action="store_true",
+                    help="don't use rsFinal version")
+                   # default is use final, it's usually what we want
 args = parser.parse_args()
 base = args.base
 plan = args.plan
@@ -145,6 +149,7 @@ redo_exp = args.redo_exp
 check = args.check
 oldWeather = args.weather
 hist = args.hist
+rsFinal = not args.final
 
 if base is None:
     base = os.getenv("OBSERVESIM_OUTPUT_BASE")
@@ -162,4 +167,4 @@ base += "/"
 
 os.environ["RS_OUTDIR"] = base
 
-runSim((number, base, plan, version, observatory, schedule, redo_exp, check, oldWeather, hist))
+runSim((number, base, plan, version, observatory, schedule, redo_exp, check, oldWeather, hist, rsFinal))

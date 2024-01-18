@@ -67,7 +67,7 @@ class Simulation(object):
     """
 
     def __init__(self, plan, observatory, idx=1, schedule="normal", redo_exp=True,
-                 oldWeather=False, with_hist=False):
+                 oldWeather=False, with_hist=False, rsFinal=True):
 
         out_path = os.getenv('RS_OUTDIR')
         cfg_file = os.path.join(out_path, "sim_cfg.yml")
@@ -77,7 +77,7 @@ class Simulation(object):
         else:
             cfg_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + "/etc/nominal_cfg.yml"
             cfg = yaml.load(open(cfg_file), Loader=yaml.FullLoader)
-            
+
         if(observatory == 'apo'):
             timezone = "US/Mountain"
             fclear = 0.5
@@ -155,7 +155,7 @@ class Simulation(object):
                                   realDesigns=all_designs,
                                   fromFits=False)
         else:
-            self.scheduler.initdb(designbase=plan)
+            self.scheduler.initdb(designbase=plan, rsFinal=rsFinal)
         self.field_ra = self.scheduler.fields.racen
         self.field_dec = self.scheduler.fields.deccen
         self.field_pk = self.scheduler.fields.pk
@@ -429,32 +429,32 @@ class Simulation(object):
                 else:
                     self.scheduler.update(field_pk=field_pk, result=res,
                                           finish=True)
-        if self.bright():
-            ap_tot = np.sum(self.scheduler.observations.apgSN2[-1*field_exp_count:])
-            # print(f"{nexposures} {field_exp_count} {len(self.scheduler.observations.apgSN2[-1*field_exp_count:])}")
-            # print(f"AP SN {ap_tot:7.1f} VS {300 * nexposures}")
-            if ap_tot < 2025 * nexposures and self.redo_exp:
-                self.redo_apg += 1
-                self.scheduler.update(field_pk=field_pk, result=res,
-                                      finish=False)
-                res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
-                self.scheduler.update(field_pk=field_pk, result=res,
-                                      finish=False)
-        else:
-            r_tot = np.sum(self.scheduler.observations.rSN2[-1*field_exp_count:])
-            b_tot = np.sum(self.scheduler.observations.bSN2[-1*field_exp_count:])
-            # print(f"{nexposures} {field_exp_count} {len(self.scheduler.observations.bSN2[-1*field_exp_count:])}")
-            # print(f"B  SN {b_tot:7.1f} VS {2.5 * nexposures} \nR  SN {r_tot:7.1f} VS {5 * nexposures}")
-            if (b_tot < 2 * nexposures or r_tot < 4 * nexposures) and self.redo_exp:
-                if r_tot < 4 * nexposures:
-                    self.redo_r += 1
-                else:
-                    self.redo_b += 1
-                self.scheduler.update(field_pk=field_pk, result=res,
-                                      finish=False)
-                res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
-                self.scheduler.update(field_pk=field_pk, result=res,
-                                      finish=False)
+        # if self.bright():
+        #     ap_tot = np.sum(self.scheduler.observations.apgSN2[-1*field_exp_count:])
+        #     # print(f"{nexposures} {field_exp_count} {len(self.scheduler.observations.apgSN2[-1*field_exp_count:])}")
+        #     # print(f"AP SN {ap_tot:7.1f} VS {300 * nexposures}")
+        #     if ap_tot < 2025 * nexposures and self.redo_exp:
+        #         self.redo_apg += 1
+        #         self.scheduler.update(field_pk=field_pk, result=res,
+        #                               finish=False)
+        #         res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
+        #         self.scheduler.update(field_pk=field_pk, result=res,
+        #                               finish=False)
+        # else:
+        #     r_tot = np.sum(self.scheduler.observations.rSN2[-1*field_exp_count:])
+        #     b_tot = np.sum(self.scheduler.observations.bSN2[-1*field_exp_count:])
+        #     # print(f"{nexposures} {field_exp_count} {len(self.scheduler.observations.bSN2[-1*field_exp_count:])}")
+        #     # print(f"B  SN {b_tot:7.1f} VS {2.5 * nexposures} \nR  SN {r_tot:7.1f} VS {5 * nexposures}")
+        #     if (b_tot < 2 * nexposures or r_tot < 4 * nexposures) and self.redo_exp:
+        #         if r_tot < 4 * nexposures:
+        #             self.redo_r += 1
+        #         else:
+        #             self.redo_b += 1
+        #         self.scheduler.update(field_pk=field_pk, result=res,
+        #                               finish=False)
+        #         res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
+        #         self.scheduler.update(field_pk=field_pk, result=res,
+        #                               finish=False)
 
     def observeMJD(self, mjd):
         mjd_evening_twilight = self.scheduler.evening_twilight(mjd)
@@ -533,7 +533,7 @@ class Simulation(object):
                 self.obsHist["weather"].append(False)
                 self.obsHist["mjd"].append(float(self.curr_mjd))
                 self.curr_mjd = self.curr_mjd + self.nom_duration
-                print(self.curr_mjd, self.obsHist["mjd"][-1]-self.curr_mjd)
+                print("nothing scheduled", self.curr_mjd, self.obsHist["mjd"][-1]-self.curr_mjd)
                 continue
             self.observeField(field_pk, nexposures, cloudy=cloudy)
 
