@@ -79,7 +79,7 @@ if __name__ == "__main__":
     # cartonCoverageByYearMaps(base, plan, rs_base, version=version)
     # cartonCoverageCumulative(base, plan, version=version,
     #                           cartons=["bhm_aqmes_bonus_faint", "bhm_csc_boss"])
-    sys.exit(0)
+    # sys.exit(0)
 
     if web:
         writeWebPage(base, rs_base, plan, version=version)
@@ -89,6 +89,7 @@ if __name__ == "__main__":
         print("post processing for {}".format(plan))
         countFields(base, rs_base, plan, version=version, loc="apo", N=0)
         countFields(base, rs_base, plan, version=version, loc="lco", N=0)
+        sys.exit(0)
 
     if draw_all:
         print("drawing cumulativePlot for {}".format(plan))
@@ -107,7 +108,7 @@ if __name__ == "__main__":
         cartonCoverageByYearMaps(base, plan, rs_base, version=version)
 
     print("creating target metrics for {}".format(plan))
-    plotTargMetric(base, rs_base, plan, version=version, reqs_file=None)
+    # plotTargMetric(base, rs_base, plan, version=version, reqs_file=None)
 
     # now makes mp4 file from frames in FramesForMP4 dir
     if draw_all:

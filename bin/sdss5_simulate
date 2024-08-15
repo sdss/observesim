@@ -49,9 +49,11 @@ def runSim(args):
             if mjd > sim.scheduler.mjds[45+check_offset] and check:
                 continue
             sim.observeMJD(mjd)
+
+    weathered = np.where(sim.obsHist["weather"])[0]
     print("skipped for physical obstructions", sim.hit_lims)
     print(f"REDO: apg {sim.redo_apg} r {sim.redo_r} b {sim.redo_b}")
-    print(f"Total obs: {len(sim.obsHist['lst'])}")
+    print(f"Total obs: {len(sim.obsHist['lst'])}, with {len(weathered)} lost to weather")
     endTime = time.time()
 
     # with open("{base}weather_tracking_{idx}.dat".format(base=base, idx=idx), "w") as df:

@@ -67,12 +67,13 @@ class Simulation(object):
     """
 
     def __init__(self, plan, observatory, idx=1, schedule="normal", redo_exp=True,
-                 oldWeather=False, with_hist=False, rsFinal=True):
+                 oldWeather=False, with_hist=False, rsFinal=True,
+                 hist_plan="eta-9"):
 
         out_path = os.getenv('RS_OUTDIR')
         cfg_file = os.path.join(out_path, "sim_cfg.yml")
         if os.path.isfile(cfg_file):
-            print(f"found priority file, applying: \n {cfg_file}")
+            print(f"found sim config file, applying: \n {cfg_file}")
             cfg = yaml.load(open(cfg_file), Loader=yaml.FullLoader)
         else:
             cfg_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + "/etc/nominal_cfg.yml"
@@ -149,8 +150,8 @@ class Simulation(object):
                                     elevation=elev*u.m, name=observatory, timezone=timezone)
         if with_hist:
             fields_sum, all_designs = fieldsFromDB(obs=observatory.upper(),
-                                                   plan=plan)
-            self.scheduler.initdb(designbase=plan, 
+                                                   plan=hist_plan)
+            self.scheduler.initdb(designbase=hist_plan, 
                                   fieldsArray=fields_sum,
                                   realDesigns=all_designs,
                                   fromFits=False)
@@ -160,11 +161,8 @@ class Simulation(object):
         self.field_dec = self.scheduler.fields.deccen
         self.field_pk = self.scheduler.fields.pk
 
-        cadencelist = self.scheduler.fields.cadencelist.cadences
-        cadences = self.scheduler.fields.cadence
-
         self.observe = observesim.observe.Observe(defaultExp=self.nom_duration,
-                                                  cadencelist=cadencelist, cadences=cadences)
+                                                  loc=observatory)
         # self.bossReadout = np.float32(70. / 60. / 60. / 24.)
 
         self.curr_mjd = np.float32(1e9)
@@ -187,7 +185,8 @@ class Simulation(object):
         self.redo_b = 0
 
         if with_hist:
-            field_mjds = doneForObs(obs=observatory.upper(), plan=plan)
+            field_mjds = doneForObs(obs=observatory.upper(),
+                                    plan=hist_plan)
 
             result = {"mjd":-99999,
                       "duration": 900,

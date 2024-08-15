@@ -173,7 +173,7 @@ class Observe(object):
     result() : return result of an observation
 
     """
-    def __init__(self, defaultExp=None, cadencelist=None, cadences=None):
+    def __init__(self, defaultExp=None, loc="apo"):
         """Return simulated result of an observation
 
         Parameters:
@@ -195,8 +195,7 @@ class Observe(object):
                               ('mjd', np.float64),
                               ('duration', np.float64)]
         self._result0 = np.zeros(1, dtype=self._result_dtype)
-        # self.cadencelist = cadencelist
-        # self.cadences = cadences
+
         if defaultExp is None:
             self.defaultExp = np.float32(15. / 60. / 24.)
         else:
@@ -211,7 +210,7 @@ class Observe(object):
         # self.rSN2 = SN2(fid_cdf=fid_data["r_fid"], fid_grid=fid_data["r_grid"])
         # self.bSN2 = SN2(fid_cdf=fid_data["b_fid"], fid_grid=fid_data["b_grid"])
 
-        model_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + "/etc/sn_models.yml"
+        model_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + f"/etc/sn_models_{loc.lower()}.yml"
         models = yaml.load(open(model_file))
 
         # self.SN2 = simple_SN2(b_fit_coef=models["b"],

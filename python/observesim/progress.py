@@ -9,7 +9,7 @@ database.set_profile('operations')
 from sdssdb.peewee.sdss5db import targetdb
 
 
-def fieldsFromDB(obs="APO", plan="eta-5"):
+def fieldsFromDB(obs="APO", plan="eta-9"):
     os.environ["OBSERVATORY"] = obs.upper()
     from sdssdb.peewee.sdss5db import opsdb
     opsdb.database.connect()

@@ -1,7 +1,18 @@
 import os
 import numpy as np
 import fitsio
+import matplotlib.pyplot as plt
 
+
+psuedo_cads = ["dark_10x4_4yr",
+               "dark_174x8",
+               "dark_100x8",
+               "dark_2x1",
+               "dark_2x2",
+               "dark_2x4",
+               "bright_x1",
+               "bright_x2",
+               "bright_x4"]
 
 def countCartons(v_base, plan, rs_base):
     obs_data_apo = fitsio.read(v_base + f"obsTargets-{plan}-apo-0.fits",
@@ -38,54 +49,128 @@ def countCartons(v_base, plan, rs_base):
 
     return carton_counts
 
+
+def matchCadence(cadence):
+    base = cadence.split("_v")[0]
+    for cad in psuedo_cads:
+        if base == cad:
+            return cad
+    if "x1" in base:
+        return "bright_x1"
+    elif "x2" in base:
+        return "bright_x2"
+    elif "x4" in base:
+        return "bright_x4"
+    else:
+        print(f"missing cadence! {base}")
+        return None
+
+
 def fieldCounts(v_base, plan, rs_base, loc="apo"):
     fields = fitsio.read(v_base + f"{plan}-{loc}-fields-0.fits")
 
-    tabulated = {
-        "dark_10x4_4yr_v1": [0, 0],
-        "dark_174x8_v1": [0, 0],
-        "dark_100x8_v1": [0, 0],
-        "dark_2x1_v1": [0, 0],
-        "dark_2x2_v1": [0, 0],
-        "dark_2x4_v1": [0, 0],
-        "bright_x1": [0, 0],
-        "bright_x2": [0, 0],
-        "bright_x4": [0, 0]
-    }
+    tabulated = {c : [0, 0] for c in psuedo_cads}
 
     for f in fields:
-        cad = f["cadence"]
-        if not cad in tabulated.keys():
-            if "x1" in cad:
-                cad = "bright_x1"
-            elif "x2" in cad:
-                cad = "bright_x2"
-            elif "x4" in cad:
-                cad = "bright_x4"
-            else:
-                raise Exception(f"missing cadence! {cad}")
+        cad = matchCadence(f["cadence"])
+
+        if cad is None:
+            continue
 
         tabulated[cad][0] += f["nobservations"]
     
     allocation = fitsio.read(rs_base + 
                  f"/{plan}/final/rsAllocationFinal-{plan}-{loc}.fits")
-     
-    for f in allocation:
-        cad = f["cadence"]
-        if not cad in tabulated.keys():
-            if "x1" in cad:
-                cad = "bright_x1"
-            elif "x2" in cad:
-                cad = "bright_x2"
-            elif "x4" in cad:
-                cad = "bright_x4"
-            else:
-                raise Exception(f"missing cadence!  {cad}")
+    
+    if "nfilled" in allocation.dtype.names:
+        nfilled = allocation["nfilled"]
+    elif "nallocated_full" in allocation.dtype.names:
+        nfilled = allocation["nallocated_full"]
+    else:
+        print("WARN: strange rsAllocation format, estimating nfilled")
+        nfilled = np.sum(np.sum(fits_dat["slots_exposures"], axis=1),
+                         axis=1, dtype=int)
 
+    for i, f in enumerate(allocation):
+        cad = matchCadence(f["cadence"])
+
+        if cad is None:
+            continue
            
-        tabulated[cad][1] += f["nfilled"]
+        tabulated[cad][1] += nfilled[i]
     
     return tabulated
+
+def cumulativeDesigns(v_base, plan, rs_base, loc="apo"):
+    time_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + f"/etc/time_avail_{loc}.csv"
+    time_array = np.genfromtxt(time_file, names=True, delimiter=",", dtype=None, encoding="UTF-8")
+    
+    dark_design = 23 / 60
+    bright_design = 21 / 60
+
+    bright_factor = 1.1
+    dark_factor = 1.1
+
+    if loc == "apo":
+        weather = 0.5
+    else:
+        weather = 0.7
+
+    max_bright = time_array["cum_bright"] / bright_design / bright_factor * weather
+    max_dark = time_array["cum_dark"] / dark_design / dark_factor * weather
+
+    # v_base + f"obsTargets-{plan}-apo-0.fits"
+    sim_data = fitsio.read(v_base + f"{plan}-{loc}-fields-0.fits")
+    sim_data.dtype
+
+    obs_data = fitsio.read(v_base + f"{plan}-{loc}-observations-0.fits")
+
+    dark = list()
+    bright = list()
+    for f in sim_data:
+        obs_idx = f["observations"][:int(f["nobservations"])]
+        mjds = [obs_data[i]["mjd"] for i in obs_idx]
+
+        cad = f["cadence"]
+        if "bright" in cad:
+            bright.extend(mjds)
+        else:
+            dark.extend(mjds)
+
+    mjd_start = np.min(bright + dark)
+    mjd_end = np.max(bright + dark) + 2
+
+    mjds = np.arange(mjd_start, mjd_end, 1)
+
+    bright = np.array(bright)
+    dark = np.array(dark)
+
+    cum_bright = list()
+    cum_dark = list()
+    for m in mjds:
+        w_bright = np.where(bright < m)
+        cum_bright.append(len(w_bright[0]))
+        w_dark = np.where(dark < m)
+        cum_dark.append(len(w_dark[0]))
+    
+    cum_bright = np.array(cum_bright)
+    cum_dark = np.array(cum_dark)
+
+    plt.figure(figsize=(8,6))
+    plt.plot(time_array["mjd"], max_bright, c="r", linestyle="--", label="theoretical bright")
+    plt.plot(time_array["mjd"], max_dark, c="b", linestyle="--", label="theoretical dark")
+    plt.plot(time_array["mjd"], max_dark+max_bright, c="k", linestyle="--", label="theoretical total")
+
+    plt.plot(mjds, cum_bright, c="r", linestyle="-", label="sim bright")
+    plt.plot(mjds, cum_dark, c="b", linestyle="-", label="sim dark")
+    plt.plot(mjds, cum_bright+cum_dark, c="k", linestyle="-", label="sim total")
+
+    plt.xlabel("MJD")
+    plt.ylabel("N Designs")
+    plt.title(f"{loc}")
+    plt.legend(loc="best")
+    plt.savefig(f"{v_base}/{plan}-{loc}-sim-v-theory.png")
+    plt.savefig(f"{v_base}/{plan}-{loc}-sim-v-theory.pdf")
 
 def quickSummary(base, plan, rs_base, version=None):
     if version is not None:
@@ -99,7 +184,9 @@ def quickSummary(base, plan, rs_base, version=None):
         table, th, tr, td {{border: 2px solid black}}
     </style>
     </head><body>
+    """
 
+    not_used_currently = """
     <table><tbody>
 
     <tr> <th>carton</th> <th>RS planned APO targs</th> <th>Done APO targs</th>
@@ -109,9 +196,9 @@ def quickSummary(base, plan, rs_base, version=None):
     carton_table_row = """<tr><td>{carton}</td> <td>{rs_apo}</td> <td>{done_apo}</td>
     <td>{rs_lco}</td> <td>{done_lco}</td> </tr>"""
 
-    next_tab = """</tbody></table>
+    # next_tab = "</tbody></table>"
 
-    <table><tbody>
+    next_tab = """<table><tbody>
 
     <tr> <th>cadence</th> <th>RS planned APO field_exps</th> <th>Done APO field_exps</th>
     <th>RS planned LCO field_exps</th> <th>Done LCO fiefield_expslds</th></tr>
@@ -120,15 +207,20 @@ def quickSummary(base, plan, rs_base, version=None):
     field_table_row = """<tr><td>{cadence}</td> <td>{rs_apo}</td> <td>{done_apo}</td>
     <td>{rs_lco}</td> <td>{done_lco}</td> </tr>"""
 
-    tail = """</tbody></table>
+    tail = f"""</tbody></table>
+
+    <a href="{plan}-apo-sim-v-theory.pdf"><img src="{plan}-apo-sim-v-theory.png" width="600px/"> </a>
+    <a href="{plan}-lco-sim-v-theory.pdf"><img src="{plan}-lco-sim-v-theory.png" width="600px/"> </a>
     </body></html>"""
 
-    carton_counts = countCartons(v_base, plan, rs_base)
+    # carton_counts = countCartons(v_base, plan, rs_base)
     tabulated_apo = fieldCounts(v_base, plan, rs_base, loc="apo")
     tabulated_lco = fieldCounts(v_base, plan, rs_base, loc="lco")
+    cumulativeDesigns(v_base, plan, rs_base, loc="apo")
+    cumulativeDesigns(v_base, plan, rs_base, loc="lco")
 
-    for c in carton_counts:
-        header += carton_table_row.format(**c)
+    # for c in carton_counts:
+    #     header += carton_table_row.format(**c)
     
     header += next_tab
 

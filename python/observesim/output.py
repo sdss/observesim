@@ -82,7 +82,10 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 
     rep_base = "/uufs/chpc.utah.edu/common/home/sdss50/sdsswork/target/robostrategy_replacement/"
     rep_file = os.path.join(rep_base, plan, f"{plan}_field_replacement_log.fits")
-    rm_replacements = fitsio.read(rep_file)
+    if os.path.isfile(rep_file):
+        rm_replacements = fitsio.read(rep_file)
+    else:
+        rm_replacements = None
 
     # prep out struct
     all_targs = list()
@@ -110,7 +113,6 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 
         cad = f["cadence"]
         fieldid=f["fieldid"]
-
 
         w_alloc = np.where(np.logical_and(allocation["fieldid"] == fieldid,
                                           allocation["cadence"] == cad))
@@ -336,16 +338,16 @@ def writeWebPage(base, rs_base, plan, version=None):
 
     targ_sum_file = v_base + plan + "-target_summary.txt"
 
-    targ_sum = np.genfromtxt(targ_sum_file, names=True, delimiter=",",
-                             dtype=None, encoding=None)
+    # targ_sum = np.genfromtxt(targ_sum_file, names=True, delimiter=",",
+    #                          dtype=None, encoding=None)
 
-    for t in targ_sum:
-        html += targ_table_row.format(prog=t["carton"], req=t["required"],
-                                      total=t["total"], apo=t["apo"], lco=t["lco"],
-                                      assign=t["assigned"], assign_apo=t["assign_apo"],
-                                      assign_lco=t["assign_lco"], input=t["input"],
-                                      apo_flag=comp_to_css(t["assign_apo"], t["apo"]),
-                                      lco_flag=comp_to_css(t["assign_lco"], t["lco"]))
+    # for t in targ_sum:
+    #     html += targ_table_row.format(prog=t["carton"], req=t["required"],
+    #                                   total=t["total"], apo=t["apo"], lco=t["lco"],
+    #                                   assign=t["assigned"], assign_apo=t["assign_apo"],
+    #                                   assign_lco=t["assign_lco"], input=t["input"],
+    #                                   apo_flag=comp_to_css(t["assign_apo"], t["apo"]),
+    #                                   lco_flag=comp_to_css(t["assign_lco"], t["lco"]))
 
     agn_args = dict()
     agn_args["apo_plan"], agn_args["apo_obs"] = spiders_area_for_program(base, rs_base, plan,
