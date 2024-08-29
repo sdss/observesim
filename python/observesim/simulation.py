@@ -148,15 +148,15 @@ class Simulation(object):
         self.observatory = Observer(longitude=self.scheduler.longitude * u.deg,
                                     latitude=self.scheduler.latitude*u.deg,
                                     elevation=elev*u.m, name=observatory, timezone=timezone)
-        if with_hist:
-            fields_sum, all_designs = fieldsFromDB(obs=observatory.upper(),
-                                                   plan=hist_plan)
-            self.scheduler.initdb(designbase=hist_plan, 
-                                  fieldsArray=fields_sum,
-                                  realDesigns=all_designs,
-                                  fromFits=False)
-        else:
-            self.scheduler.initdb(designbase=plan, rsFinal=rsFinal)
+        # if with_hist:
+        #     fields_sum, all_designs = fieldsFromDB(obs=observatory.upper(),
+        #                                            plan=hist_plan)
+        #     self.scheduler.initdb(designbase=plan, 
+        #                           fieldsArray=fields_sum,
+        #                           realDesigns=all_designs,
+        #                           fromFits=True)
+        # else:
+        self.scheduler.initdb(designbase=plan, rsFinal=rsFinal, fromFits=True)
         self.field_ra = self.scheduler.fields.racen
         self.field_dec = self.scheduler.fields.deccen
         self.field_pk = self.scheduler.fields.pk
@@ -184,9 +184,18 @@ class Simulation(object):
         self.redo_r = 0
         self.redo_b = 0
 
+        rm_translate = {
+            112359: 104667,
+            112360: 104668,
+            112361: 104669,
+            112362: 112358
+        }
+
         if with_hist:
             field_mjds = doneForObs(obs=observatory.upper(),
                                     plan=hist_plan)
+
+            # cadence_array = np.array(self.scheduler.fields.cadence)
 
             result = {"mjd":-99999,
                       "duration": 900,
@@ -194,8 +203,29 @@ class Simulation(object):
                       "rSN2": -1.0,
                       "bSN2": -1.0}
             for f in field_mjds:
+                if f["field_id"] in rm_translate:
+                    fid = rm_translate[f["field_id"]]
+                else:
+                    fid = f["field_id"]
+                w_field = np.where(self.scheduler.fields.field_id == fid)
+                assert len(w_field[0]) > 0, f"field lost? {f['field_id']}"
+                if len(w_field[0]) == 1:
+                    use_pk = int(self.scheduler.fields.pk[w_field])
+                    # print(f["field_id"], self.scheduler.fields.field_id[w_field])
+                    # print(f["cadence"], cadence_array[w_field])
+                else:
+                    f_exp = f["field_exposure"]
+                    oed = self.scheduler.fields.original_exposures_done[w_field]
+                    w_pk = np.where([f_exp in e for e in oed])
+                    # print(oed)
+                    # print(w_pk, [f_exp in e for e in oed])
+                    # print(f["field_id"], self.scheduler.fields.field_id[w_field][w_pk])
+                    # print(f["cadence"], cadence_array[w_field][w_pk])
+                    if len(w_pk[0]) == 0:
+                        continue
+                    use_pk = int(self.scheduler.fields.pk[w_field][w_pk])
                 result["mjd"] = f["mjd"]
-                self.scheduler.update(field_pk=f["field_pk"], result=result,
+                self.scheduler.update(field_pk=use_pk, result=result,
                                       finish=True)
 
     def moveDuPontTelescope(self, mjd, fieldidx):

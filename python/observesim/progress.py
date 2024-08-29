@@ -85,7 +85,7 @@ def fieldsFromDB(obs="APO", plan="eta-9"):
     return fields_sum, all_designs
 
 
-def doneForObs(obs="APO", plan="zeta-3"):
+def doneForObs(obs="APO", plan="eta-9"):
     os.environ["OBSERVATORY"] = obs.upper()
     from sdssdb.peewee.sdss5db import opsdb
     opsdb.database.connect()
@@ -100,10 +100,10 @@ def doneForObs(obs="APO", plan="zeta-3"):
 
     complete = Status.get(label="done")
 
-    query = d2s.select(Field.pk.alias("field_pk"),
-                       Field.field_id,
+    query = d2s.select(Field.field_id,
                        Field.racen, Field.deccen,
-                       d2s.mjd, Cadence.label, d2s.design_id)\
+                       d2s.mjd, Cadence.label.alias("cadence"),
+                       d2s.design_id, d2f.field_exposure)\
                .join(d2f, on=(d2f.design_id == d2s.design_id))\
                .join(Field).join(Cadence)\
                .switch(d2s)\

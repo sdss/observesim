@@ -101,11 +101,11 @@ def CountFramesAllSky(base, plan, version=None):
     lco_observe_fields = fitsio.read(v_base + f"{plan}-lco-fields-0.fits")
 
     # store the ra & decs of the fields as sky coordinate objects
-    apo_ra = coord.Angle(apo_observe_fields['racen']*u.degree)
+    apo_ra = coord.Angle(-(apo_observe_fields['racen']+90)*u.degree)
     apo_both_ra = apo_ra.wrap_at(180*u.degree)
     apo_both_dec = coord.Angle(apo_observe_fields['deccen']*u.degree)
 
-    lco_ra = coord.Angle(lco_observe_fields['racen']*u.degree)
+    lco_ra = coord.Angle(-(lco_observe_fields['racen']+90)*u.degree)
     lco_both_ra = lco_ra.wrap_at(180*u.degree)
     lco_both_dec = coord.Angle(lco_observe_fields['deccen']*u.degree)
 
