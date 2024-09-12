@@ -195,7 +195,7 @@ class Simulation(object):
             field_mjds = doneForObs(obs=observatory.upper(),
                                     plan=hist_plan)
 
-            # cadence_array = np.array(self.scheduler.fields.cadence)
+            cadence_array = np.array(self.scheduler.fields.cadence)
 
             result = {"mjd":-99999,
                       "duration": 900,
@@ -203,6 +203,7 @@ class Simulation(object):
                       "rSN2": -1.0,
                       "bSN2": -1.0}
             for f in field_mjds:
+                # print(f)
                 if f["field_id"] in rm_translate:
                     fid = rm_translate[f["field_id"]]
                 else:
@@ -305,7 +306,7 @@ class Simulation(object):
         skybrightness = self.scheduler.skybrightness(mjd)
         return skybrightness > 0.35
 
-    def nextField(self):
+    def nextField(self, pks_tonight=[]):
         # dark time or brighttime? to guess at how long we need for obs
         if not self.bright():
             airmass_weight = 1.05
@@ -317,7 +318,7 @@ class Simulation(object):
             # self.curr_mjd = self.curr_mjd + self.nom_duration
             return -1, 1, True
         field_pk, nexposures = self.scheduler.nextfield(mjd=self.curr_mjd,
-                                                        maxExp=maxExp)
+                                                        maxExp=maxExp, ignore=pks_tonight)
         # assert fieldid is not None, f"can't schedule {self.curr_mjd}, {self.bright()}"
         if(field_pk is not None):
             fieldidx = np.where(self.field_pk == field_pk)[0]
@@ -346,6 +347,14 @@ class Simulation(object):
                     # self.curr_mjd = self.curr_mjd + self.nom_duration/20
                     return -1, 1./20, False
             field_pk = int(self.field_pk[fieldidx])
+
+            fieldidx = int(fieldidx)
+
+            c = self.scheduler.fields.cadence[fieldidx]
+            cadence = self.scheduler.cadencelist.cadences[c]
+            h = self.scheduler.fields.hist[fieldidx]
+            # print(field_pk, c, len(h), np.sum(cadence.nexp))
+            assert np.sum(cadence.nexp) > len(h)
 
             return field_pk, nexposures, False
         else:
@@ -509,6 +518,8 @@ class Simulation(object):
                                                               until=mjd_morning_twilight)
         # carries on until a change or it hits morning
 
+        pks_tonight = []
+
         while(self.curr_mjd < mjd_morning_twilight and
               self.curr_mjd < self.scheduler.end_mjd()):
 
@@ -546,7 +557,8 @@ class Simulation(object):
             if self.scheduler.skybrightness(self.curr_mjd) > this_moon:
                 this_moon = self.scheduler.skybrightness(self.curr_mjd)
 
-            field_pk, nexposures, noTime = self.nextField()
+            assert len(pks_tonight) < 50, "pks_tonight got too big, did it not reset?"
+            field_pk, nexposures, noTime = self.nextField(pks_tonight=pks_tonight)
             if field_pk == -1:
                 if noTime:
                     self.curr_mjd = self.curr_mjd + self.nom_duration
@@ -565,6 +577,7 @@ class Simulation(object):
                 print("nothing scheduled", self.curr_mjd, self.obsHist["mjd"][-1]-self.curr_mjd)
                 continue
             self.observeField(field_pk, nexposures, cloudy=cloudy)
+            pks_tonight.append(field_pk)
 
         # if mjd % 10 == 0:
         #     self.scheduler.priorityLogger.write(name=str(mjd) + "-" + self.observatory.name)

@@ -62,7 +62,7 @@ def matchCadence(cadence):
     elif "x4" in base:
         return "bright_x4"
     else:
-        print(f"missing cadence! {base}")
+        # print(f"missing cadence! {base}")
         return None
 
 
@@ -101,25 +101,30 @@ def fieldCounts(v_base, plan, rs_base, loc="apo"):
     
     return tabulated
 
-def cumulativeDesigns(v_base, plan, rs_base, loc="apo", idx=0):
+
+def cumulativeDesigns(v_base, plan, rs_base, loc="apo", idx=0, hist_mjd=None):
+
     time_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + f"/etc/time_avail_{loc}.csv"
     time_array = np.genfromtxt(time_file, names=True, delimiter=",", dtype=None, encoding="UTF-8")
-    
-    dark_design = 23 / 60
-    bright_design = 21 / 60
-
-    bright_factor = 1.1
-    dark_factor = 1.1
 
     if loc == "apo":
         weather = 0.5
+        dark_design = 23 / 60
+        bright_design = 18 / 60
+
+        bright_factor = 1.1
+        dark_factor = 1.2
     else:
         weather = 0.7
+        dark_design = 23 / 60
+        bright_design = 21 / 60
+
+        bright_factor = 1.1
+        dark_factor = 1.4
 
     max_bright = time_array["cum_bright"] / bright_design / bright_factor * weather
     max_dark = time_array["cum_dark"] / dark_design / dark_factor * weather
 
-    # v_base + f"obsTargets-{plan}-apo-0.fits"
     sim_data = fitsio.read(v_base + f"{plan}-{loc}-fields-{idx}.fits")
 
     obs_data = fitsio.read(v_base + f"{plan}-{loc}-observations-{idx}.fits")
@@ -144,14 +149,32 @@ def cumulativeDesigns(v_base, plan, rs_base, loc="apo", idx=0):
     bright = np.array(bright)
     dark = np.array(dark)
 
+    hist_offset_bright = 0
+    hist_offset_dark = 0
+
     cum_bright = list()
     cum_dark = list()
     for m in mjds:
         w_bright = np.where(bright < m)
-        cum_bright.append(len(w_bright[0]))
+        bright_now = len(w_bright[0])
+        cum_bright.append(bright_now)
         w_dark = np.where(dark < m)
-        cum_dark.append(len(w_dark[0]))
-    
+        dark_now = len(w_dark[0])
+        cum_dark.append(dark_now)
+        w_now = np.where(time_array["mjd"] == int(m))
+        if m <= hist_mjd and len(w_now[0]):
+            offset_bright_now = int(max_bright[w_now]) - bright_now
+            if offset_bright_now > hist_offset_bright:
+                hist_offset_bright = offset_bright_now
+            offset_dark_now = int(max_dark[w_now]) - dark_now
+            if offset_dark_now > hist_offset_dark:
+                hist_offset_dark = offset_dark_now
+            max_bright[w_now] = bright_now
+            max_dark[w_now] = dark_now
+        else:
+            max_bright[w_now] -= hist_offset_bright
+            max_dark[w_now] -= hist_offset_dark
+
     cum_bright = np.array(cum_bright)
     cum_dark = np.array(cum_dark)
 
@@ -170,6 +193,7 @@ def cumulativeDesigns(v_base, plan, rs_base, loc="apo", idx=0):
     plt.legend(loc="best")
     plt.savefig(f"{v_base}/{plan}-{loc}-sim-v-theory-{idx}.png")
     plt.savefig(f"{v_base}/{plan}-{loc}-sim-v-theory-{idx}.pdf")
+    plt.close()
 
 
 def lstSummary(v_base, plan, rs_base, loc="apo", idx=0):
@@ -217,6 +241,7 @@ def lstSummary(v_base, plan, rs_base, loc="apo", idx=0):
     bins = np.arange(0, 25, 1)
     dark = unused[np.where(unused["bright"] <= 0.35)]
     bright = unused[np.where(unused["bright"] > 0.35)]
+    plt.figure()
     plt.hist(dark["lst"] / 15, bins=bins, label="unused dark time", alpha=0.6)
     plt.hist(bright["lst"] / 15, bins=bins, label="unused bright time", alpha=0.6)
 
@@ -227,13 +252,14 @@ def lstSummary(v_base, plan, rs_base, loc="apo", idx=0):
     plt.savefig(f"{v_base}/{plan}-{loc}-sim_vs_rs_lst-{idx}.png")
 
 
-def quickSummary(base, plan, rs_base, version=None, idx=0):
+def quickSummary(base, plan, rs_base, version=None, idx=0, hist_mjd=None):
     if version is not None:
         v_base = os.path.join(base, version)
         v_base += "/"
     else:
         v_base = os.path.join(base, plan)
         v_base += "/"
+    print(f"!! {version}, {v_base}")
     header = """<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
     <style>
         table, th, tr, td {{border: 2px solid black}}
@@ -271,8 +297,8 @@ def quickSummary(base, plan, rs_base, version=None, idx=0):
     # carton_counts = countCartons(v_base, plan, rs_base)
     tabulated_apo = fieldCounts(v_base, plan, rs_base, loc="apo")
     tabulated_lco = fieldCounts(v_base, plan, rs_base, loc="lco")
-    cumulativeDesigns(v_base, plan, rs_base, loc="apo", idx=idx)
-    cumulativeDesigns(v_base, plan, rs_base, loc="lco", idx=idx)
+    cumulativeDesigns(v_base, plan, rs_base, loc="apo", idx=idx, hist_mjd=hist_mjd)
+    cumulativeDesigns(v_base, plan, rs_base, loc="lco", idx=idx, hist_mjd=hist_mjd)
     lstSummary(v_base, plan, rs_base, loc="apo", idx=idx)
     lstSummary(v_base, plan, rs_base, loc="lco", idx=idx)
 
@@ -306,6 +332,7 @@ def quickSummary(base, plan, rs_base, version=None, idx=0):
     with open(f"{v_base}/obsSimStats-{plan}-{idx}.html", "w") as webPage:
         print(header + tail, file=webPage)
 
-def multiQuickSummary(base, plan, rs_base, version=None):
+
+def multiQuickSummary(base, plan, rs_base, version=None, hist_mjd=None):
     for i in range(4):
-        quickSummary(base, plan, rs_base, version=None, idx=i)
+        quickSummary(base, plan, rs_base, version=version, idx=i, hist_mjd=hist_mjd)
