@@ -14,10 +14,10 @@ psuedo_cads = ["dark_10x4_4yr",
                "bright_x2",
                "bright_x4"]
 
-def countCartons(v_base, plan, rs_base):
-    obs_data_apo = fitsio.read(v_base + f"obsTargets-{plan}-apo-0.fits",
+def countCartons(v_base, plan, rs_base, idx=0):
+    obs_data_apo = fitsio.read(v_base + f"obsTargets-{plan}-apo-{idx}.fits",
                            columns=["carton"])
-    obs_data_lco = fitsio.read(v_base + f"obsTargets-{plan}-lco-0.fits",
+    obs_data_lco = fitsio.read(v_base + f"obsTargets-{plan}-lco-{idx}.fits",
                            columns=["carton"])
     comp_data = fitsio.read(rs_base + 
                             f"/{plan}/final/rsCompletenessFinal-{plan}-both.fits",
@@ -101,7 +101,7 @@ def fieldCounts(v_base, plan, rs_base, loc="apo"):
     
     return tabulated
 
-def cumulativeDesigns(v_base, plan, rs_base, loc="apo"):
+def cumulativeDesigns(v_base, plan, rs_base, loc="apo", idx=0):
     time_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + f"/etc/time_avail_{loc}.csv"
     time_array = np.genfromtxt(time_file, names=True, delimiter=",", dtype=None, encoding="UTF-8")
     
@@ -120,10 +120,9 @@ def cumulativeDesigns(v_base, plan, rs_base, loc="apo"):
     max_dark = time_array["cum_dark"] / dark_design / dark_factor * weather
 
     # v_base + f"obsTargets-{plan}-apo-0.fits"
-    sim_data = fitsio.read(v_base + f"{plan}-{loc}-fields-0.fits")
-    sim_data.dtype
+    sim_data = fitsio.read(v_base + f"{plan}-{loc}-fields-{idx}.fits")
 
-    obs_data = fitsio.read(v_base + f"{plan}-{loc}-observations-0.fits")
+    obs_data = fitsio.read(v_base + f"{plan}-{loc}-observations-{idx}.fits")
 
     dark = list()
     bright = list()
@@ -169,10 +168,66 @@ def cumulativeDesigns(v_base, plan, rs_base, loc="apo"):
     plt.ylabel("N Designs")
     plt.title(f"{loc}")
     plt.legend(loc="best")
-    plt.savefig(f"{v_base}/{plan}-{loc}-sim-v-theory.png")
-    plt.savefig(f"{v_base}/{plan}-{loc}-sim-v-theory.pdf")
+    plt.savefig(f"{v_base}/{plan}-{loc}-sim-v-theory-{idx}.png")
+    plt.savefig(f"{v_base}/{plan}-{loc}-sim-v-theory-{idx}.pdf")
 
-def quickSummary(base, plan, rs_base, version=None):
+
+def lstSummary(v_base, plan, rs_base, loc="apo", idx=0):
+    fields = fitsio.read(v_base + f"{plan}-{loc}-fields-{idx}.fits")
+
+    obs = fitsio.read(v_base + f"{plan}-{loc}-observations-{idx}.fits")
+    lst = fitsio.read(v_base + f"{plan}-{loc}-lst-{idx}.fits")
+    alloc = fitsio.read(rs_base + f"/{plan}/final/rsAllocationFinal-{plan}-{loc}.fits")
+
+    bins = np.arange(0, 25, 1)
+
+    missed_bright = []
+    missed_dark = []
+
+    sum_missed = 0
+
+    for f in fields:
+        rs = alloc[f["pk"]]
+        if rs["nallocated"] <= int(f["nobservations"]) or rs["nallocated"] < 1:
+            continue
+        sum_missed += (rs["nallocated"] - int(f["nobservations"]))
+        assert rs['racen']-f['racen'] < 0.01 and rs['deccen']-f['deccen'] < 0.01
+
+        obs_idx = f["observations"][:int(f["nobservations"])]
+        dark_lsts = [obs[i]["lst"] / 15 for i in obs_idx if obs[i]["skybrightness"] <= 0.35]
+        bright_lsts = [obs[i]["lst"] / 15 for i in obs_idx if obs[i]["skybrightness"] > 0.35]
+        dark_hist, bin_edges = np.histogram(dark_lsts, bins=bins)
+        bright_hist, bin_edges = np.histogram(bright_lsts, bins=bins)
+        dark_slots = rs["slots_exposures"][:,0]
+        bright_slots = rs["slots_exposures"][:,1]
+
+        dark_diff = dark_slots - dark_hist
+        w_missed = np.where(dark_diff > 0)[0]
+        for w, l in zip(w_missed, dark_diff[w_missed]):
+            missed_dark.extend([w for i in range(int(l))])
+
+        bright_diff = bright_slots - bright_hist
+        w_missed = np.where(bright_diff > 0)[0]
+        for w, l in zip(w_missed, bright_diff[w_missed]):
+            missed_bright.extend([w for i in range(int(l))])
+
+    print(f"TOTAL MISSED DESIGNS {loc}", sum_missed)
+
+    unused = lst[np.where(np.logical_and(lst["field_pk"] < 0, ~lst["weather"]))]
+    bins = np.arange(0, 25, 1)
+    dark = unused[np.where(unused["bright"] <= 0.35)]
+    bright = unused[np.where(unused["bright"] > 0.35)]
+    plt.hist(dark["lst"] / 15, bins=bins, label="unused dark time", alpha=0.6)
+    plt.hist(bright["lst"] / 15, bins=bins, label="unused bright time", alpha=0.6)
+
+    plt.hist(missed_dark, bins=bins, label="RS missed dark", alpha=0.6)
+    plt.hist(missed_bright, bins=bins, label="RS missed bright", alpha=0.6)
+    plt.legend(loc="best")
+    plt.title("Sim VS RS LST")
+    plt.savefig(f"{v_base}/{plan}-{loc}-sim_vs_rs_lst-{idx}.png")
+
+
+def quickSummary(base, plan, rs_base, version=None, idx=0):
     if version is not None:
         v_base = os.path.join(base, version)
         v_base += "/"
@@ -209,15 +264,17 @@ def quickSummary(base, plan, rs_base, version=None):
 
     tail = f"""</tbody></table>
 
-    <a href="{plan}-apo-sim-v-theory.pdf"><img src="{plan}-apo-sim-v-theory.png" width="600px/"> </a>
-    <a href="{plan}-lco-sim-v-theory.pdf"><img src="{plan}-lco-sim-v-theory.png" width="600px/"> </a>
+    <a href="{plan}-apo-sim-v-theory.pdf"><img src="{plan}-apo-sim-v-theory-{idx}.png" width="600px/"> </a>
+    <a href="{plan}-lco-sim-v-theory.pdf"><img src="{plan}-lco-sim-v-theory-{idx}.png" width="600px/"> </a>
     </body></html>"""
 
     # carton_counts = countCartons(v_base, plan, rs_base)
     tabulated_apo = fieldCounts(v_base, plan, rs_base, loc="apo")
     tabulated_lco = fieldCounts(v_base, plan, rs_base, loc="lco")
-    cumulativeDesigns(v_base, plan, rs_base, loc="apo")
-    cumulativeDesigns(v_base, plan, rs_base, loc="lco")
+    cumulativeDesigns(v_base, plan, rs_base, loc="apo", idx=idx)
+    cumulativeDesigns(v_base, plan, rs_base, loc="lco", idx=idx)
+    lstSummary(v_base, plan, rs_base, loc="apo", idx=idx)
+    lstSummary(v_base, plan, rs_base, loc="lco", idx=idx)
 
     # for c in carton_counts:
     #     header += carton_table_row.format(**c)
@@ -246,5 +303,9 @@ def quickSummary(base, plan, rs_base, version=None):
         }
         header += field_table_row.format(**row_dict)
     
-    with open(f"{v_base}/obsSimStats-{plan}.html", "w") as webPage:
+    with open(f"{v_base}/obsSimStats-{plan}-{idx}.html", "w") as webPage:
         print(header + tail, file=webPage)
+
+def multiQuickSummary(base, plan, rs_base, version=None):
+    for i in range(4):
+        quickSummary(base, plan, rs_base, version=None, idx=i)
