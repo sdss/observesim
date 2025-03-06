@@ -62,13 +62,26 @@ def raTime(degrees):
         return (degrees - 37.2)/0.49 + 65.6
 
 
+def summmerOrWinter(startTime):
+    """Check whether we're between equinoxes, "winter"
+       Expects datetime object to check
+    """
+    winter = startTime.month < 3
+    if not winter and startTime.month == 3:
+        winter = startTime.day <= 20
+    fall = startTime.month >= 10
+    if not fall and startTime.month == 9:
+        fall = startTime.day >= 22
+    return winter or fall
+
+
 class Simulation(object):
     """A class to encapsulate an SDSS-5 simulation
     """
 
     def __init__(self, plan, observatory, idx=1, schedule="normal", redo_exp=True,
                  oldWeather=False, with_hist=False, rsFinal=True,
-                 hist_plan="eta-9"):
+                 hist_plan="theta-3"):
 
         out_path = os.getenv('RS_OUTDIR')
         cfg_file = os.path.join(out_path, "sim_cfg.yml")
@@ -88,6 +101,7 @@ class Simulation(object):
             self.obsCheck = apoCheck
             self.moveTelescope = self.moveSloanTelescope
             self.nom_duration = np.float32(cfg["nom_duration_apo"] / 60. / 24.)
+            self.dark_xtra = np.float32(cfg["dark_offset_apo"] / 60. / 24.)
             # self.cals = np.float32(3. / 60. / 24.)
             self.field_overhead = np.float32(cfg["field_overhead_apo"] / 60. / 24.)
             self.design_overhead = np.float32(cfg["design_overhead_apo"] / 60. / 24.)
@@ -99,11 +113,13 @@ class Simulation(object):
             self.obsCheck = lcoCheck
             self.moveTelescope = self.moveDuPontTelescope
             self.nom_duration = np.float32(cfg["nom_duration_lco"] / 60. / 24.)
+            self.dark_xtra = np.float32(cfg["dark_offset_lco"] / 60. / 24.)
             # self.cals = np.float32(3. / 60. / 24.)
             # extra 90s or so for cals at LCO?
             self.field_overhead = np.float32(cfg["field_overhead_lco"] / 60. / 24.)
             self.design_overhead = np.float32(cfg["design_overhead_lco"] / 60. / 24.)
 
+        self.skipable = False
         self.redo_exp = redo_exp
         self.snr_b = cfg["snr_b"]
         self.snr_r = cfg["snr_r"]
@@ -114,7 +130,9 @@ class Simulation(object):
                         "bright": list(),
                         "field_pk": list(),
                         "weather": list(),
-                        "mjd": list()}
+                        "mjd": list(),
+                        "duration": list(),
+                        "mode": list()}
 
         out_path = os.getenv('RS_OUTDIR')
         priority_file = os.path.join(out_path, "priority.yml")
@@ -124,26 +142,11 @@ class Simulation(object):
         else:
             priorities = dict()
 
+        print(f"Schedule!! {schedule}")
+
         self.scheduler = roboscheduler.scheduler.Scheduler(observatory=observatory,
                                                            schedule=schedule,
                                                            priorities=priorities)
-
-        if observatory == "lco" and not oldWeather:
-            base = os.getenv("OBSERVESIM_OUTPUT_BASE")
-            modelsDir = os.path.join(base, "weather_models")
-            fname = os.path.join(modelsDir, f"saved_model_{observatory}_{idx}.csv")
-            self.weather = observesim.weather.Weather3(mjd_start=self.scheduler.start,
-                                                       mjd_end=self.scheduler.end,
-                                                       model_fname=fname)
-        elif not oldWeather:
-            self.weather = observesim.weather.Weather2(mjd_start=self.scheduler.start,
-                                                       mjd_end=self.scheduler.end,
-                                                       seed=idx, loc=observatory)
-
-        else:
-            self.weather = observesim.weather.Weather(mjd_start=self.scheduler.start,
-                                                      mjd_end=self.scheduler.end,
-                                                      seed=idx, fclear=fclear)
 
         self.observatory = Observer(longitude=self.scheduler.longitude * u.deg,
                                     latitude=self.scheduler.latitude*u.deg,
@@ -183,6 +186,7 @@ class Simulation(object):
         self.redo_apg = 0
         self.redo_r = 0
         self.redo_b = 0
+        self.finished_early = 0
 
         rm_translate = {
             112359: 104667,
@@ -209,7 +213,9 @@ class Simulation(object):
                 else:
                     fid = f["field_id"]
                 w_field = np.where(self.scheduler.fields.field_id == fid)
-                assert len(w_field[0]) > 0, f"field lost? {f['field_id']}"
+                # assert len(w_field[0]) > 0, f"field lost? {f['field_id']}"
+                if len(w_field[0]) == 0:
+                    continue
                 if len(w_field[0]) == 1:
                     use_pk = int(self.scheduler.fields.pk[w_field])
                     # print(f["field_id"], self.scheduler.fields.field_id[w_field])
@@ -228,6 +234,44 @@ class Simulation(object):
                 result["mjd"] = f["mjd"]
                 self.scheduler.update(field_pk=use_pk, result=result,
                                       finish=True)
+
+        weather_start = np.max(self.scheduler.observations.mjd) - 1
+
+        if observatory == "lco" and not oldWeather:
+            base = os.getenv("OBSERVESIM_OUTPUT_BASE")
+            modelsDir = os.path.join(base, "weather_models")
+            fname = os.path.join(modelsDir, f"saved_model_{observatory}_{idx}.csv")
+            self.weather = observesim.weather.Weather3(mjd_start=weather_start,
+                                                       mjd_end=self.scheduler.end,
+                                                       model_fname=fname)
+        elif not oldWeather:
+            self.weather = observesim.weather.Weather2(mjd_start=weather_start,
+                                                       mjd_end=self.scheduler.end,
+                                                       seed=idx, loc=observatory)
+
+        else:
+            self.weather = observesim.weather.Weather(mjd_start=weather_start,
+                                                      mjd_end=self.scheduler.end,
+                                                      seed=idx, fclear=fclear)
+
+    def whichTwilight(self, mjd):
+        startTime = Time(mjd, format="mjd").datetime
+        north_winter = summmerOrWinter(startTime)
+
+        if north_winter and self.observatory.name.lower() == "apo":
+            long_night = True
+        elif not north_winter and self.observatory.name.lower() == "lco":
+            long_night = True
+        else:
+            long_night = False
+        
+        if long_night:
+            mjd_evening_twilight = self.scheduler.evening_twilight(mjd, twilight=-12)
+            mjd_morning_twilight = self.scheduler.morning_twilight(mjd, twilight=-12)
+        else:
+            mjd_evening_twilight = self.scheduler.evening_twilight(mjd, twilight=-8)
+            mjd_morning_twilight = self.scheduler.morning_twilight(mjd, twilight=-8)
+        return mjd_evening_twilight, mjd_morning_twilight
 
     def moveDuPontTelescope(self, mjd, fieldidx):
         next_ra, next_dec = self.field_ra[fieldidx], self.field_dec[fieldidx]
@@ -378,13 +422,18 @@ class Simulation(object):
         result = self.observe.result(mjd=self.curr_mjd, field_pk=self.field_pk[fieldidx],
                                      airmass=airmass, cloudy=cloudy,
                                      epochidx=self.scheduler.fields.icadence[fieldidx])
-        duration = result["duration"]
+        duration = result["duration"] + self.design_overhead
+        cad = self.scheduler.fields.cadence[fieldidx]
+        mode = "bright"
+        if "dark" in cad:
+            mode = "dark"
+            duration += self.dark_xtra + self.field_overhead
         if duration < 0 or np.isnan(duration):
             print("HOOOWWWOWOWOWOWW")
             print(i, alt, az, self.curr_mjd, field_pk)
 
         # self.curr_mjd = self.curr_mjd + duration + self.bossReadout
-        self.curr_mjd = self.curr_mjd + duration + self.design_overhead
+        self.curr_mjd = self.curr_mjd + duration
         # print(f"{float(duration):0.4f}, {float(self.design_overhead):0.6f}, {float(self.curr_mjd):0.7f}")
 
         # move telescope for tracking
@@ -396,6 +445,8 @@ class Simulation(object):
         self.obsHist["field_pk"].append(self.field_pk[fieldidx])
         self.obsHist["weather"].append(False)
         self.obsHist["mjd"].append(float(self.curr_mjd))
+        self.obsHist["duration"].append(duration)
+        self.obsHist["mode"].append(mode)
 
         return result
 
@@ -440,8 +491,11 @@ class Simulation(object):
 
             res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
 
+            redo_rng = np.random.random()
+
             if self.bright():
-                if res["apgSN2"] < self.snr_ap and self.redo_exp:
+                redo = redo_rng < 0.1
+                if redo and self.redo_exp:
                     field_exp_count += 1
                     self.redo_apg += 1
                     self.scheduler.update(field_pk=field_pk, result=res,
@@ -453,7 +507,15 @@ class Simulation(object):
                     self.scheduler.update(field_pk=field_pk, result=res,
                                           finish=True)
             else:
-                if (res["rSN2"] < self.snr_r or res["bSN2"] < self.snr_b) and self.redo_exp:
+                redo = redo_rng < 0.1
+                skipable = (nexposures < 8 and i > 2) or (nexposures == 8 and i > 6)
+                skip = redo_rng > 0.8 and skipable and self.skipable
+                if skip:
+                    self.scheduler.update(field_pk=field_pk, result=res,
+                                          finish=True)
+                    self.finished_early += 1
+                    break
+                elif redo and self.redo_exp:
                     field_exp_count += 1
                     if res["rSN2"] < self.snr_r:
                         self.redo_r += 1
@@ -467,36 +529,9 @@ class Simulation(object):
                 else:
                     self.scheduler.update(field_pk=field_pk, result=res,
                                           finish=True)
-        # if self.bright():
-        #     ap_tot = np.sum(self.scheduler.observations.apgSN2[-1*field_exp_count:])
-        #     # print(f"{nexposures} {field_exp_count} {len(self.scheduler.observations.apgSN2[-1*field_exp_count:])}")
-        #     # print(f"AP SN {ap_tot:7.1f} VS {300 * nexposures}")
-        #     if ap_tot < 2025 * nexposures and self.redo_exp:
-        #         self.redo_apg += 1
-        #         self.scheduler.update(field_pk=field_pk, result=res,
-        #                               finish=False)
-        #         res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
-        #         self.scheduler.update(field_pk=field_pk, result=res,
-        #                               finish=False)
-        # else:
-        #     r_tot = np.sum(self.scheduler.observations.rSN2[-1*field_exp_count:])
-        #     b_tot = np.sum(self.scheduler.observations.bSN2[-1*field_exp_count:])
-        #     # print(f"{nexposures} {field_exp_count} {len(self.scheduler.observations.bSN2[-1*field_exp_count:])}")
-        #     # print(f"B  SN {b_tot:7.1f} VS {2.5 * nexposures} \nR  SN {r_tot:7.1f} VS {5 * nexposures}")
-        #     if (b_tot < 2 * nexposures or r_tot < 4 * nexposures) and self.redo_exp:
-        #         if r_tot < 4 * nexposures:
-        #             self.redo_r += 1
-        #         else:
-        #             self.redo_b += 1
-        #         self.scheduler.update(field_pk=field_pk, result=res,
-        #                               finish=False)
-        #         res = self.bookKeeping(fieldidx, i=i, cloudy=cloudy)
-        #         self.scheduler.update(field_pk=field_pk, result=res,
-        #                               finish=False)
 
     def observeMJD(self, mjd):
-        mjd_evening_twilight = self.scheduler.evening_twilight(mjd)
-        mjd_morning_twilight = self.scheduler.morning_twilight(mjd)
+        mjd_evening_twilight, mjd_morning_twilight = self.whichTwilight(mjd)
         self.curr_mjd = mjd_evening_twilight
         # int_mjd = int(self.curr_mjd)
 
@@ -507,8 +542,6 @@ class Simulation(object):
 
         if mjd % 100 == 0:
             print("!!!!", mjd, self.scheduler.surveyComplete, " done")
-
-        # guesses = np.arange(0, 1, 0.05)
 
         self.nextchange = mjd_morning_twilight
 
@@ -535,16 +568,19 @@ class Simulation(object):
                 # count = 0
                 # dur = float(nextchange - self.curr_mjd)
                 while self.curr_mjd < nextchange:
-                    if nextchange - self.curr_mjd < self.nom_duration:
-                        self.curr_mjd = nextchange
-                        continue
+                    # if nextchange - self.curr_mjd < self.nom_duration:
+                    #     self.curr_mjd = nextchange
+                    #     continue
+                    duration = self.nom_duration + self.design_overhead + self.field_overhead
                     self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
                     self.obsHist["ra"].append(-1)
                     self.obsHist["bright"].append(float(self.scheduler.skybrightness(self.curr_mjd)))
                     self.obsHist["field_pk"].append(-1)
                     self.obsHist["weather"].append(True)
                     self.obsHist["mjd"].append(float(self.curr_mjd))
-                    self.curr_mjd += self.nom_duration
+                    self.obsHist["duration"].append(duration)
+                    self.obsHist["mode"].append("weather")
+                    self.curr_mjd += duration
                     # count += 1
                 # print("WEATHER ", self.curr_mjd, f"night {night_len*24:.1f}, weather {dur*24:.1f}", count)
             elif (onoff != 'on'):
@@ -560,21 +596,24 @@ class Simulation(object):
             assert len(pks_tonight) < 50, "pks_tonight got too big, did it not reset?"
             field_pk, nexposures, noTime = self.nextField(pks_tonight=pks_tonight)
             if field_pk == -1:
-                if noTime:
-                    self.curr_mjd = self.curr_mjd + self.nom_duration
-                    continue
+                # if noTime:
+                #     self.curr_mjd = self.curr_mjd + self.nom_duration
+                #     continue
                 if this_moon < 0.98:
                     print("skipped ", self.curr_mjd, self.scheduler.skybrightness(self.curr_mjd), this_moon)
                     # raise Exception()
                 # print("skipped ", self.curr_mjd)
+                duration = self.nom_duration + self.design_overhead
                 self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
                 self.obsHist["ra"].append(np.nan)
                 self.obsHist["bright"].append(float(this_moon))
                 self.obsHist["field_pk"].append(-1)
                 self.obsHist["weather"].append(False)
                 self.obsHist["mjd"].append(float(self.curr_mjd))
-                self.curr_mjd = self.curr_mjd + self.nom_duration
-                print("nothing scheduled", self.curr_mjd, self.obsHist["mjd"][-1]-self.curr_mjd)
+                self.obsHist["duration"].append(duration)
+                self.obsHist["mode"].append("idle")
+                self.curr_mjd += duration
+                assert np.abs(self.curr_mjd - self.obsHist["mjd"][-1])*24*60 > 14.9, f"{self.curr_mjd} insufficient skip {this_moon}"
                 continue
             self.observeField(field_pk, nexposures, cloudy=cloudy)
             pks_tonight.append(field_pk)
@@ -589,7 +628,9 @@ class Simulation(object):
                  ('bright', np.float32),
                  ('field_pk', np.int32),
                  ('weather', np.bool_),
-                 ('mjd', np.float64)]
+                 ('mjd', np.float64),
+                 ('duration', np.float64),
+                 ('mode', np.dtype('a8'))]
         lstOut = np.zeros(len(self.obsHist["lst"]), dtype=dtype)
         lstOut["lst"] = np.array(self.obsHist["lst"])
         lstOut["ra"] = np.array(self.obsHist["ra"])
@@ -597,6 +638,8 @@ class Simulation(object):
         lstOut["field_pk"] = np.array(self.obsHist["field_pk"])
         lstOut["weather"] = np.array(self.obsHist["weather"])
         lstOut["mjd"] = np.array(self.obsHist["mjd"])
+        lstOut["duration"] = np.array(self.obsHist["duration"])
+        lstOut["mode"] = np.array(self.obsHist["mode"])
         return(lstOut)
 
     def slewsToArray(self):

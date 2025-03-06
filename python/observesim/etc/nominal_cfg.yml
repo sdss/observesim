@@ -1,10 +1,12 @@
-nom_duration_apo: 15.0
-field_overhead_apo: 7.0
-design_overhead_apo: 5.5
+nom_duration_apo: 12.0
+dark_offset_apo: 3.0
+field_overhead_apo: 2.0
+design_overhead_apo: 5.0
 
 nom_duration_lco: 15.0
-field_overhead_lco: 8.5
-design_overhead_lco: 5.5
+dark_offset_lco: 2.5
+field_overhead_lco: 3.0
+design_overhead_lco: 4.0
 
 snr_b: 1.0
 snr_r: 2.0

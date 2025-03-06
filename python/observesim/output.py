@@ -35,6 +35,7 @@ def read_field(fname, alloc, exp_to_mjd):
     ras = list()
     decs = list()
     mjds = list()
+    lambda_eff = list()
 
 
     for m, i in zip(exp_to_mjd, range(int(alloc["iexpst"]), int(alloc["iexpnd"])+1)):
@@ -59,9 +60,10 @@ def read_field(fname, alloc, exp_to_mjd):
         ras.extend(list(w_names["ra"][w_assigned]))
         decs.extend(list(w_names["dec"][w_assigned]))
         mjds.extend([m for i in w_assigned[0]])
+        lambda_eff.extend(list(w_names["lambda_eff"][w_assigned]))
 
     return (catalog_ids, cadences, cartons, programs, target_pks,
-            carton_pks, c2t_pks, categories, ras, decs, mjds)
+            carton_pks, c2t_pks, categories, ras, decs, mjds, lambda_eff)
 
 
 def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True):
@@ -101,10 +103,16 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     all_categories = list()
     all_ras = list()
     all_decs = list()
+    all_lambda_eff = list()
 
     # start_time = time.time()
 
     fields_to_alloc_map = list()
+
+    fields_skipped = list()
+    exps_skipped = list()
+    cadences_skipped = list()
+    n_planned = list()
 
     print("matching fields for {} {}".format(plan, loc))
     for f in sim_data:
@@ -121,6 +129,12 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
 
         if len(w_alloc[0]) == 0:
             alt_field_row = rm_replacements[np.where(rm_replacements["field_id_new"] == fieldid)]
+            if len(alt_field_row["field_id_old"]) != 1:
+                n_planned.append(-999)
+                fields_skipped.append(fieldid)
+                exps_skipped.append(len(mjds))
+                cadences_skipped.append(cad)
+                continue
             fieldid = int(alt_field_row["field_id_old"])
             w_alloc = np.where(np.logical_and(allocation["fieldid"] == fieldid,
                                               allocation["cadence"] == cad))
@@ -131,16 +145,29 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
         
         alloc = allocation[w_alloc]
 
+        # if len(alloc["nallocated"]) != 1:
+        #     n_planned.append(0)
+        # else:
+        n_planned.append(int(alloc["nallocated"]))
+
         fields_to_alloc_map.append(w_alloc)
-        
+
         if len(mjds) == 0:
             continue
 
         fname = "{plan}/final/rsFieldAssignmentsFinal-{plan}-{loc}-{fieldid}.fits"
         fname = rs_base + fname.format(plan=plan, loc=loc, fieldid=fieldid)
 
+        if not os.path.isfile(fname):
+            print(f"missing {fname}, simulated mjds {mjds}")
+            fields_skipped.append(fieldid)
+            exps_skipped.append(len(mjds))
+            cadences_skipped.append(cad)
+            continue
+
         cat_ids, cadences, cartons, programs, target_pks, carton_pks, c2t_pks,\
-            categories, ras, decs, targ_mjds = read_field(fname, alloc, mjds)
+            categories, ras, decs, targ_mjds, lambda_eff\
+            = read_field(fname, alloc, mjds)
         all_targs.extend(cat_ids)
         all_cads.extend(cadences)
         all_mjds.extend(targ_mjds)
@@ -154,6 +181,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
         all_categories.extend(categories)
         all_ras.extend(ras)
         all_decs.extend(decs)
+        all_lambda_eff.extend(lambda_eff)
 
         # print(f["pk"], f["fieldid"], "GOT", len(ids), len(all_targs))
 
@@ -161,6 +189,19 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     assert len(all_targs) == len(all_mjds), "targ != mjd!!"
     assert len(all_targs) == len(all_field_ids), "targ != field!!"
 
+    for f, e, c in zip(fields_skipped, exps_skipped, cadences_skipped):
+        print(f, e, c)
+
+    dtype = sim_data.dtype.descr
+    dtype.append(('n_planned', '>i8'))
+    empty = np.zeros(len(sim_data), dtype)
+    for col in sim_data.dtype.names:
+        empty[col] = sim_data[col]
+    empty[n_planned] = n_planned
+    
+    fname = v_base + f"{plan}-{loc}-fieldsFinal-{N}.fits"
+
+    fitsio.write(fname, empty, clobber=True)
 
     # completeness = fitsio.read(rs_base + "{plan}/rsCompleteness-{plan}-{loc}.fits".format(
     #                                       loc=loc, plan=plan),
@@ -196,7 +237,8 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
              # ('assigned', np.int32),
              ('obs_mjd', np.float64),
              ('ra', np.float64),
-             ('dec', np.float64)]
+             ('dec', np.float64),
+             ('lambda_eff', np.float64)]
     obs_targs = np.zeros(len(all_targs), dtype=dtype)
 
     obs_targs["catalogid"] = all_targs
@@ -213,6 +255,7 @@ def countFields(res_base, rs_base, plan, version=None, loc="apo", N=0, save=True
     obs_targs["carton_pk"] = all_carton_pks
     obs_targs["ra"] = all_ras
     obs_targs["dec"] = all_decs
+    obs_targs["lambda_eff"] = all_lambda_eff
 
     # catch those -1 obs mjds!!! Oops
     # UPDATE: with rs*Final updates, this should be unnecessary, but harmless

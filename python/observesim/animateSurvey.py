@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 import os
-import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -70,7 +69,7 @@ def drawMoonish(phase, ax):
     ax.axis([-1, 1, -1, 1])
 
 
-def CountFramesAllSky(base, plan, version=None):
+def CountFramesAllSky(base, plan, rs_base, version=None, invert=False):
     if version is not None:
         v_base = os.path.join(base, version)
         v_base += "/"
@@ -79,6 +78,8 @@ def CountFramesAllSky(base, plan, version=None):
         v_base += "/"
 
     movieFrameDir = v_base + "moviePngsAllSky"
+    if invert:
+        movieFrameDir += "_invert"
 
     try:
         os.makedirs(movieFrameDir)
@@ -99,6 +100,43 @@ def CountFramesAllSky(base, plan, version=None):
     lco_observations = fitsio.read(v_base + f"{plan}-lco-observations-0.fits",
                                    columns=["field_pk", "mjd", "skybrightness"])
     lco_observe_fields = fitsio.read(v_base + f"{plan}-lco-fields-0.fits")
+
+    apo_alloc = fitsio.read(rs_base + f"{plan}/final/rsAllocationFinal-{plan}-apo.fits")
+    lco_alloc = fitsio.read(rs_base + f"{plan}/final/rsAllocationFinal-{plan}-lco.fits")
+
+    apo_n_planned = list()
+
+    for f in apo_observe_fields:
+        cad = f["cadence"]
+        fieldid = f["fieldid"]
+
+        w_alloc = np.where(np.logical_and(apo_alloc["fieldid"] == fieldid,
+                                          apo_alloc["cadence"] == cad))
+        alloc = apo_alloc[w_alloc]
+        if len(alloc["nallocated"]) != 1:
+            n = 0
+        else:
+            n = int(alloc["nallocated"][0])
+        apo_n_planned.append(n)
+    
+    lco_n_planned = list()
+
+    for f in lco_observe_fields:
+        cad = f["cadence"]
+        fieldid = f["fieldid"]
+
+        w_alloc = np.where(np.logical_and(lco_alloc["fieldid"] == fieldid,
+                                          lco_alloc["cadence"] == cad))
+        alloc = lco_alloc[w_alloc]
+        if len(alloc["nallocated"]) != 1:
+            n = 0
+        else:
+            n = int(alloc["nallocated"][0])
+        # print(alloc["fieldid"], fieldid, alloc["nallocated"])
+        lco_n_planned.append(n)
+
+    lco_n_planned = np.array(lco_n_planned)
+    apo_n_planned = np.array(apo_n_planned)
 
     # store the ra & decs of the fields as sky coordinate objects
     apo_ra = coord.Angle(-(apo_observe_fields['racen']+90)*u.degree)
@@ -125,24 +163,11 @@ def CountFramesAllSky(base, plan, version=None):
 
     print(f"counting fields obs from {min_mjd} to {max_mjd}; {survey_length/365.} years")
 
-    # count the number of nights & fields in this simulation
-    n_nights = np.ceil(max_mjd) - np.floor(min_mjd)
-    n_apo_fields = len(apo_observe_fields)
-    n_lco_fields = len(lco_observe_fields)
-
-    # make an array of all the nights
-    mjds = np.arange(min_mjd, min_mjd+n_nights, 1)
-
     scaleFunc = np.arctan
 
     # set a ceiling to allow the visit maps to saturate, so that RM fields don't break things
     ceil = 10.
     dark_ceil = scaleFunc(ceil)
-
-    bright_apo = np.extract(apo_observations["skybrightness"] > 0.35, apo_observations)
-    dark_apo = np.extract(apo_observations["skybrightness"] <= 0.35, apo_observations)
-    bright_lco = np.extract(lco_observations["skybrightness"] > 0.35, lco_observations)
-    dark_lco = np.extract(lco_observations["skybrightness"] <= 0.35, lco_observations)
 
     # calculate moon phases for everything
     days = np.arange(min_mjd - 1, max_mjd + 1, 0.1)
@@ -178,6 +203,10 @@ def CountFramesAllSky(base, plan, version=None):
         # count visits
         apo_visits = countFieldMjd(obs=apo_observations, field_ids=apo_field_ids, mjd=mjd)
         lco_visits = countFieldMjd(obs=lco_observations, field_ids=lco_field_ids, mjd=mjd)
+
+        if invert:
+            apo_visits = apo_n_planned - apo_visits
+            lco_visits = lco_n_planned - lco_visits
 
         cmap = "hot_r"
         mk = "D"
