@@ -211,7 +211,7 @@ class Observe(object):
         # self.bSN2 = SN2(fid_cdf=fid_data["b_fid"], fid_grid=fid_data["b_grid"])
 
         model_file = '/'.join(os.path.realpath(__file__).split('/')[0:-1]) + f"/etc/sn_models_{loc.lower()}.yml"
-        models = yaml.load(open(model_file))
+        models = yaml.load(open(model_file), Loader=yaml.FullLoader)
 
         # self.SN2 = simple_SN2(b_fit_coef=models["b"],
         #                       b_noise_coef=models["bnoise"],

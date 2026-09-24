@@ -22,21 +22,21 @@ def runSim(args):
     # ###################
     # make sure this starts a clean slate every run!
     # ###################
-    idx, base, plan, version, observatory, schedule, redo_exp, check, oldWeather, hist, rsFinal = args
+    idx, base, plan, version, observatory, schedule, redo_exp, check, hist, rsFinal, alt = args
 
     print(f"running {observatory} sim {plan} VER {version} seed {idx}")
 
     sim = simulation.Simulation(plan, observatory,
                                 idx=idx, schedule=schedule,
-                                redo_exp=redo_exp, oldWeather=oldWeather,
-                                with_hist=hist, rsFinal=rsFinal)
+                                redo_exp=redo_exp,
+                                with_hist=hist, rsFinal=rsFinal, alternate=alt)
 
     if hist:
         max_done_mjd = np.max(sim.scheduler.observations.mjd)
-        check_offset = int(max_done_mjd - np.min(sim.scheduler.mjds))
+        check_until = max_done_mjd + 30
     else:
         max_done_mjd = 0.0
-        check_offset = 0
+        check_until = np.min(sim.scheduler.mjds) + 30
     startTime = time.time()
     # Loop through nights
     with warnings.catch_warnings():
@@ -44,7 +44,7 @@ def runSim(args):
         for mjd in sim.scheduler.mjds:
             if mjd < max_done_mjd:
                 continue
-            if mjd > sim.scheduler.mjds[45+check_offset] and check:
+            if mjd > check_until and check:
                 continue
             sim.observeMJD(mjd)
 
@@ -88,6 +88,7 @@ def runSim(args):
 
     priorityLogName = observatory + str(idx)
     sim.scheduler.priorityLogger.write(name=priorityLogName)
+    sim.scheduler.idleLog.write(name=priorityLogName)
 
     if check:
         print("just a check, no figures needed")
@@ -97,9 +98,9 @@ def runSim(args):
     rs_base = os.getenv('OBSERVING_PLAN_DIR') + "/"
     base = os.getenv("OBSERVESIM_OUTPUT_BASE")
 
-    countFields(base, rs_base, plan, version=version, loc=observatory, N=idx)
+    # countFields(base, rs_base, plan, version=version, loc=observatory, N=idx)
 
-    quickSummary(base, plan, rs_base, version=version)
+    # quickSummary(base, plan, rs_base, version=version, hist_mjd=max_done_mjd)
 
     # cumulativePlot(base, plan, rs_base, version=version, loc=observatory)
     # spiders_area_for_program_time(base, rs_base, plan, version=version, loc=observatory)
@@ -138,6 +139,8 @@ parser.add_argument("--hist", dest="hist", action="store_true",
                     help="grab field info and history from DB")
 parser.add_argument("-f", "--final", dest="final", action="store_true",
                     help="don't use rsFinal version")
+parser.add_argument("-a", "--alt", dest="alt", action="store_true",
+                    help="alternate input directory")
                    # default is use final, it's usually what we want
 args = parser.parse_args()
 base = args.base
@@ -151,6 +154,7 @@ check = args.check
 oldWeather = args.weather
 hist = args.hist
 rsFinal = not args.final
+alt = args.alt
 
 if base is None:
     base = os.getenv("OBSERVESIM_OUTPUT_BASE")
@@ -168,4 +172,4 @@ base += "/"
 
 os.environ["RS_OUTDIR"] = base
 
-runSim((number, base, plan, version, observatory, schedule, redo_exp, check, oldWeather, hist, rsFinal))
+runSim((number, base, plan, version, observatory, schedule, redo_exp, check, hist, rsFinal, alt))

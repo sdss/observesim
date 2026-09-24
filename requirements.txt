@@ -8,4 +8,5 @@ pygments
 matplotlib
 shapely
 click
--e git://github.com/albireox/fitsio.git#egg=fitsio
+healpy
+astroplan

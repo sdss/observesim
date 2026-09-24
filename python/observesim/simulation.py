@@ -79,9 +79,9 @@ class Simulation(object):
     """A class to encapsulate an SDSS-5 simulation
     """
 
-    def __init__(self, plan, observatory, idx=1, schedule="normal", redo_exp=True,
-                 oldWeather=False, with_hist=False, rsFinal=True,
-                 hist_plan="theta-3"):
+    def __init__(self, plan, observatory, idx=1, schedule="normal", redo_exp=False,
+                 with_hist=False, rsFinal=False,
+                 hist_plan="null", alternate=False):
 
         out_path = os.getenv('RS_OUTDIR')
         cfg_file = os.path.join(out_path, "sim_cfg.yml")
@@ -132,7 +132,9 @@ class Simulation(object):
                         "weather": list(),
                         "mjd": list(),
                         "duration": list(),
-                        "mode": list()}
+                        "mode": list(),
+                        "cadence": list(),
+                        "remaining_dark_lst": list()}
 
         out_path = os.getenv('RS_OUTDIR')
         priority_file = os.path.join(out_path, "priority.yml")
@@ -141,6 +143,12 @@ class Simulation(object):
             priorities = yaml.load(open(priority_file), Loader=yaml.FullLoader)
         else:
             priorities = dict()
+
+        priority_file = os.path.join(out_path, "priority_fields.yml")
+        if os.path.isfile(priority_file):
+            self.priority_fields = yaml.load(open(priority_file), Loader=yaml.FullLoader)
+        else:
+            self.priority_fields = dict()
 
         print(f"Schedule!! {schedule}")
 
@@ -159,7 +167,8 @@ class Simulation(object):
         #                           realDesigns=all_designs,
         #                           fromFits=True)
         # else:
-        self.scheduler.initdb(designbase=plan, rsFinal=rsFinal, fromFits=True)
+        self.scheduler.initdb(designbase=plan, rsFinal=rsFinal, fromFits=True,
+                              alternate_input=alternate)
         self.field_ra = self.scheduler.fields.racen
         self.field_dec = self.scheduler.fields.deccen
         self.field_pk = self.scheduler.fields.pk
@@ -188,13 +197,6 @@ class Simulation(object):
         self.redo_b = 0
         self.finished_early = 0
 
-        rm_translate = {
-            112359: 104667,
-            112360: 104668,
-            112361: 104669,
-            112362: 112358
-        }
-
         if with_hist:
             field_mjds = doneForObs(obs=observatory.upper(),
                                     plan=hist_plan)
@@ -212,7 +214,9 @@ class Simulation(object):
                     fid = rm_translate[f["field_id"]]
                 else:
                     fid = f["field_id"]
-                w_field = np.where(self.scheduler.fields.field_id == fid)
+                w_field = np.where(np.logical_and(self.scheduler.fields.field_id == fid,
+                                                  np.invert(self.scheduler.fields.overplan.astype(bool))))
+
                 # assert len(w_field[0]) > 0, f"field lost? {f['field_id']}"
                 if len(w_field[0]) == 0:
                     continue
@@ -237,22 +241,14 @@ class Simulation(object):
 
         weather_start = np.max(self.scheduler.observations.mjd) - 1
 
-        if observatory == "lco" and not oldWeather:
-            base = os.getenv("OBSERVESIM_OUTPUT_BASE")
-            modelsDir = os.path.join(base, "weather_models")
-            fname = os.path.join(modelsDir, f"saved_model_{observatory}_{idx}.csv")
-            self.weather = observesim.weather.Weather3(mjd_start=weather_start,
-                                                       mjd_end=self.scheduler.end,
-                                                       model_fname=fname)
-        elif not oldWeather:
-            self.weather = observesim.weather.Weather2(mjd_start=weather_start,
-                                                       mjd_end=self.scheduler.end,
-                                                       seed=idx, loc=observatory)
+        self.weather = observesim.weather.Weather(mjd_start=self.scheduler.start,
+                                                  mjd_end=self.scheduler.end,
+                                                  seed=idx, fclear=fclear)
 
-        else:
-            self.weather = observesim.weather.Weather(mjd_start=weather_start,
-                                                      mjd_end=self.scheduler.end,
-                                                      seed=idx, fclear=fclear)
+        wv = np.where(~self.scheduler.fields.validCadence)
+        print("Invalid cadences:", wv)
+        # for n in wv[0]:
+        #     print(self.scheduler.fields.validCadence[n], self.scheduler.fields.cadence[n])
 
     def whichTwilight(self, mjd):
         startTime = Time(mjd, format="mjd").datetime
@@ -350,19 +346,20 @@ class Simulation(object):
         skybrightness = self.scheduler.skybrightness(mjd)
         return skybrightness > 0.35
 
-    def nextField(self, pks_tonight=[]):
+    def nextField(self):
         # dark time or brighttime? to guess at how long we need for obs
         if not self.bright():
             airmass_weight = 1.05
         else:
             airmass_weight = 0.05
         # integer division floors; no partial exposures
+        # this now penalizes LCO a bit more, but maybe that's not a big deal
         maxExp = int((self.nextchange - self.curr_mjd)//(self.nom_duration * 1.3 ** airmass_weight))
         if maxExp == 0:
             # self.curr_mjd = self.curr_mjd + self.nom_duration
             return -1, 1, True
         field_pk, nexposures = self.scheduler.nextfield(mjd=self.curr_mjd,
-                                                        maxExp=maxExp, ignore=pks_tonight)
+                                                        maxExp=maxExp)
         # assert fieldid is not None, f"can't schedule {self.curr_mjd}, {self.bright()}"
         if(field_pk is not None):
             fieldidx = np.where(self.field_pk == field_pk)[0]
@@ -402,8 +399,12 @@ class Simulation(object):
 
             return field_pk, nexposures, False
         else:
+            args = self.scheduler.observable(mjd=self.curr_mjd,
+                                             maxExp=maxExp, ignore=pks_tonight,
+                                             idle=True)
+            print("IDLE", self.curr_mjd)
             # if not self.bright():
-            #     assert False, f"{self.curr_mjd} ugh"
+            # assert False, f"{self.curr_mjd} ugh"
             return -1, 1, False
 
     def bookKeeping(self, fieldidx, i=-1, cloudy=False):
@@ -427,10 +428,14 @@ class Simulation(object):
         mode = "bright"
         if "dark" in cad:
             mode = "dark"
-            duration += self.dark_xtra + self.field_overhead
+            duration += self.dark_xtra  # dark extra, i.e. 3 minutes more than bright at APO
+        elif "double" in cad:
+            duration *= 2
         if duration < 0 or np.isnan(duration):
             print("HOOOWWWOWOWOWOWW")
-            print(i, alt, az, self.curr_mjd, field_pk)
+            print(i, alt, az, self.curr_mjd)
+
+        dark_now = self.scheduler.skybrightness(self.curr_mjd) < 0.35
 
         # self.curr_mjd = self.curr_mjd + duration + self.bossReadout
         self.curr_mjd = self.curr_mjd + duration
@@ -439,14 +444,26 @@ class Simulation(object):
         # move telescope for tracking
         self.moveTelescope(self.curr_mjd, fieldidx)
 
+        remaining_dark_lst = 9999
+        if mode == "bright" and dark_now:
+            lstHist = self.scheduler.fields.lstObserved[fieldidx][:, 0]
+            lstPlan = self.scheduler.fields.slots[fieldidx][:, 0]
+            diff = lstPlan - lstHist
+            # w_plan = np.where(lstPlan)
+            # if np.any(diff < 0):
+            #     print("Dark LST alloc violation: \n", diff)
+            remaining_dark_lst = np.sum(diff)
+
         self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
         self.obsHist["ra"].append(self.field_ra[fieldidx])
-        self.obsHist["bright"].append(self.scheduler.skybrightness(self.curr_mjd))
-        self.obsHist["field_pk"].append(self.field_pk[fieldidx])
+        self.obsHist["bright"].append(float(self.scheduler.skybrightness(self.curr_mjd)))
+        self.obsHist["field_pk"].append(float(self.field_pk[fieldidx]))
         self.obsHist["weather"].append(False)
         self.obsHist["mjd"].append(float(self.curr_mjd))
-        self.obsHist["duration"].append(duration)
+        self.obsHist["duration"].append(float(duration))
         self.obsHist["mode"].append(mode)
+        self.obsHist["cadence"].append(cad)
+        self.obsHist["remaining_dark_lst"].append(remaining_dark_lst)
 
         return result
 
@@ -530,10 +547,23 @@ class Simulation(object):
                     self.scheduler.update(field_pk=field_pk, result=res,
                                           finish=True)
 
+    def updatePriorities(self):
+        for fid, props in self.priority_fields.items():
+            w = np.where(np.logical_and(self.scheduler.fields.field_id == fid,
+                        [c == props["cadence"] for c in self.scheduler.fields.cadence]))
+            if len(w[0]) == 0:
+                return None
+            nexp = len(self.scheduler.fields.observations[w[0][0]])
+            if nexp >= props["nexp"]:
+                self.scheduler.fields.basePriority[w] = 1
+        if not np.any(self.scheduler.fields.basePriority > 1):
+            self.priority_fields = {}
+
     def observeMJD(self, mjd):
         mjd_evening_twilight, mjd_morning_twilight = self.whichTwilight(mjd)
         self.curr_mjd = mjd_evening_twilight
         # int_mjd = int(self.curr_mjd)
+        self.updatePriorities()
 
         surveyGoal = np.sum(self.scheduler.fields.slots)
         surveyDone = np.sum([len(self.scheduler.fields.hist[i]) for i in self.scheduler.fields.pk])
@@ -580,6 +610,8 @@ class Simulation(object):
                     self.obsHist["mjd"].append(float(self.curr_mjd))
                     self.obsHist["duration"].append(duration)
                     self.obsHist["mode"].append("weather")
+                    self.obsHist["cadence"].append("weather")
+                    self.obsHist["remaining_dark_lst"].append(9999)
                     self.curr_mjd += duration
                     # count += 1
                 # print("WEATHER ", self.curr_mjd, f"night {night_len*24:.1f}, weather {dur*24:.1f}", count)
@@ -593,8 +625,7 @@ class Simulation(object):
             if self.scheduler.skybrightness(self.curr_mjd) > this_moon:
                 this_moon = self.scheduler.skybrightness(self.curr_mjd)
 
-            assert len(pks_tonight) < 50, "pks_tonight got too big, did it not reset?"
-            field_pk, nexposures, noTime = self.nextField(pks_tonight=pks_tonight)
+            field_pk, nexposures, noTime = self.nextField()
             if field_pk == -1:
                 # if noTime:
                 #     self.curr_mjd = self.curr_mjd + self.nom_duration
@@ -602,21 +633,28 @@ class Simulation(object):
                 if this_moon < 0.98:
                     print("skipped ", self.curr_mjd, self.scheduler.skybrightness(self.curr_mjd), this_moon)
                     # raise Exception()
-                # print("skipped ", self.curr_mjd)
-                duration = self.nom_duration + self.design_overhead
-                self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
-                self.obsHist["ra"].append(np.nan)
-                self.obsHist["bright"].append(float(this_moon))
-                self.obsHist["field_pk"].append(-1)
-                self.obsHist["weather"].append(False)
-                self.obsHist["mjd"].append(float(self.curr_mjd))
-                self.obsHist["duration"].append(duration)
-                self.obsHist["mode"].append("idle")
+                if nexposures >= 1 and not noTime:
+                    print("skipped ", self.curr_mjd)
+                    duration = self.nom_duration + self.design_overhead
+                    self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
+                    self.obsHist["ra"].append(np.nan)
+                    self.obsHist["bright"].append(float(this_moon))
+                    self.obsHist["field_pk"].append(-1)
+                    self.obsHist["weather"].append(False)
+                    self.obsHist["mjd"].append(float(self.curr_mjd))
+                    self.obsHist["duration"].append(duration)
+                    self.obsHist["mode"].append("idle")
+                    self.obsHist["cadence"].append("idle")
+                    self.obsHist["remaining_dark_lst"].append(9999)
+                else:
+                    duration = self.design_overhead
+                    # print("skipped", self.curr_mjd, "site obs or something, don't log")
+
                 self.curr_mjd += duration
-                assert np.abs(self.curr_mjd - self.obsHist["mjd"][-1])*24*60 > 14.9, f"{self.curr_mjd} insufficient skip {this_moon}"
+                # assert np.abs(self.curr_mjd - self.obsHist["mjd"][-1])*24*60 > 14.9, f"{self.curr_mjd} insufficient skip {this_moon}"
                 continue
             self.observeField(field_pk, nexposures, cloudy=cloudy)
-            pks_tonight.append(field_pk)
+            # pks_tonight.append(field_pk)
 
         # if mjd % 10 == 0:
         #     self.scheduler.priorityLogger.write(name=str(mjd) + "-" + self.observatory.name)
@@ -630,7 +668,9 @@ class Simulation(object):
                  ('weather', np.bool_),
                  ('mjd', np.float64),
                  ('duration', np.float64),
-                 ('mode', np.dtype('a8'))]
+                 ('mode', np.dtype('a8')),
+                 ('cadence', np.dtype('a40')),
+                 ('remaining_dark_lst', np.int32)]
         lstOut = np.zeros(len(self.obsHist["lst"]), dtype=dtype)
         lstOut["lst"] = np.array(self.obsHist["lst"])
         lstOut["ra"] = np.array(self.obsHist["ra"])
@@ -640,6 +680,9 @@ class Simulation(object):
         lstOut["mjd"] = np.array(self.obsHist["mjd"])
         lstOut["duration"] = np.array(self.obsHist["duration"])
         lstOut["mode"] = np.array(self.obsHist["mode"])
+        lstOut["cadence"] = np.array(self.obsHist["cadence"])
+        lstOut["remaining_dark_lst"] = np.array(self.obsHist["remaining_dark_lst"])
+
         return(lstOut)
 
     def slewsToArray(self):
