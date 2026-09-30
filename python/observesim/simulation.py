@@ -80,8 +80,7 @@ class Simulation(object):
     """
 
     def __init__(self, plan, observatory, idx=1, schedule="normal", redo_exp=False,
-                 with_hist=False, rsFinal=False,
-                 hist_plan="null", alternate=False):
+                 with_hist=False, hist_plan="null", alternate=False):
 
         out_path = os.getenv('RS_OUTDIR')
         cfg_file = os.path.join(out_path, "sim_cfg.yml")
@@ -167,7 +166,7 @@ class Simulation(object):
         #                           realDesigns=all_designs,
         #                           fromFits=True)
         # else:
-        self.scheduler.initdb(designbase=plan, rsFinal=rsFinal, fromFits=True,
+        self.scheduler.initdb(designbase=plan, fromFits=True,
                               alternate_input=alternate)
         self.field_ra = self.scheduler.fields.racen
         self.field_dec = self.scheduler.fields.deccen
@@ -239,16 +238,14 @@ class Simulation(object):
                 self.scheduler.update(field_pk=use_pk, result=result,
                                       finish=True)
 
-        weather_start = np.max(self.scheduler.observations.mjd) - 1
-
         self.weather = observesim.weather.Weather(mjd_start=self.scheduler.start,
                                                   mjd_end=self.scheduler.end,
                                                   seed=idx, fclear=fclear)
 
         wv = np.where(~self.scheduler.fields.validCadence)
         print("Invalid cadences:", wv)
-        # for n in wv[0]:
-        #     print(self.scheduler.fields.validCadence[n], self.scheduler.fields.cadence[n])
+        for n in wv[0]:
+            print(self.scheduler.fields.validCadence[n], self.scheduler.fields.cadence[n])
 
     def whichTwilight(self, mjd):
         startTime = Time(mjd, format="mjd").datetime
@@ -400,9 +397,9 @@ class Simulation(object):
             return field_pk, nexposures, False
         else:
             args = self.scheduler.observable(mjd=self.curr_mjd,
-                                             maxExp=maxExp, ignore=pks_tonight,
+                                             maxExp=maxExp,
                                              idle=True)
-            print("IDLE", self.curr_mjd)
+            # print("IDLE", self.curr_mjd)
             # if not self.bright():
             # assert False, f"{self.curr_mjd} ugh"
             return -1, 1, False
@@ -445,14 +442,14 @@ class Simulation(object):
         self.moveTelescope(self.curr_mjd, fieldidx)
 
         remaining_dark_lst = 9999
-        if mode == "bright" and dark_now:
-            lstHist = self.scheduler.fields.lstObserved[fieldidx][:, 0]
-            lstPlan = self.scheduler.fields.slots[fieldidx][:, 0]
-            diff = lstPlan - lstHist
-            # w_plan = np.where(lstPlan)
-            # if np.any(diff < 0):
-            #     print("Dark LST alloc violation: \n", diff)
-            remaining_dark_lst = np.sum(diff)
+        # if mode == "bright" and dark_now:
+        #     lstHist = self.scheduler.fields.lstObserved[fieldidx][:, 0]
+        #     lstPlan = self.scheduler.fields.slots[fieldidx][:, 0]
+        #     diff = lstPlan - lstHist
+        #     # w_plan = np.where(lstPlan)
+        #     # if np.any(diff < 0):
+        #     #     print("Dark LST alloc violation: \n", diff)
+        #     remaining_dark_lst = np.sum(diff)
 
         self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
         self.obsHist["ra"].append(self.field_ra[fieldidx])
@@ -565,7 +562,7 @@ class Simulation(object):
         # int_mjd = int(self.curr_mjd)
         self.updatePriorities()
 
-        surveyGoal = np.sum(self.scheduler.fields.slots)
+        surveyGoal = np.sum(self.scheduler.fields.nfilled)
         surveyDone = np.sum([len(self.scheduler.fields.hist[i]) for i in self.scheduler.fields.pk])
 
         self.scheduler.surveyComplete = surveyDone / surveyGoal
@@ -630,11 +627,11 @@ class Simulation(object):
                 # if noTime:
                 #     self.curr_mjd = self.curr_mjd + self.nom_duration
                 #     continue
-                if this_moon < 0.98:
-                    print("skipped ", self.curr_mjd, self.scheduler.skybrightness(self.curr_mjd), this_moon)
+                # if this_moon < 0.98:
+                #     print(" ", self.curr_mjd, self.scheduler.skybrightness(self.curr_mjd), this_moon)
                     # raise Exception()
                 if nexposures >= 1 and not noTime:
-                    print("skipped ", self.curr_mjd)
+                    # print("skipped ", self.curr_mjd)
                     duration = self.nom_duration + self.design_overhead
                     self.obsHist["lst"].append(self.scheduler.lst(self.curr_mjd)[0])
                     self.obsHist["ra"].append(np.nan)

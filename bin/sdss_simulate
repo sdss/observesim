@@ -22,14 +22,14 @@ def runSim(args):
     # ###################
     # make sure this starts a clean slate every run!
     # ###################
-    idx, base, plan, version, observatory, schedule, redo_exp, check, hist, rsFinal, alt = args
+    idx, base, plan, version, observatory, schedule, redo_exp, check, hist, alt = args
 
     print(f"running {observatory} sim {plan} VER {version} seed {idx}")
 
     sim = simulation.Simulation(plan, observatory,
                                 idx=idx, schedule=schedule,
                                 redo_exp=redo_exp,
-                                with_hist=hist, rsFinal=rsFinal, alternate=alt)
+                                with_hist=hist, alternate=alt)
 
     if hist:
         max_done_mjd = np.max(sim.scheduler.observations.mjd)
@@ -128,17 +128,13 @@ parser.add_argument("-v", "--version", dest="version", type=str,
                     default=None)
 parser.add_argument("-s", "--schedule", dest="schedule", type=str,
                     required=False, help="master schedule to use",
-                    default="v6")
+                    default="normal")
 parser.add_argument("-r", "--redo", dest="redo_exp", action="store_true",
                     help="redo exposures if snr below threshold")
 parser.add_argument("-c", "--check", dest="check", action="store_true",
                     help="do minimal sim to check changes")
-parser.add_argument("-w", "--weather", dest="weather", action="store_true",
-                    help="user old weather model")
 parser.add_argument("--hist", dest="hist", action="store_true",
                     help="grab field info and history from DB")
-parser.add_argument("-f", "--final", dest="final", action="store_true",
-                    help="don't use rsFinal version")
 parser.add_argument("-a", "--alt", dest="alt", action="store_true",
                     help="alternate input directory")
                    # default is use final, it's usually what we want
@@ -151,9 +147,7 @@ version = args.version
 schedule = args.schedule
 redo_exp = args.redo_exp
 check = args.check
-oldWeather = args.weather
 hist = args.hist
-rsFinal = not args.final
 alt = args.alt
 
 if base is None:
@@ -172,4 +166,4 @@ base += "/"
 
 os.environ["RS_OUTDIR"] = base
 
-runSim((number, base, plan, version, observatory, schedule, redo_exp, check, hist, rsFinal, alt))
+runSim((number, base, plan, version, observatory, schedule, redo_exp, check, hist, alt))

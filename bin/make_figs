@@ -4,9 +4,10 @@ import os, sys
 import subprocess
 import argparse
 
-from observesim.output import *
-from observesim.cumulative_plots import *
-from observesim.stats import quickSummary, multiQuickSummary
+# from observesim.output import *
+# from observesim.cumulative_plots import *
+# from observesim.stats import quickSummary, multiQuickSummary
+from observesim.as5 import quickSummary, multiQuickSummary
 from observesim.animateSurvey import CountFramesAllSky
 
 
@@ -43,8 +44,6 @@ if __name__ == "__main__":
                         help="redo all plots, adds 15+ min")
     parser.add_argument("-w", "--w", dest="web", action="store_true",
                         help="regenerate webpage only")
-    parser.add_argument("--hist", dest="hist", type=int,
-                        help="mjd to use obs hist until")
     parser.add_argument("-n", "--num", dest="num", type=int,
                         required=True, help="number of sims",
                         default=1)
@@ -60,7 +59,6 @@ if __name__ == "__main__":
     recount = args.count
     draw_all = args.all
     web = args.web
-    hist = args.hist
     slow = False
     num = args.num
     location = args.location
@@ -77,21 +75,7 @@ if __name__ == "__main__":
     assert base is not None, "must specify result base"
     assert rs_base is not None, "must specify roboscheduler result base"
 
-    # print("drawing old figs for {}".format(plan))
-    # doHist(base, rs_base, plan, version=version, loc="lco")
-    # doHist(base, rs_base, plan, version=version, loc="apo")
-    multiQuickSummary(base, plan, rs_base, version=version, hist_mjd=hist, n=num, loc=location)
-    # quickSummary(base, plan, rs_base, version=version, hist_mjd=hist)
-    # spiders_area_for_program_time(base, rs_base, plan, version=version, loc="lco")
-    # spiders_area_for_program_time(base, rs_base, plan, version=version, loc="apo")
-    # cumulativePlot(base, plan, rs_base, version=version, loc="apo")
-    # cumulativePlot(base, plan, rs_base, version=version, loc="lco")
-    # runAllCumulativeEpochs(base, plan, version=version)
-    # cumulativeWebpage(base, plan, version=version)
-    # cartonCoverageByYearMaps(base, plan, rs_base, version=version)
-    # cartonCoverageCumulative(base, plan, version=version,
-    #                           cartons=["bhm_aqmes_bonus_faint", "bhm_csc_boss"])
-    # sys.exit(0)
+    multiQuickSummary(base, plan, rs_base, version=version, n=num, loc=location)
 
     if web:
         writeWebPage(base, rs_base, plan, version=version)
@@ -125,9 +109,6 @@ if __name__ == "__main__":
         print("drawing old figs for {}".format(plan))
         doHist(base, rs_base, plan, version=version, loc="lco")
         doHist(base, rs_base, plan, version=version, loc="apo")
-
-    if slow:
-        cartonCoverageByYearMaps(base, plan, rs_base, version=version)
 
     # print("creating target metrics for {}".format(plan))
     # # plotTargMetric(base, rs_base, plan, version=version, reqs_file=None)
