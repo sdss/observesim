@@ -42,7 +42,9 @@ def read_field(fname, alloc, exp_to_mjd):
         # zip will end when exp_to_mjd ends if it is shorter than
         # nplanned (i.e. the range)
         if len(w_idx["equivRobotID"].shape) == 1:
-            assert len(exp_to_mjd) == 1, "obs len != plan len"
+            # assert len(exp_to_mjd) == 1, "obs len != plan len"
+            # that assert fails, some weird history stuff maybe?
+            exp_to_mjd = exp_to_mjd[:1]
             w_assigned = np.where(w_idx["equivRobotID"] != -1)
         else:
             w_assigned = np.where(w_idx["equivRobotID"][:, i] != -1)

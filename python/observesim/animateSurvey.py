@@ -208,7 +208,7 @@ def CountFramesAllSky(base, plan, rs_base, version=None, invert=False):
             apo_visits = apo_n_planned - apo_visits
             lco_visits = lco_n_planned - lco_visits
 
-        cmap = "hot_r"
+        cmap = "hot_r" #gnuplot, berlin
         mk = "D"
 
         im = ax1.scatter(apo_both_ra.radian, apo_both_dec.radian, s=2.7, c=scaleFunc(apo_visits),

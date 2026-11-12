@@ -101,7 +101,7 @@ def doneForObs(obs="APO", plan="eta-9"):
     complete = Status.get(label="done")
 
     query = d2s.select(Field.field_id,
-                       Field.racen, Field.deccen,
+                       Field.racen, Field.deccen, Field.overplan_pk,
                        d2s.mjd, Cadence.label.alias("cadence"),
                        d2s.design_id, d2f.field_exposure)\
                .join(d2f, on=(d2f.design_id == d2s.design_id))\
